@@ -1,0 +1,63 @@
+# ===== Java =====
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+
+# ===== Maven =====
+.mvn/
+mvnw
+mvnw.cmd
+*.log
+
+# ===== Node / 前端 =====
+node_modules/
+dist/
+.output/
+.nuxt/
+*.tsbuildinfo
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ===== IDE =====
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# ===== 环境变量（含密钥，绝对不能提交）=====
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ===== OS 杂项 =====
+.DS_Store
+Thumbs.db
+*.tmp
+
+# ===== Docker =====
+docker-compose.override.yml
+
+# ===== 测试产物 =====
+hs_err_pid*
+replay_pid*
+jacoco.exec
+coverage/
+
+# ===== 数据 =====
+data/
+*.db

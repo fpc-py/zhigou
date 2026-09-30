@@ -1,7 +1,5 @@
 # 智购项目 · CLAUDE.md
 
-> 本文件是 Claude Code 在本仓库工作时必须遵守的硬约束。每次新会话启动，Claude Code 会自动读本文件。
-> 你（人类开发者）发现它做错事，就把规则补在这里；它下次就不会再犯。
 
 ## 项目一句话
 
@@ -127,6 +125,14 @@ chore: 升级 spring-boot 到 3.2.5
 ```
 
 每次提交必须能独立通过构建。
+
+## 规则文件（每次会话必须阅读）
+
+以下文件包含与 CLAUDE.md 同等效力的硬约束，开工前必须读：
+
+- `.claude/rules/security.md` — 安全红线（数据保护、鉴权、密钥、SQL）
+- `.claude/rules/git-workflow.md` — Git 工作流（分支策略、PR 流程、回滚）
+- `.claude/rules/observability.md` — 可观测性（日志格式、指标、链路追踪、告警）
 
 ## 你（Claude Code）的工作方式
 

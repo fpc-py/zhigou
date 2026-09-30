@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {"matcher": "", "command": "bash .claude/hooks/session-start-context.sh"}
+    ],
+    "PostToolUse": [
+      {"matcher": "Edit|Write", "command": "bash .claude/hooks/post-edit-lint.sh"}
+    ],
+    "PreToolUse": [
+      {"matcher": "Bash", "command": "bash .claude/hooks/pre-commit-format.sh"}
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(docker compose:*)",
+      "Bash(mvn:*)",
+      "Bash(pnpm:*)",
+      "Bash(npm:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)"
+    ]
+  }
+}
