@@ -1,0 +1,28 @@
+server.port: ${SERVER_PORT:8090}
+spring:
+  application.name: aftersale-service
+  cloud.openfeign.client.config.default:
+    connectTimeout: 300
+    readTimeout: 300
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3307/zhigou?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:123456}
+  data.redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    table: flyway_aftersale_history
+    baseline-on-migrate: true
+    repair-on-migrate: true
+mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+order-service.url: ${ORDER_SERVICE_URL:http://localhost:8085}
