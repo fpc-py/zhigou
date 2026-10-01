@@ -1,0 +1,28 @@
+package com.zhigou.cart.interceptor;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+
+@Slf4j @Component
+public class UserIdInterceptor implements HandlerInterceptor {
+    @Value("${jwt.secret}") private String jwtSecret;
+
+    @Override public boolean preHandle(HttpServletRequest req, HttpServletResponse res, Object h) {
+        String header = req.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) return true;
+        try {
+            Claims c = Jwts.parser().verifyWith(new SecretKeySpec(jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256")).build().parseSignedClaims(header.substring(7)).getPayload();
+            UserContext.set(Long.valueOf(c.getSubject()));
+        } catch (Exception e) { log.warn("JWT 解析失败: {}", e.getMessage()); }
+        return true;
+    }
+    @Override public void afterCompletion(HttpServletRequest req, HttpServletResponse res, Object h, Exception ex) { UserContext.clear(); }
+}

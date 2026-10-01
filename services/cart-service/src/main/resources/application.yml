@@ -1,0 +1,10 @@
+server.port: ${SERVER_PORT:8084}
+spring:
+  application.name: cart-service
+  data.redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+springdoc.swagger-ui.path: /swagger-ui.html
+knife4j.enable: true
+jwt.secret: ${JWT_SECRET:change-me-to-a-random-256-bit-string}
+product-service.url: ${PRODUCT_SERVICE_URL:http://localhost:8083}

@@ -1,0 +1,7 @@
+spring:
+  config.activate.on-profile: test
+  data.redis:
+    host: ${spring.data.redis.host}
+    port: ${spring.data.redis.port}
+jwt.secret: test-jwt-secret-for-cart-service!!
+product-service.url: http://localhost:9999
