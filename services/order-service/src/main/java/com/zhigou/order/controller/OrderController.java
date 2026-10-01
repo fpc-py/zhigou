@@ -23,4 +23,14 @@ public class OrderController {
     public Result<Void> cancel(@PathVariable("id") Long id) {
         orderService.cancel(10001L, id); return Result.ok();
     }
+
+    @Operation(summary = "支付回调") @PostMapping("/payCallback/{orderId}")
+    public Result<Void> payCallback(@PathVariable Long orderId) {
+        orderService.payCallback(orderId); return Result.ok();
+    }
+
+    @Operation(summary = "订单详情") @GetMapping("/{orderId}")
+    public Result<OrderResponse> detail(@PathVariable Long orderId) {
+        return Result.ok(orderService.getByOrderId(orderId));
+    }
 }

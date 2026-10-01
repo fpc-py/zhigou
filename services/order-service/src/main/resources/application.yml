@@ -12,6 +12,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    table: flyway_order_history
     baseline-on-migrate: true
     repair-on-migrate: true
 mybatis-plus.global-config.db-config:
