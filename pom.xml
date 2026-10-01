@@ -16,6 +16,7 @@
         <!-- 微服务 -->
         <module>services/auth-center</module>
         <module>services/user-service</module>
+        <module>services/file-service</module>
         <module>services/product-service</module>
         <module>services/cart-service</module>
         <module>services/order-service</module>
