@@ -1,0 +1,118 @@
+# ============================================================
+# 智购 · 本地开发中间件编排
+#
+# 启动: docker compose -f infra/compose/middleware.yml up -d
+# 停止: docker compose -f infra/compose/middleware.yml down
+# 清数据: docker compose -f infra/compose/middleware.yml down -v
+# ============================================================
+
+services:
+  # ==================== MySQL 8.0 ====================
+  mysql:
+    image: mysql:8.0
+    container_name: zhigou-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: zhigou
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d   # 初始化脚本（可选）
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-time-zone=+08:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ==================== Redis 7 ====================
+  redis:
+    image: redis:7-alpine
+    container_name: zhigou-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # ==================== RocketMQ 5.x ====================
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.0
+    container_name: zhigou-rocketmq-namesrv
+    restart: unless-stopped
+    ports:
+      - "9876:9876"
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m"
+    command: sh mqnamesrv
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/9876'"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.0
+    container_name: zhigou-rocketmq-broker
+    restart: unless-stopped
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+      - "10912:10912"
+    environment:
+      NAMESRV_ADDR: "rocketmq-namesrv:9876"
+      JAVA_OPT_EXT: "-Xms512m -Xmx512m"
+    command: sh mqbroker -n rocketmq-namesrv:9876 --enable-proxy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/10911'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ==================== MinIO ====================
+  minio:
+    image: minio/minio:latest
+    container_name: zhigou-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# ==================== 卷 ====================
+volumes:
+  mysql-data:
+  redis-data:
+  minio-data:
