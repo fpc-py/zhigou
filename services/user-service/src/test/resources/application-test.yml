@@ -1,0 +1,26 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: ${TEST_JDBC_URL}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: test
+    password: test
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: ${spring.data.redis.host}
+      port: ${spring.data.redis.port}
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+jwt:
+  secret: test-jwt-secret-for-user-service!
+
+phone:
+  secret: phone-secret-test

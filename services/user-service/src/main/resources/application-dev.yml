@@ -1,0 +1,12 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+server:
+  port: ${SERVER_PORT:8081}
+
+# dev 环境可在此覆盖任何配置，如 debug 日志
+logging:
+  level:
+    com.zhigou: DEBUG

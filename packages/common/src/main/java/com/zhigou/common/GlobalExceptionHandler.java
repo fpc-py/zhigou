@@ -1,7 +1,5 @@
-package com.zhigou.auth.exception;
+package com.zhigou.common;
 
-import com.zhigou.common.BizException;
-import com.zhigou.common.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
