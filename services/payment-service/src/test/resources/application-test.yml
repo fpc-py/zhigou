@@ -1,0 +1,12 @@
+spring:
+  config.activate.on-profile: test
+  datasource:
+    url: ${TEST_JDBC_URL}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: test
+    password: test
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    repair-on-migrate: true
+payment.sandbox-secret: test-sandbox-secret
