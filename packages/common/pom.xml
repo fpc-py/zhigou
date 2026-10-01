@@ -12,4 +12,11 @@
     <artifactId>zhigou-common</artifactId>
     <packaging>jar</packaging>
     <name>智购 · 公共库</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+    </dependencies>
 </project>
