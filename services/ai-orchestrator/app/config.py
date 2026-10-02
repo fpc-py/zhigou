@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     # ── JWT（用于转发认证） ──
     jwt_secret: str = "change-me-to-a-random-256-bit-string"
 
+    # ── pgvector ──
+    pg_dsn: str = "postgresql+asyncpg://zhigou:zhigou123@localhost:5432/zhigou_rag"
+
+    # ── Embedding ──
+    embedding_model: str = "text-embedding-v4"
+    embedding_dim: int = 1536
+
+    # ── RocketMQ ──
+    rocketmq_namesrv: str = "localhost:9876"
+
     model_config = {"env_prefix": "ZHIGOU_", "env_file": ".env", "extra": "ignore"}
 
 

@@ -111,8 +111,29 @@ services:
       retries: 5
       start_period: 10s
 
+# ==================== PostgreSQL 16 + pgvector ====================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: zhigou-pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zhigou_rag
+      POSTGRES_USER: zhigou
+      POSTGRES_PASSWORD: zhigou123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zhigou -d zhigou_rag"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 # ==================== 卷 ====================
 volumes:
   mysql-data:
   redis-data:
   minio-data:
+  pgvector-data:

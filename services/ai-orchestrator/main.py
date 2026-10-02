@@ -16,6 +16,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from app.api import router as chat_router
 from app.config import settings
 
+from app.rag.router import router as rag_router
+from app.rag.service import init_db
+from app.rag.mq_consumer import start_mq_consumer_thread
+
 # ── 日志配置 ──
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -42,6 +46,23 @@ app.add_middleware(
 
 # ── 路由注册 ──
 app.include_router(chat_router, prefix="/api/v1")
+app.include_router(rag_router)
+
+
+@app.on_event("startup")
+async def startup():
+    """启动时初始化 pgvector 表和 MQ 消费者。"""
+    try:
+        await init_db()
+        logger.info("pgvector 初始化完成")
+    except Exception as e:
+        logger.warning("pgvector 初始化失败（可稍后重试）: %s", e)
+
+    try:
+        start_mq_consumer_thread()
+        logger.info("MQ 消费者已启动")
+    except Exception as e:
+        logger.warning("MQ 消费者启动失败: %s", e)
 
 
 @app.get("/health")
