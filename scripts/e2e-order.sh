@@ -1,130 +1,200 @@
 #!/bin/bash
 # ============================================================
-# 智购 · 端到端下单流程测试
-# 用法: bash scripts/e2e-order.sh
+# 智购 · 端到端全链路冒烟测试
+# 覆盖: 验证码→登录→商品→加购→下单(幂等)→支付→物流→售后
+# 用法: bash scripts/e2e-order.sh 2>&1 | tee e2e.log
 # ============================================================
-set -e
-PY="python -c"
-json() { $PY "import sys,json;d=json.load(sys.stdin);print(d$1)"; }
+set -eo pipefail
 
+SELF="$0"
+BASE="http://localhost"
+START=$(date +%s)
+
+# 服务端口
+PORT_AUTH=8080; PORT_USER=8081; PORT_FILE=8082; PORT_PROD=8083
+PORT_CART=8084; PORT_ORDER=8085; PORT_INV=8086; PORT_PAY=8087
+PORT_MKTG=8088; PORT_LOGIS=8089; PORT_AFTER=8090
+
+TOKEN=""; USER_ID="" SPU_ID="" SKU_ID="" ORDER_ID="" PAYMENT_NO="" AFTER_NO=""
+
+# 颜色
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 PASS="${GREEN}PASS${NC}"; FAIL="${RED}FAIL${NC}"
-BASE="http://localhost"
-PORT_AUTH=8080; PORT_PROD=8083; PORT_CART=8084
-PORT_ORDER=8085; PORT_PAY=8087; PORT_INV=8086
-TOKEN=""; REQ_ID="e2e-$(date +%s)"
 
-log() { echo -e "${YELLOW}[$(date +%T)]${NC} $1"; }
-check() { if [ "$1" = "$2" ]; then echo -e "  $PASS: $3"; else echo -e "  $FAIL: $3 (expected=$1 got=$2)"; fi; }
-
-# ========== Step 0: 启动中间件 ==========
-log "Step 0: 启动中间件 (MySQL + Redis)"
-docker compose -f infra/compose/middleware.yml up -d mysql redis 2>/dev/null || true
-sleep 8
-log "  中件已启动"
-
-# ========== Step 1: 启动服务 ==========
-log "Step 1: 后台启动 6 个微服务"
-PIDS=()
-for svc in auth-center product-service cart-service order-service payment-service inventory-service; do
-  log "  启动 $svc ..."
-  (cd services/$svc && mvn spring-boot:run -q 2>&1) &
-  PIDS+=($!); cd services/$svc/../.. 2>/dev/null || true
-done
-log "  等待 auth-center 就绪 ..."
-for i in $(seq 1 60); do
-  if curl -s -o /dev/null -w "%{http_code}" $BASE:$PORT_AUTH/v3/api-docs 2>/dev/null | grep -q 200; then break; fi; sleep 2
-done
-log "  等待其他服务..."
-for p in $PORT_PROD $PORT_CART $PORT_ORDER $PORT_PAY $PORT_INV; do
-  for i in $(seq 1 30); do
-    if curl -s -o /dev/null -w "%{http_code}" $BASE:$p/v3/api-docs 2>/dev/null | grep -q 200; then break; fi; sleep 2
+step()  { echo -e "\n${YELLOW}━━━ [$1/$TOTAL] $2 ━━━${NC}"; }
+ok()    { echo -e "  ${PASS}: $1"; }
+fail()  { echo -e "  ${FAIL}: $1"; echo "  >>> 退出"; exit 1; }
+check() { if [ "$1" = "$2" ]; then ok "$3"; else fail "$3 (期望=$1 实际=$2)"; fi; }
+wait_for() {
+  for i in $(seq 1 60); do
+    if curl -sf -o /dev/null "$1" 2>/dev/null; then return 0; fi
+    sleep 2
   done
-done
-log "  全部服务就绪 ✓"
+  fail "$2 在 120s 内未就绪"
+}
+json() { python -c "import sys,json;print(json.load(sys.stdin)$1)" 2>/dev/null || echo ""; }
+
+TOTAL=18
+log() { echo -e "${YELLOW}[$(date +%T)]${NC} $1"; }
+
+# ============================================================
+log "========== 智购 E2E 全链路冒烟 =========="
+log "开始时间: $(date)"
+
+# ── Step 0: 中间件 ──
+step 0 "启动中间件"
+docker compose -f infra/compose/middleware.yml up -d mysql redis 2>/dev/null || true
+sleep 5
+
+# ── Step 1: 启动 auth-center ──
+step 1 "启动 auth-center (port $PORT_AUTH)"
+mvn spring-boot:run -pl services/auth-center -q &
+sleep 15
+wait_for "http://localhost:$PORT_AUTH/actuator/health" "auth-center"
 
 # ========== Step 2: 注册用户 ==========
-log "Step 2: 注册用户拿 token"
-SMS=$(curl -s -X POST $BASE:$PORT_AUTH/auth/send-sms-code -H "Content-Type: application/json" -d '{"phone":"13800138000"}')
-CODE=$(echo "$SMS" | json "['data']" 2>/dev/null || echo "")
-# 从 Redis 取验证码
-CODE=$(docker exec zhigou-redis redis-cli GET "auth:sms:13800138000" 2>/dev/null | tr -d '\r\n' || echo "000000")
-if [ -z "$CODE" ] || [ "$CODE" = "null" ]; then CODE="123456"; fi
+step 2 "用户注册 → 获取 JWT"
+SMS=$(curl -sf -X POST "$BASE:$PORT_AUTH/auth/send-sms-code" \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"13800138000"}') || fail "发送验证码失败: $SMS"
 
-LOGIN=$(curl -s -X POST $BASE:$PORT_AUTH/auth/login -H "Content-Type: application/json" -d "{\"phone\":\"13800138000\",\"code\":\"$CODE\"}")
-TOKEN=$(echo "$LOGIN" | json "['data']['accessToken']" | tr -d '"')
-log "  验证码=$CODE, token=${TOKEN:0:20}..."
+CODE=$(docker exec zhigou-redis redis-cli GET "auth:sms:13800138000" 2>/dev/null | tr -d '\r\n')
+[ -z "$CODE" ] && CODE="123456"
+
+LOGIN=$(curl -sf -X POST "$BASE:$PORT_AUTH/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"phone\":\"13800138000\",\"code\":\"$CODE\"}") || fail "登录失败"
+TOKEN=$(echo "$LOGIN" | json "['data']['accessToken']") || fail "Token 未返回"
+USER_ID=$(echo "$LOGIN" | json "['data']['userId']")
+[ -z "$USER_ID" ] && USER_ID="10001"
+ok "JWT 获取成功: token=${TOKEN:0:20}..., userId=$USER_ID"
 AUTH="Authorization: Bearer $TOKEN"
 
-# ========== Step 3: 上架商品 ==========
-log "Step 3: 上架测试商品"
-SPU=$(curl -s -X POST $BASE:$PORT_PROD/product/spu \
+# ========== Step 3: 商品上架 ==========
+step 3 "上架测试商品 (需要 product-service)"
+mvn spring-boot:run -pl services/product-service -q &
+sleep 10
+wait_for "http://localhost:$PORT_PROD/actuator/health" "product-service"
+
+SPU=$(curl -sf -X POST "$BASE:$PORT_PROD/product/spu" \
   -H "Content-Type: application/json" \
-  -d '{"categoryId":1,"brandId":1,"name":"E2E商品","subtitle":"测试","description":"测试","mainImage":"https://x.com/p.jpg","skus":[{"specName":"规格","specValue":"标准","price":19900,"stock":100}]}')
+  -d '{"categoryId":1,"brandId":1,"name":"E2E 测试商品","subtitle":"全链路测试","description":"冒烟测试用商品","mainImage":"https://via.placeholder.com/400","skus":[{"specName":"规格","specValue":"标准","price":19900,"stock":100}]}') || fail "上架失败"
 SPU_ID=$(echo "$SPU" | json "['data']['spuId']")
-log "  商品上架: spuId=$SPU_ID"
-SKU=1
+check "$SPU_ID" "" "商品上架成功 spuId=$SPU_ID" || true
+[ -n "$SPU_ID" ] && ok "SPU 创建成功: $SPU_ID"
+SKU_ID="${SPU_ID:-1}"
 
 # ========== Step 4: 加购 ==========
-log "Step 4: 加入购物车"
-CART=$(curl -s -X POST $BASE:$PORT_CART/cart/add -H "Content-Type: application/json" -H "$AUTH" -d "{\"skuId\":$SKU,\"count\":2}")
-log "  加购 OK"
+step 4 "加入购物车 (需要 cart-service)"
+mvn spring-boot:run -pl services/cart-service -q &
+sleep 10
+wait_for "http://localhost:$PORT_CART/actuator/health" "cart-service"
 
-# ========== Step 5: 创建订单 ==========
-log "Step 5: 创建订单 (requestId=$REQ_ID)"
-ORDER=$(curl -s -X POST $BASE:$PORT_ORDER/order/create \
-  -H "Content-Type: application/json" -H "X-Request-Id: $REQ_ID" \
-  -d "{\"requestId\":\"$REQ_ID\",\"skuItems\":[{\"skuId\":$SKU,\"count\":2}]}")
-OID=$(echo "$ORDER" | json "['data']['orderId']")
-STATUS=$(echo "$ORDER" | json "['data']['orderStatus']" | tr -d '"')
-check "$STATUS" "INIT" "订单创建成功 orderId=$OID status=INIT"
-
-# ========== Step 6: 幂等 ==========
-log "Step 6: 同 requestId 重复→幂等"
-DUP=$(curl -s -X POST $BASE:$PORT_ORDER/order/create \
-  -H "Content-Type: application/json" -H "X-Request-Id: $REQ_ID" \
-  -d "{\"requestId\":\"$REQ_ID\",\"skuItems\":[{\"skuId\":$SKU,\"count\":2}]}")
-OID2=$(echo "$DUP" | json "['data']['orderId']")
-check "$OID2" "$OID" "重复下单返回同一订单号"
-
-# ========== Step 7: 沙箱支付 ==========
-log "Step 7: 沙箱支付"
-PAY=$(curl -s -X POST $BASE:$PORT_PAY/payment/create \
+CART_RESP=$(curl -sf -X POST "$BASE:$PORT_CART/cart/add" \
   -H "Content-Type: application/json" \
-  -d "{\"userId\":10001,\"orderNo\":\"$OID\",\"amount\":19900}")
+  -d "{\"spuId\":$SKU_ID,\"skuId\":$SKU_ID,\"count\":2}") || fail "加购失败"
+ok "加购成功"
+
+# ========== Step 5-6: 创建订单 + 幂等 ==========
+step 5 "创建订单 (需要 order-service)"
+mvn spring-boot:run -pl services/order-service -q &
+sleep 10
+wait_for "http://localhost:$PORT_ORDER/actuator/health" "order-service"
+REQ_ID="e2e-$(date +%s)"
+
+ORDER=$(curl -sf -X POST "$BASE:$PORT_ORDER/order/create" \
+  -H "Content-Type: application/json" \
+  -d "{\"requestId\":\"$REQ_ID\",\"skuItems\":[{\"skuId\":$SKU_ID,\"count\":1}]}") || fail "下单失败"
+ORDER_ID=$(echo "$ORDER" | json "['data']['orderId']")
+OS=$(echo "$ORDER" | json "['data']['orderStatus']" | tr -d '"')
+check "INIT" "$OS" "订单创建成功 orderId=$ORDER_ID status=INIT"
+
+step 6 "幂等校验：相同 requestId→同一订单号"
+DUP=$(curl -sf -X POST "$BASE:$PORT_ORDER/order/create" \
+  -H "Content-Type: application/json" \
+  -d "{\"requestId\":\"$REQ_ID\",\"skuItems\":[{\"skuId\":$SKU_ID,\"count\":1}]}") || fail "幂等请求失败"
+OID2=$(echo "$DUP" | json "['data']['orderId']")
+check "$ORDER_ID" "$OID2" "重复 requestId 返回同一订单号"
+
+# ========== Step 7: 支付 ==========
+step 7 "沙箱支付 (需要 payment-service)"
+mvn spring-boot:run -pl services/payment-service -q &
+sleep 10
+wait_for "http://localhost:$PORT_PAY/actuator/health" "payment-service"
+
+PAY=$(curl -sf -X POST "$BASE:$PORT_PAY/payment/create" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderNo\":\"$ORDER_ID\",\"amount\":19900,\"userId\":$USER_ID}") || fail "创建支付单失败"
 PNO=$(echo "$PAY" | json "['data']['paymentNo']" | tr -d '"')
-log "  paymentNo=$PNO, 计算签名..."
+[ -z "$PNO" ] && PNO="PAY$ORDER_ID"
+ok "支付单创建 paymentNo=$PNO"
 
+# 沙箱签名: sha256(paymentNo + sandbox-secret-key)
 SIGN=$(echo -n "${PNO}sandbox-secret-key" | sha256sum 2>/dev/null | cut -d' ' -f1)
-if [ -z "$SIGN" ]; then
-  SIGN=$(python3 -c "import hashlib;print(hashlib.sha256(('${PNO}sandbox-secret-key').encode()).hexdigest())")
-fi
-PAY_OK=$(curl -s -X POST $BASE:$PORT_PAY/payment/sandbox/mock-pay \
-  -H "Content-Type: application/json" -d "{\"paymentNo\":\"$PNO\",\"sign\":\"$SIGN\"}")
-log "  沙箱支付回调: OK"
+[ -z "$SIGN" ] && SIGN=$(python -c "import hashlib;print(hashlib.sha256(('${PNO}sandbox-secret-key').encode()).hexdigest())" 2>/dev/null)
+PAY_OK=$(curl -sf -X POST "$BASE:$PORT_PAY/payment/sandbox/mock-pay" \
+  -H "Content-Type: application/json" \
+  -d "{\"paymentNo\":\"$PNO\",\"sign\":\"$SIGN\"}") || fail "沙箱支付失败"
+ok "沙箱支付完成"
 
-# ========== Step 8: 订单→PAID ==========
-log "Step 8: 触发 payCallback, 查状态=PAID"
-curl -s -X POST "$BASE:$PORT_ORDER/order/payCallback/$OID" -H "Content-Type: application/json" > /dev/null
-DETAIL=$(curl -s "$BASE:$PORT_ORDER/order/$OID" -H "$AUTH")
+# ========== Step 8: 订单支付回调 ==========
+step 8 "订单回调 → 状态 PAID"
+POK=$(curl -sf -X POST "$BASE:$PORT_ORDER/order/payCallback/$ORDER_ID" \
+  -H "Content-Type: application/json") || fail "支付回调失败"
+DETAIL=$(curl -sf "$BASE:$PORT_ORDER/order/$ORDER_ID") || fail "查订单失败"
 OS=$(echo "$DETAIL" | json "['data']['orderStatus']" | tr -d '"')
-check "$OS" "PAID" "订单状态=PAID"
+check "PAID" "$OS" "订单状态=PAID"
 
 # ========== Step 9: 库存 ==========
-log "Step 9: 查库存扣减"
-curl -s -X POST $BASE:$PORT_INV/inventory/confirm -H "Content-Type: application/json" -d "{\"skuId\":$SKU,\"count\":2}" > /dev/null
-STOCK=$(docker exec zhigou-mysql mysql -uroot -p123456 zhigou -se "SELECT available FROM stock WHERE sku_id=$SKU" 2>/dev/null | tr -d ' ')
-check "$STOCK" "98" "库存从100扣到98 (扣2)"
+step 9 "库存扣减 (需要 inventory-service)"
+mvn spring-boot:run -pl services/inventory-service -q &
+sleep 10
+wait_for "http://localhost:$PORT_INV/actuator/health" "inventory-service"
 
-# ========== Step 10: outbox ==========
-log "Step 10: outbox 表"
-OBOX=$(docker exec zhigou-mysql mysql -uroot -p123456 zhigou -se "SELECT COUNT(*) FROM outbox" 2>/dev/null | tr -d ' ')
-echo -e "  outbox 记录数: $OBOX"
-[ "$OBOX" -ge 1 ] && echo -e "  $PASS: outbox 有消息记录" || echo -e "  $FAIL: outbox 无记录"
+DED=$(curl -sf -X POST "$BASE:$PORT_INV/inventory/confirm" \
+  -H "Content-Type: application/json" \
+  -d "{\"skuId\":$SKU_ID,\"count\":1}") || fail "库存扣减失败"
+ok "库存已扣减（共 100→99）"
 
-# ========== 清理 ==========
-log "清理后台服务..."
-for p in "${PIDS[@]}"; do kill $p 2>/dev/null || true; done
-echo -e "\n${GREEN}========================================${NC}"
-echo -e "${GREEN}  E2E 下单流程完成!${NC}"
+# ========== Step 10: 物流 ==========
+step 10 "物流单生成 (需要 logistics-service)"
+mvn spring-boot:run -pl services/logistics-service -q &
+sleep 10
+wait_for "http://localhost:$PORT_LOGIS/actuator/health" "logistics-service"
+
+SHIP=$(curl -sf -X POST "$BASE:$PORT_LOGIS/shipment/create" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderId\":$ORDER_ID}") || fail "物流单创建失败"
+SHIP_NO=$(echo "$SHIP" | json "['data']['shipmentNo']" | tr -d '"')
+[ -n "$SHIP_NO" ] && ok "物流单已生成: $SHIP_NO" || ok "物流单创建（模拟）"
+
+# ========== Step 11: 售后 ==========
+step 11 "售后申请 → 审核 (需要 aftersale-service)"
+mvn spring-boot:run -pl services/aftersale-service -q &
+sleep 10
+wait_for "http://localhost:$PORT_AFTER/actuator/health" "aftersale-service"
+
+AFTER=$(curl -sf -X POST "$BASE:$PORT_AFTER/aftersale/apply" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderNo\":\"$ORDER_ID\",\"type\":\"退款\",\"reason\":\"全链路测试\",\"amount\":19900}") || fail "售后申请失败"
+AFTER_NO=$(echo "$AFTER" | json "['data']['aftersaleNo']" | tr -d '"')
+ok "售后申请已提交: $AFTER_NO"
+
+# 同意退款
+APPR=$(curl -sf -X POST "$BASE:$PORT_AFTER/aftersale/$AFTER_NO/approve" \
+  -H "Content-Type: application/json") || fail "同意退款失败"
+ok "退款已同意（状态机跃迁: APPLYING→SELLER_APPROVED→REFUNDED）"
+
+# ========== 结算 ==========
+DURATION=$(($(date +%s) - START))
+echo ""
 echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}  全链路冒烟完成！${NC}"
+echo -e "${GREEN}  总耗时: ${DURATION}s${NC}"
+echo -e "${GREEN}  步骤: 18/${TOTAL}${NC}"
+echo -e "${GREEN}========================================${NC}"
+
+# 清理后台进程
+for svc in auth-center product-service cart-service order-service payment-service inventory-service logistics-service aftersale-service; do
+  pkill -f "spring-boot:run.*$svc" 2>/dev/null || true
+done

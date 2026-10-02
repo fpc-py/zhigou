@@ -1,5 +1,6 @@
 package com.zhigou.auth.service.impl;
 
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zhigou.auth.dto.LoginResponse;
@@ -58,9 +59,10 @@ public class AuthServiceImpl implements AuthService {
         );
         if (user == null) {
             user = new User();
+            user.setUserId(IdUtil.getSnowflakeNextId());
             user.setPhone(phone);
             userMapper.insert(user);
-            log.info("新用户注册: userId={}, phone={}", user.getId(), phone);
+            log.info("新用户注册: userId={}, phone={}", user.getUserId(), phone);
         }
 
         // 4. 签发 token
