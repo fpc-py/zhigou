@@ -35,3 +35,17 @@ jwt:
   secret: ${JWT_SECRET:change-me-to-a-random-256-bit-string}
   access-expire-seconds: ${JWT_ACCESS_EXPIRE_SECONDS:7200}
   refresh-expire-seconds: ${JWT_REFRESH_EXPIRE_SECONDS:1209600}
+# ==================== Actuator / Prometheus ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true

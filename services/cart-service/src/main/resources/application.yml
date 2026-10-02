@@ -8,3 +8,17 @@ springdoc.swagger-ui.path: /swagger-ui.html
 knife4j.enable: true
 jwt.secret: ${JWT_SECRET:change-me-to-a-random-256-bit-string}
 product-service.url: ${PRODUCT_SERVICE_URL:http://localhost:8083}
+# ==================== Actuator / Prometheus ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true

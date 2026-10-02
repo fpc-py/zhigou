@@ -54,3 +54,17 @@ minio:
 file:
   url-expire-seconds: ${FILE_URL_EXPIRE_SECONDS:3600}
   max-size-mb: ${FILE_MAX_SIZE_MB:5}
+# ==================== Actuator / Prometheus ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true

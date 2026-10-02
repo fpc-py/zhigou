@@ -26,3 +26,17 @@ rocketmq:
   name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
   producer.group: order-producer-group
   consumer.group: order-consumer-group
+# ==================== Actuator / Prometheus ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true

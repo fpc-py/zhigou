@@ -22,3 +22,17 @@ mybatis-plus:
       logic-not-delete-value: 0
 rocketmq:
   name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+# ==================== Actuator / Prometheus ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true

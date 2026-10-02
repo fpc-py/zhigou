@@ -20,3 +20,17 @@ mybatis-plus:
     logic-delete-field: deleted
     logic-delete-value: 1
     logic-not-delete-value: 0
+# ==================== Actuator / Prometheus ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
