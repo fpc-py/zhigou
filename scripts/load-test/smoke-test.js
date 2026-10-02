@@ -53,12 +53,14 @@ export const options = {
 };
 
 // ── 用户会话数据 ──
+// 所有虚拟用户共用同一个 JWT（BFF 只验证签名有效期，不校验用户归属）
+// 运行前设置 JWT 环境变量: k6 run -e JWT=<token> scripts/load-test/smoke-test.js
+const JWT_TOKEN = __ENV.JWT || '';
 const users = [];
-// 预生成 2000 个虚拟用户（压测前无需注册，BFF 支持 JWT 直接指定 userId）
 for (let i = 0; i < 2000; i++) {
   users.push({
     userId: `loadtest_${String(i).padStart(4, '0')}`,
-    token:  `loadtest_token_${i}`,  // 压测环境 BFF 应开放测试 token 验证
+    token:  JWT_TOKEN,
     phone:  `1380000${String(i).padStart(4, '0')}`,
   });
 }
