@@ -1,0 +1,27 @@
+/* 智购 H5 — 设计令牌（对齐原型） */
+:root {
+  --ink: #16181F;
+  --ink-2: #5C6270;
+  --ink-3: #8B90A0;
+  --bg: #F4F5F9;
+  --card: #FFFFFF;
+  --line: #E7E9F0;
+  --line-2: #DDE0EA;
+  --brand: #4C5CFF;
+  --brand-d: #3B49E0;
+  --brand-soft: #E9EBFF;
+  --accent: #FF5C39;
+  --accent-soft: #FFEDE7;
+  --mint: #00A87E;
+  --mint-soft: #E3F7F0;
+  --amber: #FFA62B;
+  --amber-soft: #FFF3DF;
+  --danger: #E5484D;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 10px 30px rgba(20, 26, 58, 0.10);
+
+  /* safe-area */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
