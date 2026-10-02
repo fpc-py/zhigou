@@ -2,6 +2,7 @@
 智购 AI Orchestrator — 对话服务（SSE 流式处理）
 """
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -13,6 +14,8 @@ from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from .config import settings
+from .fallback_config import llm_timeout_ms
+from .fallback_handler import timeout_fallback_stream
 from .tools import TOOLS, _current_user_id
 
 logger = logging.getLogger(__name__)
@@ -124,38 +127,48 @@ async def chat_stream(
         # 收集完整回复，用于后续可能的消息持久化
         response_text = ""
 
-        async for event in graph.astream_events(inputs, thread_config, version="v2"):
-            kind = event.get("event", "")
+        # ── LLM 超时兜底 ──
+        timeout_s = llm_timeout_ms() / 1000.0
 
-            # ── LLM token 输出 ──
-            if kind == "on_chat_model_stream":
-                chunk = event.get("data", {}).get("chunk", None)
-                if chunk is not None and hasattr(chunk, "content") and chunk.content:
-                    content = chunk.content
-                    response_text += content
-                    yield f"event: token\ndata: {json.dumps({'content': content}, ensure_ascii=False)}\n\n"
+        try:
+            async with asyncio.timeout(timeout_s):
+                async for event in graph.astream_events(inputs, thread_config, version="v2"):
+                    kind = event.get("event", "")
 
-            # ── 工具调用 ──
-            elif kind == "on_chat_model_start":
-                # 读取工具调用（如果有）
-                pass
+                    # ── LLM token 输出 ──
+                    if kind == "on_chat_model_stream":
+                        chunk = event.get("data", {}).get("chunk", None)
+                        if chunk is not None and hasattr(chunk, "content") and chunk.content:
+                            content = chunk.content
+                            response_text += content
+                            yield f"event: token\ndata: {json.dumps({'content': content}, ensure_ascii=False)}\n\n"
 
-            elif kind == "on_tool_start":
-                tool_data = event.get("data", {})
-                tool_name = tool_data.get("name", "unknown")
-                tool_input = tool_data.get("input", {})
-                # 工具入参可能包含 userId，脱敏后发送
-                safe_args = dict(tool_input)
-                if "userId" in safe_args:
-                    safe_args["userId"] = safe_args["userId"][:3] + "***"
-                yield f"event: tool_call\ndata: {json.dumps({'tool': tool_name, 'args': safe_args}, ensure_ascii=False)}\n\n"
+                    # ── 工具调用 ──
+                    elif kind == "on_chat_model_start":
+                        pass
 
-            elif kind == "on_tool_end":
-                tool_data = event.get("data", {})
-                tool_name = event.get("name", "unknown")
-                output = tool_data.get("output", "")
-                output_str = str(output) if output else ""
-                yield f"event: tool_result\ndata: {json.dumps({'tool': tool_name, 'result': output_str}, ensure_ascii=False)}\n\n"
+                    elif kind == "on_tool_start":
+                        tool_data = event.get("data", {})
+                        tool_name = tool_data.get("name", "unknown")
+                        tool_input = tool_data.get("input", {})
+                        safe_args = dict(tool_input)
+                        if "userId" in safe_args:
+                            safe_args["userId"] = safe_args["userId"][:3] + "***"
+                        yield f"event: tool_call\ndata: {json.dumps({'tool': tool_name, 'args': safe_args}, ensure_ascii=False)}\n\n"
+
+                    elif kind == "on_tool_end":
+                        tool_data = event.get("data", {})
+                        tool_name = event.get("name", "unknown")
+                        output = tool_data.get("output", "")
+                        output_str = str(output) if output else ""
+                        yield f"event: tool_result\ndata: {json.dumps({'tool': tool_name, 'result': output_str}, ensure_ascii=False)}\n\n"
+
+        except TimeoutError:
+            logger.warning("LLM 超时 (timeout=%dms)，切换为兜底推荐", llm_timeout_ms())
+            async for event in timeout_fallback_stream():
+                yield event
+            yield "event: done\ndata: null\n\n"
+            return
 
         # 完成
         yield "event: done\ndata: null\n\n"

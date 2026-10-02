@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.api import router as chat_router
 from app.config import settings
+from app.fallback_config import init_config as init_fallback_config
 
 from app.rag.router import router as rag_router
 from app.rag.service import init_db
@@ -51,7 +52,10 @@ app.include_router(rag_router)
 
 @app.on_event("startup")
 async def startup():
-    """启动时初始化 pgvector 表和 MQ 消费者。"""
+    """启动时加载降级配置，初始化 pgvector 表和 MQ 消费者。"""
+    # 降级配置（本地 yaml，后续换 Nacos）
+    init_fallback_config()
+
     try:
         await init_db()
         logger.info("pgvector 初始化完成")
