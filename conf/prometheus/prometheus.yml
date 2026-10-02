@@ -1,0 +1,24 @@
+# 智购 Prometheus 抓取配置
+# 所有 Java 服务通过 /actuator/prometheus 暴露指标
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'zhigou-services'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+        - 'host.docker.internal:8080'   # auth-center
+        - 'host.docker.internal:8081'   # user-service
+        - 'host.docker.internal:8082'   # file-service
+        - 'host.docker.internal:8083'   # product-service
+        - 'host.docker.internal:8084'   # cart-service
+        - 'host.docker.internal:8085'   # order-service
+        - 'host.docker.internal:8086'   # inventory-service
+        - 'host.docker.internal:8087'   # payment-service
+        - 'host.docker.internal:8088'   # marketing-service
+        - 'host.docker.internal:8089'   # logistics-service
+        - 'host.docker.internal:8090'   # aftersale-service
+        labels:
+          service_group: 'zhigou'

@@ -1,0 +1,71 @@
+# ============================================================
+# 智购 · 可观测性编排（Prometheus + Grafana + Loki + Promtail）
+#
+# 启动: docker compose -f infra/compose/monitoring.yml up -d
+# 停止: docker compose -f infra/compose/monitoring.yml down
+# ============================================================
+
+services:
+  # ==================== Prometheus ====================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: zhigou-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./conf/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ==================== Grafana ====================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zhigou-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - ./conf/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./conf/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "-q", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ==================== Loki ====================
+  loki:
+    image: grafana/loki:latest
+    container_name: zhigou-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./conf/loki/config.yml:/etc/loki/config.yml
+      - loki-data:/loki
+    command:
+      - '-config.file=/etc/loki/config.yml'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "http://localhost:3100/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+# ==================== 卷 ====================
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:

@@ -1,0 +1,69 @@
+{
+  "title": "智购 · RED 监控面板",
+  "uid": "zhigou-red",
+  "schemaVersion": 38,
+  "version": 1,
+  "panels": [
+    {
+      "title": "QPS（每秒请求数）",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [{
+        "expr": "rate(http_server_requests_seconds_count[1m])",
+        "legendFormat": "{{application}} {{method}} {{status}}"
+      }],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 }
+    },
+    {
+      "title": "错误率（4xx/5xx）",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [{
+        "expr": "sum(rate(http_server_requests_seconds_count{status=~\"4..|5..\"}[1m])) / sum(rate(http_server_requests_seconds_count[1m])) * 100",
+        "legendFormat": "错误率 %"
+      }],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 }
+    },
+    {
+      "title": "P50 / P95 / P99 延迟",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, application))", "legendFormat": "{{application}} P50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, application))", "legendFormat": "{{application}} P95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket[1m])) by (le, application))", "legendFormat": "{{application}} P99" }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 }
+    },
+    {
+      "title": "JVM 堆内存",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [{
+        "expr": "sum(jvm_memory_used_bytes{area=\"heap\"}) by (application)",
+        "legendFormat": "{{application}}"
+      }],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 }
+    },
+    {
+      "title": "GC 次数",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [{
+        "expr": "rate(jvm_gc_pause_seconds_count[1m])",
+        "legendFormat": "{{application}}"
+      }],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 }
+    },
+    {
+      "title": "下单量",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "targets": [{
+        "expr": "rate(order_created_total[1m])",
+        "legendFormat": "下单/分钟"
+      }],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 }
+    }
+  ]
+}
