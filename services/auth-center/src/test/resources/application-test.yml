@@ -1,0 +1,1 @@
+# 测试配置（留空即可，@Profile("!test") 确保安全配置不在 test profile 加载）

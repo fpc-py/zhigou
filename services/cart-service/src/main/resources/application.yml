@@ -22,3 +22,6 @@ management:
       show-details: always
       probes:
         enabled: true
+
+jwt:
+  secret: ${JWT_SECRET:change-me-to-a-random-256-bit-string}
