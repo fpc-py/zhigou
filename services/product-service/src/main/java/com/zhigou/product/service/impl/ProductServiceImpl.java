@@ -1,6 +1,7 @@
 package com.zhigou.product.service.impl;
 
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,11 +17,13 @@ import com.zhigou.product.mapper.*;
 import com.zhigou.product.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -35,6 +38,7 @@ public class ProductServiceImpl implements ProductService {
     private final BrandMapper brandMapper;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final RocketMQTemplate rocketMQTemplate;
 
     private static final String DETAIL_CACHE_KEY = "product:detail:";
     private static final long CACHE_TTL = 5;
@@ -117,6 +121,17 @@ public class ProductServiceImpl implements ProductService {
             }
         }
         log.info("SPU 创建: spuId={}", spuId);
+
+        // 发送 MQ 消息触发 RAG 向量同步
+        try {
+            rocketMQTemplate.convertAndSend("PRODUCT_CHANGED",
+                Map.of("spuId", spuId, "name", request.getName(),
+                       "subtitle", request.getSubtitle() != null ? request.getSubtitle() : "",
+                       "description", request.getDescription() != null ? request.getDescription() : ""));
+        } catch (Exception e) {
+            log.warn("PRODUCT_CHANGED MQ 发送失败: spuId={}, {}", spuId, e.getMessage());
+        }
+
         return spuId;
     }
 
@@ -132,6 +147,17 @@ public class ProductServiceImpl implements ProductService {
 
         // 删缓存
         redisTemplate.delete(DETAIL_CACHE_KEY + spuId);
+
+        // 发送 MQ 消息触发 RAG 向量同步
+        try {
+            rocketMQTemplate.convertAndSend("PRODUCT_CHANGED",
+                Map.of("spuId", spuId, "name", spu.getName(),
+                       "subtitle", spu.getSubtitle() != null ? spu.getSubtitle() : "",
+                       "description", spu.getDescription() != null ? spu.getDescription() : ""));
+        } catch (Exception e) {
+            log.warn("PRODUCT_CHANGED MQ 发送失败: spuId={}, {}", spuId, e.getMessage());
+        }
+
         log.info("SPU 更新: spuId={}", spuId);
     }
 
@@ -141,6 +167,14 @@ public class ProductServiceImpl implements ProductService {
         spu.setStatus(0);
         spuMapper.updateById(spu);
         redisTemplate.delete(DETAIL_CACHE_KEY + spuId);
+
+        try {
+            rocketMQTemplate.convertAndSend("PRODUCT_CHANGED",
+                Map.of("spuId", spuId, "action", "DELETE"));
+        } catch (Exception e) {
+            log.warn("PRODUCT_CHANGED MQ 发送失败: spuId={}, {}", spuId, e.getMessage());
+        }
+
         log.info("SPU 下架: spuId={}", spuId);
     }
 
