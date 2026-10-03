@@ -20,6 +20,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
         http
+                .securityMatchers(matchers -> matchers.requestMatchers("/auth/**", "/actuator/**", "/doc.html",
+                        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**"))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth

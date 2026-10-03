@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -33,7 +35,7 @@ public class CartServiceImpl implements CartService {
     @Override
     public void add(Long userId, CartAddRequest req) {
         // 1. 调 product-service 校验
-        validateSku(req.getSkuId());
+        validateSku(req.getSkuId(), userId);
 
         // 2. 写入 Redis Hash
         CartItemResponse item = CartItemResponse.builder()
@@ -88,11 +90,19 @@ public class CartServiceImpl implements CartService {
         log.info("清空选中: userId={}", userId);
     }
 
-    private void validateSku(Long skuId) {
+    private void validateSku(Long skuId, Long userId) {
         try {
-            ResponseEntity<String> resp = restTemplate.getForEntity(
-                    productServiceUrl + "/product/" + skuId, String.class);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-User-Id", String.valueOf(userId));
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    productServiceUrl + "/product/sku/" + skuId + "/validate",
+                    org.springframework.http.HttpMethod.GET, entity, String.class);
             if (!resp.getStatusCode().is2xxSuccessful()) {
+                throw new BizException(400, "商品不存在或已下架");
+            }
+            String body = resp.getBody();
+            if (body == null || !body.contains("\"data\":true")) {
                 throw new BizException(400, "商品不存在或已下架");
             }
         } catch (BizException e) { throw e; }

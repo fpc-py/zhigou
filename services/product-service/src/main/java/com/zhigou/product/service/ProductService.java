@@ -17,4 +17,6 @@ public interface ProductService {
     void offShelf(Long spuId);
     List<Category> categoryTree();
     List<Brand> brands();
+    /** 校验 SKU 是否存在（供 cart-service 等下游服务调用） */
+    boolean validateSku(Long skuId);
 }

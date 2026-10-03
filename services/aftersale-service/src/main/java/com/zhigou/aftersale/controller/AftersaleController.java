@@ -35,6 +35,13 @@ public class AftersaleController {
     @PostMapping("/{no}/approve")
     public Result<Void> approve(@PathVariable String no) { service.approve(no); return Result.ok(); }
 
+    @PostMapping("/{no}/refund")
+    public Result<Void> refund(@PathVariable String no) {
+        service.startRefunding(no);
+        service.onRefundSuccess(no);
+        return Result.ok();
+    }
+
     @PostMapping("/{no}/reject")
     public Result<Void> reject(@PathVariable String no, @RequestBody Map<String, String> body) {
         service.reject(no, body.get("reason")); return Result.ok();

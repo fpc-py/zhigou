@@ -65,13 +65,14 @@ public class AuthServiceImpl implements AuthService {
             log.info("新用户注册: userId={}, phone={}", user.getUserId(), phone);
         }
 
-        // 4. 签发 token
-        String accessToken = jwtUtil.createAccessToken(user.getId(), phone);
-        String refreshToken = jwtUtil.createRefreshToken(user.getId(), phone);
+        // 4. 签发 token（subject 用业务 userId，下游服务据此识别用户）
+        String accessToken = jwtUtil.createAccessToken(user.getUserId(), phone);
+        String refreshToken = jwtUtil.createRefreshToken(user.getUserId(), phone);
 
-        log.info("登录成功: userId={}", user.getId());
+        log.info("登录成功: userId={}", user.getUserId());
 
         return LoginResponse.builder()
+                .userId(user.getUserId())
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .expiresIn(7200)

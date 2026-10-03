@@ -35,7 +35,7 @@ public class AftersaleServiceImpl {
         if (activeCount > 0) throw new BizException(409, "该订单已有进行中的售后单");
 
         // 2. 调用 order-service 校验
-        OrderInfo order = orderClient.getOrder(Long.valueOf(req.getOrderNo()));
+        OrderInfo order = orderClient.getOrder(Long.valueOf(req.getOrderNo())).getData();
         if (order == null) throw new BizException(404, "订单不存在");
         if (!order.getUserId().equals(userId)) throw new BizException(403, "无权操作该订单");
         if (!ALLOWED_ORDER_STATUS.contains(order.getOrderStatus()))

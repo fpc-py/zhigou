@@ -9,6 +9,7 @@ import java.util.List;
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class OrderResponse {
     private Long orderId;
+    private Long userId;
     private String orderStatus;
     private Long totalAmount;
     private Long payAmount;

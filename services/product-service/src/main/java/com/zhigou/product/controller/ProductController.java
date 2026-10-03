@@ -68,4 +68,10 @@ public class ProductController {
     public Result<List<Brand>> brands() {
         return Result.ok(productService.brands());
     }
+
+    @Operation(summary = "校验SKU是否存在")
+    @GetMapping("/sku/{skuId}/validate")
+    public Result<Boolean> validateSku(@PathVariable("skuId") Long skuId) {
+        return Result.ok(productService.validateSku(skuId));
+    }
 }

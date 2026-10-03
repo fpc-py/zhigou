@@ -119,7 +119,7 @@ public class OrderServiceImpl implements OrderService {
         List<OrderItem> items = itemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getOrderId()));
         return OrderResponse.builder()
-                .orderId(order.getOrderId()).orderStatus(order.getOrderStatus())
+                .orderId(order.getOrderId()).userId(order.getUserId()).orderStatus(order.getOrderStatus())
                 .totalAmount(order.getTotalAmount()).payAmount(order.getPayAmount())
                 .items(items.stream().map(i -> OrderResponse.Item.builder()
                         .skuId(i.getSkuId()).skuName(i.getSkuName()).price(i.getPrice()).count(i.getCount()).build())

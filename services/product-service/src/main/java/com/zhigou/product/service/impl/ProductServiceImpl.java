@@ -218,4 +218,12 @@ public class ProductServiceImpl implements ProductService {
         if (spu == null) throw new BizException(404, "商品不存在");
         return spu;
     }
+
+    @Override
+    public boolean validateSku(Long skuId) {
+        if (skuId == null) return false;
+        ProductSku sku = skuMapper.selectOne(
+                new LambdaQueryWrapper<ProductSku>().eq(ProductSku::getSkuId, skuId));
+        return sku != null;
+    }
 }

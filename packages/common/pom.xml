@@ -18,6 +18,18 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- Spring Security（JwtAuthFilter 注入 Authentication，optional 不强依赖下游） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- MyBatis-Plus（MyMetaObjectHandler 自动填充，optional） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <optional>true</optional>
+        </dependency>
         <!-- Micrometer（业务指标 MeterRegistry） -->
         <dependency>
             <groupId>io.micrometer</groupId>
