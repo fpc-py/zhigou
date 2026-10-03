@@ -43,6 +43,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
+import TabBar from '@/components/TabBar.vue';
 
 const router = useRouter();
 const userStore = useUserStore();

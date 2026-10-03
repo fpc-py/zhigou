@@ -12,17 +12,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // 前端 /api/* → BFF（去掉 /api 前缀）
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-      },
-      '/auth': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
-      '/health': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

@@ -15,7 +15,7 @@ export function chatSse(
   signal?: AbortSignal,
 ): Promise<void> {
   return postSse(
-    '/api/v1/chat/sse',
+    '/api/chat/sse',
     { query, userId: '', sessionId }, // userId 由 BFF 从 JWT 提取
     onMessage,
     signal,

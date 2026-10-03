@@ -56,6 +56,9 @@ import { useRoute } from 'vue-router';
 import { getProductDetail } from '@/api/product';
 import { useCartStore } from '@/stores/cart';
 import type { ProductDetailData } from '@/api/product';
+import Skeleton from '@/components/Skeleton.vue';
+import ErrorRetry from '@/components/ErrorRetry.vue';
+import EmptyState from '@/components/EmptyState.vue';
 
 const route = useRoute();
 const cartStore = useCartStore();

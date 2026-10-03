@@ -1,6 +1,6 @@
 <p align="center">
   <br/>
-  <img src="docs/logo.svg" width="120" alt="智购" />
+  <img src="docs/logo.png" width="120" alt="智购" />
   <h1 align="center">智购 · AI 原生超级商城</h1>
   <p align="center">
     AI 驱动的全渠道电商平台 · 12 微服务 · 对话式购物体验
@@ -59,11 +59,20 @@ docker compose -f infra/compose/middleware.yml up -d
 mvn install -pl packages/common -DskipTests
 
 # 启动所有 Java 微服务（分终端启动）
-for svc in auth-center product-service cart-service order-service \
-           inventory-service payment-service marketing-service \
-           logistics-service aftersale-service user-service file-service; do
-  mvn spring-boot:run -pl services/$svc &
-done
+$root = "D:\aafpc\Java\demo\zhigou\zhigou"
+$services = @(
+  'auth-center','product-service','cart-service','order-service',
+  'inventory-service','payment-service','marketing-service',
+  'logistics-service','aftersale-service','user-service','file-service'
+)
+
+foreach ($svc in $services) {
+  Write-Host "Starting $svc ..." -ForegroundColor Cyan
+  Start-Process -FilePath "cmd.exe" `
+    -ArgumentList "/k","mvn spring-boot:run -pl services/$svc" `
+    -WorkingDirectory $root
+  Start-Sleep -Seconds 2   # 错开启动，避免同时抢 CPU/内存
+}
 ```
 
 | 服务 | 端口 | 说明 |
@@ -91,7 +100,7 @@ cd services/ai-orchestrator && python main.py
 
 ```bash
 # BFF 聚合层（NestJS）
-cd apps/bff-shop && npm install && npm run dev
+cd apps/bff-shop && npm install && npm run start:dev
 
 # 移动端 H5（Vue 3）
 cd apps/h5-shop && npm install && npm run dev

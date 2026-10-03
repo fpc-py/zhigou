@@ -40,6 +40,7 @@
 import { ref, nextTick } from 'vue';
 import { chatSse } from '@/api/chat';
 import { useUserStore } from '@/stores/user';
+import EmptyState from '@/components/EmptyState.vue';
 
 interface Message {
   role: 'user' | 'ai';

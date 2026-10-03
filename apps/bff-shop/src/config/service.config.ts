@@ -28,5 +28,7 @@ export const SERVICE_PATHS = {
   userCoupons:       '/coupon/mine',
   ragRetrieve:       '/api/v1/rag/retrieve',
   chatSse:           '/api/v1/chat/sse',
+  authSendSms:       '/auth/send-sms-code',
+  authLogin:         '/auth/login',
   authRefresh:       '/auth/refresh',
 };

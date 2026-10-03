@@ -45,6 +45,9 @@
 import { ref } from 'vue';
 import { getProductDetail } from '@/api/product';
 import { useCartStore } from '@/stores/cart';
+import Skeleton from '@/components/Skeleton.vue';
+import ErrorRetry from '@/components/ErrorRetry.vue';
+import EmptyState from '@/components/EmptyState.vue';
 
 const keyword = ref('');
 const loading = ref(false);

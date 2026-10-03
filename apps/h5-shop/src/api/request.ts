@@ -9,7 +9,7 @@ import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'a
 import { useUserStore } from '@/stores/user';
 
 const http: AxiosInstance = axios.create({
-  baseURL: '/api/v1',
+  baseURL: '/api',
   timeout: 10000,
 });
 
@@ -22,14 +22,13 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// ── 响应拦截器：401 跳登录 ──
+// ── 响应拦截器：401 清除 token 但不跳转（防止死循环） ──
 http.interceptors.response.use(
   (res: AxiosResponse) => res,
   (err) => {
     if (err.response?.status === 401) {
       const userStore = useUserStore();
       userStore.clearToken();
-      window.location.href = '/login';
       return Promise.reject(err);
     }
     const msg = err.response?.data?.message || '系统繁忙，请稍后重试';

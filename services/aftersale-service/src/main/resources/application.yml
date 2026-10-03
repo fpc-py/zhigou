@@ -5,7 +5,7 @@ spring:
     connectTimeout: 300
     readTimeout: 300
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3307/zhigou?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    url: ${DB_URL:jdbc:mysql://localhost:3307/zhigou_aftersale?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:123456}
   data.redis:

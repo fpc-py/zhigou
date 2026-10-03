@@ -6,7 +6,7 @@ spring:
     name: auth-center
 
   datasource:
-    url: jdbc:mysql://localhost:3307/zhigou?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3307/zhigou_auth?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
     username: root
     password: "123456"
     driver-class-name: com.mysql.cj.jdbc.Driver

@@ -24,6 +24,16 @@
       <ErrorRetry text="加载失败，请检查网络" btn-text="重试" @retry="loadFeed" />
     </div>
 
+    <!-- 未登录提示 -->
+    <div v-else-if="!userStore.isLoggedIn" class="feed-section">
+      <div class="login-prompt" @click="router.push('/login')">
+        <p class="login-title">登录后查看推荐商品</p>
+        <p class="login-desc">手机号一键登录，开启 AI 导购体验</p>
+        <button class="login-btn">立即登录 →</button>
+      </div>
+    </div>
+
+    <!-- 登录后但无商品 -->
     <div v-else-if="products.length === 0" class="feed-section">
       <EmptyState illustration="📭" text="暂无商品" />
     </div>
@@ -43,9 +53,16 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { getHomeFeed } from '@/api/home';
+import { useUserStore } from '@/stores/user';
 import type { ProductItem } from '@/api/home';
+import Skeleton from '@/components/Skeleton.vue';
+import ErrorRetry from '@/components/ErrorRetry.vue';
+import EmptyState from '@/components/EmptyState.vue';
+import ProductCard from '@/components/ProductCard.vue';
+import TabBar from '@/components/TabBar.vue';
 
 const router = useRouter();
+const userStore = useUserStore();
 const loading = ref(true);
 const error = ref(false);
 const products = ref<ProductItem[]>([]);
@@ -61,6 +78,12 @@ async function loadFeed() {
   loading.value = true;
   error.value = false;
   try {
+    if (!userStore.isLoggedIn) {
+      // 未登录时显示空状态，不请求接口（BFF 首页 feed 需要 JWT）
+      products.value = [];
+      loading.value = false;
+      return;
+    }
     const data = await getHomeFeed();
     products.value = data.products;
   } catch {
@@ -138,5 +161,29 @@ onMounted(loadFeed);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+.login-prompt {
+  text-align: center;
+  padding: 60px 24px;
+  cursor: pointer;
+}
+.login-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.login-desc {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-bottom: 20px;
+}
+.login-btn {
+  display: inline-block;
+  padding: 10px 32px;
+  background: var(--brand);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 500;
 }
 </style>
