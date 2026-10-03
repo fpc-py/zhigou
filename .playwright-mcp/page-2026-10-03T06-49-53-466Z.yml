@@ -1,0 +1,20 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4] [cursor=pointer]:
+      - generic [ref=e5]: 💬
+      - generic [ref=e6]: 问问小智，想买什么？
+      - generic [ref=e7]: →
+    - generic [ref=e8]:
+      - generic [ref=e9] [cursor=pointer]:
+        - generic [ref=e10]: 🛍️
+        - generic [ref=e11]: 全部商品
+      - generic [ref=e12] [cursor=pointer]:
+        - generic [ref=e13]: 🎫
+        - generic [ref=e14]: 优惠券
+      - generic [ref=e15] [cursor=pointer]:
+        - generic [ref=e16]: 📦
+        - generic [ref=e17]: 订单
+      - generic [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: 💁
+        - generic [ref=e20]: 客服
+  - generic [ref=e21]: Cannot GET /api/v1/home/feed

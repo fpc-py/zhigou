@@ -1,0 +1,8 @@
+- generic [ref=f436e4]:
+  - heading "商家登录" [level=2] [ref=f436e5]
+  - paragraph [ref=f436e6]: 智购 · 商家管理中心
+  - generic [ref=f436e7]:
+    - textbox "账号" [ref=f436e12]
+    - textbox "密码" [ref=f436e17]
+    - button "登录" [ref=f436e20] [cursor=pointer]
+  - generic [ref=f436e22]: "W11 演示账号: admin / admin123"
