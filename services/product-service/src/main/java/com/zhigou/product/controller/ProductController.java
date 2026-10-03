@@ -7,6 +7,7 @@ import com.zhigou.product.dto.SpuDetailResponse;
 import com.zhigou.product.dto.SpuPageQuery;
 import com.zhigou.product.entity.Brand;
 import com.zhigou.product.entity.Category;
+import com.zhigou.product.entity.ProductSku;
 import com.zhigou.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,8 +40,9 @@ public class ProductController {
 
     @Operation(summary = "新增spu")
     @PostMapping("/spu")
-    public Result<Map<String, Long>> create(@Valid @RequestBody SpuCreateRequest request) {
-        return Result.ok(Map.of("spuId", productService.createSpu(request)));
+    public Result<Map<String, String>> create(@Valid @RequestBody SpuCreateRequest request) {
+        // spuId 为 Snowflake ID，转字符串返回避免前端精度丢失
+        return Result.ok(Map.of("spuId", String.valueOf(productService.createSpu(request))));
     }
 
     @Operation(summary = "更新spu")
@@ -73,5 +75,20 @@ public class ProductController {
     @GetMapping("/sku/{skuId}/validate")
     public Result<Boolean> validateSku(@PathVariable("skuId") Long skuId) {
         return Result.ok(productService.validateSku(skuId));
+    }
+
+    @Operation(summary = "按 skuId 查 SKU 详情")
+    @GetMapping("/sku/{skuId}")
+    public Result<SpuDetailResponse.SkuItem> querySku(@PathVariable("skuId") Long skuId) {
+        ProductSku sku = productService.querySku(skuId);
+        if (sku == null) return Result.ok(null);
+        return Result.ok(SpuDetailResponse.SkuItem.builder()
+                .skuId(sku.getSkuId())
+                .specName(sku.getSpecName())
+                .specValue(sku.getSpecValue())
+                .price(sku.getPrice())
+                .stock(sku.getStock())
+                .image(sku.getImage())
+                .build());
     }
 }

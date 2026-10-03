@@ -73,4 +73,10 @@ public class InventoryServiceImpl implements InventoryService {
         }
         log.info("预热完成: {} 条记录", stocks.size());
     }
+
+    @Override
+    public Stock query(Long skuId) {
+        if (skuId == null) return null;
+        return stockMapper.selectOne(new LambdaQueryWrapper<Stock>().eq(Stock::getSkuId, skuId));
+    }
 }

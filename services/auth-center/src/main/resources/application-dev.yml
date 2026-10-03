@@ -1,0 +1,13 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  flyway:
+    # dev profile 追加 mock 数据目录（DDL + mock）
+    # 上线时不激活 dev profile，仅执行 db/migration（纯 DDL）
+    # 注意：db/mock 必须与 db/migration 平级，否则会被 Flyway 递归扫描到
+    locations: classpath:db/migration,classpath:db/mock
+
+logging:
+  level:
+    com.zhigou: DEBUG

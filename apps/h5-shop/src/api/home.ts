@@ -1,7 +1,8 @@
 import http from './request';
 
 export interface ProductItem {
-  spuId: number;
+  /** Snowflake ID，后端以字符串返回以避免 JS 精度丢失 */
+  spuId: string;
   name: string;
   priceMin: number;
   priceMax: number;

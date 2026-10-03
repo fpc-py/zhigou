@@ -68,7 +68,7 @@ const error = ref(false);
 const products = ref<ProductItem[]>([]);
 
 const entries = [
-  { icon: '🛍️', label: '全部商品', action: () => {} },
+  { icon: '🛍️', label: '全部商品', action: () => router.push('/products') },
   { icon: '🎫', label: '优惠券', action: () => router.push('/profile') },
   { icon: '📦', label: '订单', action: () => router.push('/profile') },
   { icon: '💁', label: '客服', action: () => router.push('/chat') },

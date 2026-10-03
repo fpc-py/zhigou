@@ -11,12 +11,12 @@ export const SERVICES: Record<string, ServiceEntry> = {
   // 鉴权（登录/刷新不需要 500ms 限制）
   authCenter: { url: 'http://localhost:8080', timeout: 5_000 },
 
-  // 业务服务（每个下游 500ms，超过就降级）
-  userService:    { url: 'http://localhost:8081', timeout: 500 },
-  productService: { url: 'http://localhost:8083', timeout: 500 },
-  cartService:    { url: 'http://localhost:8084', timeout: 500 },
-  inventorySvc:   { url: 'http://localhost:8086', timeout: 500 },
-  marketingSvc:   { url: 'http://localhost:8088', timeout: 500 },
+  // 业务服务（单次下游调用超时后降级；原值 500ms 对冷启动/首次查询过短，易误判超时）
+  userService:    { url: 'http://localhost:8081', timeout: 2_000 },
+  productService: { url: 'http://localhost:8083', timeout: 2_000 },
+  cartService:    { url: 'http://localhost:8084', timeout: 2_000 },
+  inventorySvc:   { url: 'http://localhost:8086', timeout: 2_000 },
+  marketingSvc:   { url: 'http://localhost:8088', timeout: 2_000 },
 
   // AI 服务（SSE 需要长连接）
   aiOrchestrator: { url: 'http://localhost:8000', timeout: 30_000 },

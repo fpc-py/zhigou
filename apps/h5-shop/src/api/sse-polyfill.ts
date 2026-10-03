@@ -54,6 +54,9 @@ export async function postSse(
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
+      // 服务端（sse_starlette）默认以 \r\n 分隔，统一规范化为 \n，
+      // 否则按 \n\n 分割时永远切不出事件（\r\n\r\n 不含连续 \n\n）
+      buffer = buffer.replace(/\r\n/g, '\n');
 
       // SSE 事件以 \n\n 分隔
       const parts = buffer.split('\n\n');

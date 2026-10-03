@@ -36,10 +36,10 @@ def _check_user_id(param_user_id: str) -> None:
         raise PermissionError(f"userId 不一致: 当前请求用户 {current}，工具入参 {param_user_id}")
 
 
-async def _http_get(url: str, timeout: float = 5.0) -> dict[str, Any]:
+async def _http_get(url: str, timeout: float = 5.0, headers: dict | None = None) -> dict[str, Any]:
     """执行 HTTP GET 并返回 JSON body。"""
     async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.get(url)
+        resp = await client.get(url, headers=headers or {})
         resp.raise_for_status()
         return resp.json()
 
@@ -66,14 +66,21 @@ async def search_products(keyword: str, limit: int = 10) -> str:
         limit: 返回条数，默认 10，最大 50
     """
     try:
-        url = f"{settings.search_service_url}/api/products/search?keyword={keyword}&pageSize={limit}"
-        data = await _http_get(url, timeout=5.0)
+        limit = min(limit, 50)
+        url = f"{settings.product_service_url}/product/page?keyword={keyword}&pageNum=1&pageSize={limit}"
+        # product-service 要求认证，内网调用通过 x-user-id 透传身份
+        headers = {"x-user-id": _get_current_user()}
+        data = await _http_get(url, timeout=5.0, headers=headers)
         items = data.get("data", {}).get("records", [])
         if not items:
             return "未搜索到相关商品。"
         results = []
         for item in items[:limit]:
-            results.append(f"· {item.get('name', '未知')} | ¥{item.get('price', 0)/100:.2f} | {item.get('stockStatus', '未知')}")
+            price_min = item.get("priceMin", 0)
+            skus = item.get("skus") or []
+            # 带上首个 SKU 的真实 skuId，便于 LLM 后续调用查价/查库存工具
+            sku_hint = f" | skuId={skus[0].get('skuId')}" if skus else ""
+            results.append(f"· {item.get('name', '未知')} | ¥{price_min / 100:.2f} 起{sku_hint}")
         return "\n".join(results)
     except Exception as e:
         logger.warning("search_products 调用失败: %s", e)
@@ -89,10 +96,14 @@ async def get_price(sku_id: str) -> str:
         sku_id: SKU ID
     """
     try:
-        url = f"{settings.product_service_url}/api/products/sku/{sku_id}/price"
-        data = await _http_get(url, timeout=5.0)
-        price_fen = data.get("data", {}).get("price", 0)
-        return f"¥{price_fen/100:.2f}"
+        url = f"{settings.product_service_url}/product/sku/{sku_id}"
+        headers = {"x-user-id": _get_current_user()}
+        data = await _http_get(url, timeout=5.0, headers=headers)
+        sku = data.get("data") or {}
+        if not sku:
+            return "未查询到该 SKU 的价格信息。"
+        price_fen = sku.get("price", 0)
+        return f"¥{price_fen / 100:.2f}"
     except Exception as e:
         logger.warning("get_price 调用失败 skuId=%s: %s", sku_id, e)
         return "这项信息暂时没查到"
@@ -107,12 +118,15 @@ async def check_inventory(sku_id: str) -> str:
         sku_id: SKU ID
     """
     try:
-        url = f"{settings.inventory_service_url}/api/inventory/{sku_id}"
-        data = await _http_get(url, timeout=5.0)
-        inv = data.get("data", {})
+        url = f"{settings.inventory_service_url}/inventory/{sku_id}"
+        headers = {"x-user-id": _get_current_user()}
+        data = await _http_get(url, timeout=5.0, headers=headers)
+        inv = data.get("data")
+        if not inv:
+            return "该商品暂无库存记录。"
         available = inv.get("available", 0)
-        status = inv.get("status", "unknown")
-        return f"可售库存: {available}，状态: {status}"
+        locked = inv.get("locked", 0)
+        return f"可售库存: {available}，已锁定: {locked}"
     except Exception as e:
         logger.warning("check_inventory 调用失败 skuId=%s: %s", sku_id, e)
         return "这项信息暂时没查到"
@@ -130,9 +144,12 @@ async def get_user_profile(user_id: str) -> str:
         # 安全校验：userId 越权则返回友好提示
         _check_user_id(user_id)
 
-        url = f"{settings.user_service_url}/api/users/{user_id}/profile"
-        data = await _http_get(url, timeout=5.0)
-        profile = data.get("data", {})
+        url = f"{settings.user_service_url}/user/profile"
+        headers = {"x-user-id": user_id}
+        data = await _http_get(url, timeout=5.0, headers=headers)
+        profile = data.get("data")
+        if not profile:
+            return "暂无该用户画像信息。"
         return json.dumps(profile, ensure_ascii=False)
     except PermissionError:
         return "这项信息暂时没查到"
@@ -154,15 +171,14 @@ async def apply_coupon(user_id: str, items: list[str]) -> str:
         # 安全校验：userId 越权则返回友好提示
         _check_user_id(user_id)
 
-        url = f"{settings.marketing_service_url}/api/coupons/available"
-        payload = {"userId": user_id, "skuIds": items}
-        data = await _http_post(url, json_data=payload, timeout=5.0)
+        url = f"{settings.marketing_service_url}/coupon/mine?userId={user_id}&status=UNUSED"
+        data = await _http_get(url, timeout=5.0)
         coupons = data.get("data", [])
         if not coupons:
             return "当前暂无可用优惠券。"
         results = []
         for c in coupons:
-            results.append(f"· {c.get('name', '优惠券')} | 减¥{c.get('discount', 0)/100:.0f} | 有效期至 {c.get('endTime', '未知')}")
+            results.append(f"· 优惠券 #{c.get('couponTemplateId', '未知')} | 状态 {c.get('status', '未知')}")
         return "\n".join(results)
     except PermissionError:
         return "这项信息暂时没查到"

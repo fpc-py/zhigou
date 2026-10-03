@@ -11,7 +11,9 @@ const EXEMPT_PREFIXES = ['/chat/sse', '/auth/login', '/auth/refresh', '/health']
 
 @Injectable()
 export class TimeoutInterceptor implements NestInterceptor {
-  private readonly defaultTimeout = 500;
+  // 入口超时需大于单次下游超时（service.config 为 2000ms），
+  // 否则下游尚未返回降级数据，整体请求已先被判定超时（返回 code 500 / data null）。
+  private readonly defaultTimeout = 3_000;
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();

@@ -6,6 +6,7 @@ import com.zhigou.product.dto.SpuDetailResponse;
 import com.zhigou.product.dto.SpuPageQuery;
 import com.zhigou.product.entity.Brand;
 import com.zhigou.product.entity.Category;
+import com.zhigou.product.entity.ProductSku;
 
 import java.util.List;
 
@@ -19,4 +20,6 @@ public interface ProductService {
     List<Brand> brands();
     /** 校验 SKU 是否存在（供 cart-service 等下游服务调用） */
     boolean validateSku(Long skuId);
+    /** 按 skuId 查询 SKU 详情（供 AI 导购等下游服务调用） */
+    ProductSku querySku(Long skuId);
 }

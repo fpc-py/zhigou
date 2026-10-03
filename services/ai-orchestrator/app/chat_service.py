@@ -141,7 +141,7 @@ async def chat_stream(
                         if chunk is not None and hasattr(chunk, "content") and chunk.content:
                             content = chunk.content
                             response_text += content
-                            yield f"event: token\ndata: {json.dumps({'content': content}, ensure_ascii=False)}\n\n"
+                            yield {"event": "token", "data": json.dumps({"content": content}, ensure_ascii=False)}
 
                     # ── 工具调用 ──
                     elif kind == "on_chat_model_start":
@@ -149,37 +149,38 @@ async def chat_stream(
 
                     elif kind == "on_tool_start":
                         tool_data = event.get("data", {})
-                        tool_name = tool_data.get("name", "unknown")
+                        # LangChain astream_events v2: 工具名在事件顶层 name 字段（原取自 data.name 会得到 unknown）
+                        tool_name = event.get("name", "unknown")
                         tool_input = tool_data.get("input", {})
                         safe_args = dict(tool_input)
                         if "userId" in safe_args:
                             safe_args["userId"] = safe_args["userId"][:3] + "***"
-                        yield f"event: tool_call\ndata: {json.dumps({'tool': tool_name, 'args': safe_args}, ensure_ascii=False)}\n\n"
+                        yield {"event": "tool_call", "data": json.dumps({"tool": tool_name, "args": safe_args}, ensure_ascii=False)}
 
                     elif kind == "on_tool_end":
                         tool_data = event.get("data", {})
                         tool_name = event.get("name", "unknown")
                         output = tool_data.get("output", "")
                         output_str = str(output) if output else ""
-                        yield f"event: tool_result\ndata: {json.dumps({'tool': tool_name, 'result': output_str}, ensure_ascii=False)}\n\n"
+                        yield {"event": "tool_result", "data": json.dumps({"tool": tool_name, "result": output_str}, ensure_ascii=False)}
 
         except TimeoutError:
             logger.warning("LLM 超时 (timeout=%dms)，切换为兜底推荐", llm_timeout_ms())
-            async for event in timeout_fallback_stream():
+            # 兜底流内部已 yield done，此处无需重复
+            async for event in timeout_fallback_stream(user_id):
                 yield event
-            yield "event: done\ndata: null\n\n"
             return
 
         # 完成
-        yield "event: done\ndata: null\n\n"
+        yield {"event": "done", "data": "null"}
 
     except PermissionError as e:
         logger.error("权限校验失败: %s", e)
-        yield f"event: error\ndata: {json.dumps({'message': '权限校验失败'}, ensure_ascii=False)}\n\n"
-        yield "event: done\ndata: null\n\n"
+        yield {"event": "error", "data": json.dumps({"message": "权限校验失败"}, ensure_ascii=False)}
+        yield {"event": "done", "data": "null"}
     except Exception as e:
         logger.error("对话处理异常: %s", e, exc_info=True)
-        yield f"event: error\ndata: {json.dumps({'message': '对话处理异常，请稍后重试'}, ensure_ascii=False)}\n\n"
-        yield "event: done\ndata: null\n\n"
+        yield {"event": "error", "data": json.dumps({"message": "对话处理异常，请稍后重试"}, ensure_ascii=False)}
+        yield {"event": "done", "data": "null"}
     finally:
         _current_user_id.reset(token)

@@ -15,7 +15,7 @@
     <img src="https://img.shields.io/badge/Redis-7-%23DC382D?logo=redis" alt="Redis 7" />
     <img src="https://img.shields.io/badge/PostgreSQL-16-%234169E1?logo=postgresql" alt="PostgreSQL 16" />
   </p>
-</p>
+
 
 ---
 
@@ -59,6 +59,34 @@ docker compose -f infra/compose/middleware.yml up -d
 mvn install -pl packages/common -DskipTests
 
 # 启动所有 Java 微服务（分终端启动）
+##dev
+$root = "D:\aafpc\Java\demo\zhigou\zhigou" $services = @( 'auth-center' , 'product-service' , 'cart-service' , 'order-service' , 'inventory-service' , 'payment-service' , 'marketing-service' , 'logistics-service' , 'aftersale-service' , 'user-service' , 'file-service' ) foreach ( $svc in $services ) {
+  Write-Host "Starting $svc (dev) ..." -ForegroundColor Cyan
+  Start-Process -FilePath "cmd.exe" `
+    -ArgumentList "/k" , "mvn spring-boot:run -pl services/ $svc -Dspring-boot.run.profiles=dev" `
+    -WorkingDirectory $root Start-Sleep -Seconds 2 }
+
+##直接跑打包好的 jar（推荐，启动快，不用每次编译）
+$root = "D:\aafpc\Java\demo\zhigou\zhigou"
+$services = @{
+  'auth-center'='zhigou-auth-center'; 'product-service'='zhigou-product-service'
+  'cart-service'='zhigou-cart-service'; 'order-service'='zhigou-order-service'
+  'inventory-service'='zhigou-inventory-service'; 'payment-service'='zhigou-payment-service'
+  'marketing-service'='zhigou-marketing-service'; 'logistics-service'='zhigou-logistics-service'
+  'aftersale-service'='zhigou-aftersale-service'; 'user-service'='zhigou-user-service'
+  'file-service'='zhigou-file-service'
+}
+
+foreach ($svc in $services.Keys) {
+  $jar = "services\$svc\target\$($services[$svc])-0.1.0-SNAPSHOT.jar"
+  Write-Host "Starting $svc (dev) ..." -ForegroundColor Cyan
+  Start-Process -FilePath "cmd.exe" `
+    -ArgumentList "/k","java -jar $jar --spring.profiles.active=dev" `
+    -WorkingDirectory $root
+  Start-Sleep -Seconds 2
+}
+    
+##上线
 $root = "D:\aafpc\Java\demo\zhigou\zhigou"
 $services = @(
   'auth-center','product-service','cart-service','order-service',

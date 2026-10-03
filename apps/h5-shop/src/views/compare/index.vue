@@ -38,6 +38,8 @@
         <button class="result-cart" @click="add(r)">加购</button>
       </div>
     </div>
+
+    <TabBar />
   </div>
 </template>
 
@@ -48,6 +50,7 @@ import { useCartStore } from '@/stores/cart';
 import Skeleton from '@/components/Skeleton.vue';
 import ErrorRetry from '@/components/ErrorRetry.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import TabBar from '@/components/TabBar.vue';
 
 const keyword = ref('');
 const loading = ref(false);
@@ -90,7 +93,8 @@ function add(item: any) {
 
 <style scoped>
 .compare-page {
-  padding: 16px;
+  /* 底部预留固定 TabBar 高度 */
+  padding: 16px 16px 74px;
 }
 .search-bar {
   display: flex;

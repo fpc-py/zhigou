@@ -226,4 +226,11 @@ public class ProductServiceImpl implements ProductService {
                 new LambdaQueryWrapper<ProductSku>().eq(ProductSku::getSkuId, skuId));
         return sku != null;
     }
+
+    @Override
+    public ProductSku querySku(Long skuId) {
+        if (skuId == null) return null;
+        return skuMapper.selectOne(
+                new LambdaQueryWrapper<ProductSku>().eq(ProductSku::getSkuId, skuId));
+    }
 }

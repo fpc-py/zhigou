@@ -1,6 +1,7 @@
 package com.zhigou.inventory.controller;
 
 import com.zhigou.common.Result;
+import com.zhigou.inventory.entity.Stock;
 import com.zhigou.inventory.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -30,5 +31,10 @@ public class InventoryController {
         Long skuId = ((Number) body.get("skuId")).longValue();
         int count = ((Number) body.get("count")).intValue();
         inventoryService.rollback(skuId, count); return Result.ok();
+    }
+
+    @GetMapping("/{skuId}")
+    public Result<Stock> query(@PathVariable("skuId") Long skuId) {
+        return Result.ok(inventoryService.query(skuId));
     }
 }

@@ -33,6 +33,8 @@
         {{ sending ? '...' : '发送' }}
       </button>
     </div>
+
+    <TabBar />
   </div>
 </template>
 
@@ -41,6 +43,7 @@ import { ref, nextTick } from 'vue';
 import { chatSse } from '@/api/chat';
 import { useUserStore } from '@/stores/user';
 import EmptyState from '@/components/EmptyState.vue';
+import TabBar from '@/components/TabBar.vue';
 
 interface Message {
   role: 'user' | 'ai';
@@ -111,7 +114,8 @@ async function send() {
 .chat-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  /* 减去固定底部 TabBar 的高度，避免输入框被遮挡 */
+  height: calc(100vh - 58px);
   padding-bottom: 0;
 }
 .msg-list {

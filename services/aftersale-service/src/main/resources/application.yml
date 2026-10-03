@@ -16,7 +16,7 @@ spring:
     locations: classpath:db/migration
     table: flyway_aftersale_history
     baseline-on-migrate: true
-    repair-on-migrate: true
+    validate-on-migrate: false
 mybatis-plus:
   global-config:
     db-config:

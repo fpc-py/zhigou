@@ -1,0 +1,12 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  flyway:
+    # cart-service 使用 Redis，无 DataSource；Flyway 自动配置会跳过。
+    # 保留此配置以保持 11 服务目录结构一致，便于后续若 cart 落库时扩展。
+    locations: classpath:db/migration,classpath:db/mock
+
+logging:
+  level:
+    com.zhigou: DEBUG

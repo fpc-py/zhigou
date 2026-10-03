@@ -24,11 +24,11 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.7
 
     # ── 各服务 HTTP 地址 ──
-    search_service_url: str = "http://localhost:8085"
+    search_service_url: str = "http://localhost:8083"
     product_service_url: str = "http://localhost:8083"
     inventory_service_url: str = "http://localhost:8086"
     user_service_url: str = "http://localhost:8081"
-    marketing_service_url: str = "http://localhost:8087"
+    marketing_service_url: str = "http://localhost:8088"
 
     # ── JWT（用于转发认证） ──
     jwt_secret: str = "change-me-to-a-random-256-bit-string"

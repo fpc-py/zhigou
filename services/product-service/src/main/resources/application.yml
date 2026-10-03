@@ -18,7 +18,7 @@ spring:
     locations: classpath:db/migration
     table: flyway_product_history
     baseline-on-migrate: true
-    repair-on-migrate: true
+    validate-on-migrate: false
   jackson:
     serialization:
       write-dates-as-timestamps: false

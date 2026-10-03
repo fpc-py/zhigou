@@ -2,4 +2,7 @@ ai:
   enabled: true
 
 llm:
-  timeout_ms: 1500
+  # 远程 LLM（阿里云百炼）首字延迟通常 1~3s，整体流式生成 5~15s。
+  # 原值 1500ms 过短，会导致几乎必然超时并直接返回兜底文案。
+  # 需小于 BFF 的 aiOrchestrator timeout（30s）。
+  timeout_ms: 20000

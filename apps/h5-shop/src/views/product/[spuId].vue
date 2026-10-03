@@ -43,8 +43,8 @@
 
       <!-- 加购按钮 -->
       <div class="buy-bar">
-        <button class="cart-btn" @click="addToCart">加入购物车</button>
-        <button class="buy-btn">立即购买</button>
+        <button class="cart-btn" @click="addToCart()">加入购物车</button>
+        <button class="buy-btn" @click="buyNow">立即购买</button>
       </div>
     </template>
   </div>
@@ -79,7 +79,7 @@ async function loadDetail() {
   }
 }
 
-function addToCart() {
+function addToCart(silent = false) {
   if (!detail.value.product) return;
   cartStore.addItem({
     spuId: Number(spuId),
@@ -87,7 +87,13 @@ function addToCart() {
     price: detail.value.product.priceMin || 0,
     count: 1,
   });
-  alert('已加入购物车');
+  if (!silent) alert('已加入购物车');
+}
+
+// 「立即购买」：项目暂无独立结算页，先加购并引导到「我的」页面完成结算
+function buyNow() {
+  addToCart(true);
+  alert('已加入购物车，请在「我的」页面完成结算');
 }
 
 onMounted(loadDetail);

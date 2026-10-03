@@ -15,7 +15,7 @@ export class HomeService {
 
   async getFeed(userId: string): Promise<HomeFeedResponse> {
     const [productsResult, ragResult] = await Promise.all([
-      this.safeCall<ProductItem[]>(this.fetchProducts()),
+      this.safeCall<ProductItem[]>(this.fetchProducts(userId)),
       this.safeCall<any[]>(this.fetchRagRecommend()),
     ]);
 
@@ -28,9 +28,9 @@ export class HomeService {
 
   // ── 下游调用封装 ──
 
-  private async fetchProducts() {
+  private async fetchProducts(userId: string) {
     const url = `${SERVICES.productService.url}${SERVICE_PATHS.productPage}?pageNum=1&pageSize=10`;
-    const obs = this.http.get(url).pipe(
+    const obs = this.http.get(url, { headers: { 'x-user-id': userId } }).pipe(
       timeout(SERVICES.productService.timeout),
       catchError((err) => {
         if (err instanceof TimeoutError) {

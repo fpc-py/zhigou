@@ -13,9 +13,9 @@ export class ProductService {
 
   constructor(private readonly http: HttpService) {}
 
-  async getDetail(spuId: string): Promise<ProductDetailResponse> {
+  async getDetail(spuId: string, userId: string): Promise<ProductDetailResponse> {
     const [productResult, ragResult] = await Promise.all([
-      this.safeCall<Record<string, any>>(this.fetchProduct(spuId)),
+      this.safeCall<Record<string, any>>(this.fetchProduct(spuId, userId)),
       this.safeCall<any>(this.fetchAiReason(spuId)),
     ]);
 
@@ -25,9 +25,9 @@ export class ProductService {
     };
   }
 
-  private async fetchProduct(spuId: string) {
+  private async fetchProduct(spuId: string, userId: string) {
     const url = `${SERVICES.productService.url}${SERVICE_PATHS.productDetail(spuId)}`;
-    const obs = this.http.get(url).pipe(
+    const obs = this.http.get(url, { headers: { 'x-user-id': userId } }).pipe(
       timeout(SERVICES.productService.timeout),
       catchError((err) => {
         if (err instanceof TimeoutError) {
