@@ -16,21 +16,23 @@ public class OrderNotifyClient {
     @Value("${payment.order-service-url:http://localhost:8085}") private String orderServiceUrl;
 
     /**
-     * 通知订单已支付。HTTP 失败重试 3 次（指数退避），最终失败仅告警。
-     * order-service 的 payCallback 已幂等（PAID 时直接返回），重复通知无副作用。
+     * 通知订单已支付。HTTP 失败重试 3 次（指数退避）。
+     *
+     * @return true=通知成功（或幂等成功）；false=最终失败，交由 T+1 对账补偿
      */
-    public void notifyPaid(String orderNo) {
+    public boolean notifyPaid(String orderNo) {
         String url = orderServiceUrl + "/order/payCallback/" + orderNo;
         for (int i = 1; i <= 3; i++) {
             try {
                 String body = HttpUtil.post(url, "");
                 log.info("通知订单支付成功: orderNo={}, resp={}", orderNo, body);
-                return;
+                return true;
             } catch (Exception e) {
                 log.warn("通知订单支付第 {} 次失败: orderNo={}, err={}", i, orderNo, e.getMessage());
-                try { Thread.sleep(500L * i); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return; }
+                try { Thread.sleep(500L * i); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return false; }
             }
         }
         log.error("通知订单支付最终失败，交由对账补偿: orderNo={}", orderNo);
+        return false;
     }
 }

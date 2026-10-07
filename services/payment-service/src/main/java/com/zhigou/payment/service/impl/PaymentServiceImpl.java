@@ -60,20 +60,47 @@ public class PaymentServiceImpl implements PaymentService {
         log.info("支付成功: paymentNo={}, orderNo={}", paymentNo, payment.getOrderNo());
 
         // 联动订单服务：订单 INIT → PAID（失败不阻断，重试+对账兜底）
-        orderNotifyClient.notifyPaid(payment.getOrderNo());
+        boolean ok = orderNotifyClient.notifyPaid(payment.getOrderNo());
+        if (ok) {
+            payment.setNotifyStatus(1);
+            paymentMapper.updateById(payment);
+        } else {
+            log.warn("订单联动通知失败，待 T+1 对账补偿: paymentNo={}", paymentNo);
+        }
     }
 
     @Override
     public void reconcile() {
-        // T+1 对账: 检查 SUCCESS 但支付单缺失的异常情况
-        List<Payment> pendings = paymentMapper.selectList(
-                new LambdaQueryWrapper<Payment>().eq(Payment::getStatus, "PENDING"));
+        // 1) 补偿：SUCCESS 但未通知订单服务的支付单（前 3 次重试失败 → 对账兜底）
+        List<Payment> unnotified = paymentMapper.selectList(new LambdaQueryWrapper<Payment>()
+                .eq(Payment::getStatus, "SUCCESS")
+                .eq(Payment::getNotifyStatus, 0));
+        int compensated = 0;
+        for (Payment p : unnotified) {
+            try {
+                if (orderNotifyClient.notifyPaid(p.getOrderNo())) {
+                    p.setNotifyStatus(1);
+                    paymentMapper.updateById(p);
+                    compensated++;
+                    log.info("对账补偿成功: paymentNo={}, orderNo={}", p.getPaymentNo(), p.getOrderNo());
+                } else {
+                    log.error("对账补偿失败（明日重试）: paymentNo={}, orderNo={}", p.getPaymentNo(), p.getOrderNo());
+                }
+            } catch (Exception e) {
+                log.error("对账补偿异常（明日重试）: paymentNo={}, err={}", p.getPaymentNo(), e.getMessage());
+            }
+        }
+
+        // 2) 风险告警：PENDING 超过 24h 的支付单（用户未完成支付，可联动超时关单）
         LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
-        long stale = pendings.stream().filter(p -> p.getCreateTime() != null && p.getCreateTime().isBefore(yesterday)).count();
+        long stale = paymentMapper.selectList(new LambdaQueryWrapper<Payment>()
+                .eq(Payment::getStatus, "PENDING")).stream()
+                .filter(p -> p.getCreateTime() != null && p.getCreateTime().isBefore(yesterday)).count();
         if (stale > 0) {
-            log.error("对账异常: {} 笔 PENDING 超过 24h", stale);
+            log.error("对账异常: {} 笔 PENDING 超过 24h，需联动超时关单", stale);
         } else {
             log.info("对账正常: 无超时待支付单");
         }
+        log.info("T+1 对账完成: 补偿 {} 笔订单联动通知", compensated);
     }
 }

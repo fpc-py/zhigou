@@ -7,12 +7,22 @@
 
 ### P0 · M1 收尾（进行中）
 - RocketMQ 事务消息最终一致性（outbox 投递任务）
-- 超时关单 / 支付对账 / 退款资金流
+- 超时关单 ✅（[0.1.3]）/ 支付对账 ✅（[0.1.3]）/ 退款资金流
 - 售后逆向全流程
 - 营销活动（满减/秒杀/拼团/凑单）
 - 评价增量向量更新
 - 用户画像 / 收藏 / 浏览历史
 - 日志脱敏、Dockerfile（9 服务）、CI/CD
+
+## [0.1.3] - 2026-10-07
+
+### feat
+- **超时关单（order-service）**：新增 `OrderTimeoutTask`（@Scheduled 每 5 分钟 + 启动首扫）与 `OrderServiceImpl.closeExpired`——扫描超过阈值（默认 15 分钟，`order.timeout-close-minutes` 可配）的 INIT 订单 → 状态机 INIT→CLOSED（closeReason="超时未支付自动关单"）→ 写 ORDER_CLOSED outbox → 调 inventory-service `/rollback` 释放预占库存（失败告警不阻断）
+- **支付对账补偿（payment-service）**：Payment 新增 `notify_status`（Flyway V20261091，幂等标记订单联动状态）；mockPay 通知失败保留 0 待补偿；`reconcile()` 增强为「SUCCESS 未通知 → 补偿 notifyPaid + PENDING 超 24h 告警」；新增运维端点 `POST /payment/reconcile`（SecurityConfig permitAll，生产需内网白名单）
+
+### test
+- 超时关单：服务启动首扫关闭 **16 笔**超时 INIT 订单，状态分布 PAID 11 / PENDING 1 / CLOSED 16，中文关单原因落库正确
+- 对账补偿：手动触发 `/payment/reconcile` 补偿 **4 笔** SUCCESS 未通知支付单（含历史数据，payCallback 幂等无副作用），SUCCESS 全部 notify_status=1，PENDING 无超时
 
 ## [0.1.2] - 2026-10-07
 

@@ -42,6 +42,8 @@
 
 
 
+* 2026-10-07：**P0-A 交易完整性第一梯队落地**：① 超时关单（order-service `OrderTimeoutTask` 每 5 分钟 + 启动首扫，INIT 超 15 分钟→CLOSED + outbox + 释放库存，首扫关闭 16 笔）；② 支付对账补偿（payment-service `notify_status` 迁移 V20261091 + reconcile 补偿 SUCCESS 未通知单 + 运维端点 `/payment/reconcile`，实测补偿 4 笔）。详见 CHANGELOG [0.1.3]。
+
 * 2026-10-07：**支付待付款终极根因修复 + 浏览器实测闭环**：① payment-service Spring Security 未放行 mock-pay 致全部支付回调被 403（BFF 吞错伪装成功）→ SecurityConfig permitAll `/payment/sandbox/mock-pay`、`/payment/notify/**`，BFF 不再吞错；② 支付成功自动通知 order-service（新增 `OrderNotifyClient` + payCallback 幂等），订单 INIT→PAID 联动自动化；③ 订单详情页 INIT 轮询刷新；④ 订单列表 tab 筛选修复（模板误用 `list` 而非 `filtered`）+ 新增"售后"tab；⑤ 详情页按钮按状态机收敛。**浏览器全流程实测**：登录→加购→结算→提交→支付成功→自动跳订单详情"商家备货中"（PAID）；售后/待付款 tab 正确过滤。已提交 git（见 CHANGELOG [0.1.2]）。
 
 * 2026-10-07：**全链路联调冒烟 PASS 17/17**（12 微服务 + BFF + H5 全启动；黄金路径 登录→商品→AI 对话→加购→下单幂等→支付→回调→库存→物流→售后→我的订单 全绿）。脚本 `scripts/smoke/zhigou-e2e.ps1`。联调修复 6 处真实 bug：Snowflake ID JSON 精度丢失（order/cart/auth DTO 序列化转字符串）、payment 强转 ClassCastException、aftersale 403 请求头不匹配、cart/file/user 拦截器不认内网透传头、AI 401 降级兜底、ai-orchestrator 启动入口修正。
@@ -61,7 +63,9 @@
 * **P0・M1 交易闭环收尾**（差距报告 P0）：
 
 
-  * RocketMQ 事务消息落地下单 - 扣库存 - 支付最终一致性（当前有 outbox 表骨架，无实际投递）
+  * ✅ 超时关单（[0.1.3]，INIT 超 15min 自动 CLOSED + 释放库存）
+  * ✅ 支付对账补偿（[0.1.3]，SUCCESS 未通知 → 补偿；PENDING 超 24h 告警；运维端点）
+  * RocketMQ 事务消息落地下单 - 扣库存 - 支付最终一致性（outbox 表已有、无投递任务）
 
   * 超时未支付自动关单、部分退款等状态边界
 

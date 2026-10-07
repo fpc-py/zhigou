@@ -28,7 +28,9 @@ public class SecurityConfig {
                                 "/doc.html", "/swagger-ui.html", "/swagger-ui/**",
                                 "/v3/api-docs/**", "/webjars/**",
                                 // 支付沙箱回调与未来真实渠道回调：服务端回调无用户上下文，靠签名验签而非登录态
-                                "/payment/sandbox/mock-pay", "/payment/notify/**"
+                                "/payment/sandbox/mock-pay", "/payment/notify/**",
+                                // 运维手动对账入口（生产应加内网白名单/管理员鉴权）
+                                "/payment/reconcile"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

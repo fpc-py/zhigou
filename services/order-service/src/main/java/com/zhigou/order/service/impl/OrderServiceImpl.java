@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +43,7 @@ public class OrderServiceImpl implements OrderService {
     private final RestTemplate restTemplate;
 
     @Value("${product-service.url}") private String productServiceUrl;
+    @Value("${inventory-service.url}") private String inventoryServiceUrl;
 
     /** 占位价（product-service 不可用时的回退值，与历史实现一致） */
     private static final long FALLBACK_PRICE = 100L;
@@ -184,6 +186,69 @@ public class OrderServiceImpl implements OrderService {
                 .eq(OrderMain::getUserId, userId)
                 .orderByDesc(OrderMain::getCreateTime));
         return orders.stream().map(this::buildResponse).collect(Collectors.toList());
+    }
+
+    @Override @Transactional
+    public int closeExpired(int minutes) {
+        LocalDateTime deadline = LocalDateTime.now().minusMinutes(minutes);
+        List<OrderMain> expired = orderMapper.selectList(new LambdaQueryWrapper<OrderMain>()
+                .eq(OrderMain::getOrderStatus, OrderState.INIT.name())
+                .lt(OrderMain::getCreateTime, deadline));
+        if (expired.isEmpty()) {
+            log.info("超时关单: 无超时未支付订单 (threshold={}min)", minutes);
+            return 0;
+        }
+        int closed = 0;
+        for (OrderMain order : expired) {
+            OrderState.validateTransition(OrderState.from(order.getOrderStatus()), OrderState.CLOSED);
+            order.setOrderStatus(OrderState.CLOSED.name());
+            order.setCloseReason("超时未支付自动关单");
+            orderMapper.updateById(order);
+
+            // outbox：超时关单事件（供下游释放库存 / 营销券回滚）
+            Outbox outbox = new Outbox();
+            outbox.setMessageId(IdUtil.fastSimpleUUID());
+            outbox.setTopic("ORDER_CLOSED"); outbox.setTag("TIMEOUT_CLOSE");
+            outbox.setPayload(JSONUtil.toJsonStr(order));
+            outboxMapper.insert(outbox);
+
+            // 释放预占库存（失败仅告警，由对账/重试兜底，不阻断关单）
+            releaseInventory(order);
+            closed++;
+        }
+        log.info("超时关单: 关闭 {} 笔超时未支付订单 (threshold={}min)", closed, minutes);
+        return closed;
+    }
+
+    /** 关单/取消时调 inventory-service 释放预占库存（演示环境预扣逻辑简单，一次 /rollback 释放该单全部 SKU 数量） */
+    private void releaseInventory(OrderMain order) {
+        try {
+            List<OrderItem> items = itemMapper.selectList(
+                    new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getOrderId()));
+            List<Map<String, Object>> skuList = items.stream().map(i -> {
+                Map<String, Object> m = new HashMap<>();
+                m.put("skuId", i.getSkuId());
+                m.put("count", i.getCount());
+                return m;
+            }).collect(Collectors.toList());
+            Map<String, Object> body = new HashMap<>();
+            body.put("orderId", String.valueOf(order.getOrderId()));
+            body.put("items", skuList);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-User-Id", String.valueOf(order.getUserId()));
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    inventoryServiceUrl + "/inventory/rollback", HttpMethod.POST,
+                    new HttpEntity<>(body, headers), String.class);
+            if (resp.getStatusCode().is2xxSuccessful()) {
+                log.info("释放库存成功: orderId={}, items={}", order.getOrderId(), skuList.size());
+            } else {
+                log.warn("释放库存非 2xx: orderId={}, status={}", order.getOrderId(), resp.getStatusCode());
+            }
+        } catch (Exception e) {
+            log.warn("释放库存失败（留待对账兜底）: orderId={}, err={}", order.getOrderId(), e.getMessage());
+        }
     }
 
     private OrderMain requireOrder(Long orderId) {

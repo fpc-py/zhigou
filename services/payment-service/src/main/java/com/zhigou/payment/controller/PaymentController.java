@@ -40,4 +40,14 @@ public class PaymentController {
         paymentService.mockPay(body.get("paymentNo"), body.get("sign"));
         return Result.ok();
     }
+
+    /**
+     * 运维触发 T+1 对账补偿（定时任务每日凌晨 1 点自动执行，此端点为手动补跑入口）。
+     * 生产环境应增加内网白名单/管理员鉴权，演示环境放行。
+     */
+    @PostMapping("/reconcile")
+    public Result<Map<String, Object>> reconcile() {
+        paymentService.reconcile();
+        return Result.ok(Map.of("triggered", true));
+    }
 }
