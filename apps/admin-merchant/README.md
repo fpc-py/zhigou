@@ -1,42 +1,20 @@
-# admin-merchant
+# admin-merchant · 商家后台
 
-This template should help get you started developing with Vue 3 in Vite.
+智购商家端管理后台，基于 **Vue 3 + Element Plus + Vite + TypeScript**。
 
-## Recommended IDE Setup
+## 职责
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- 商家登录与鉴权（`role=ADMIN` 校验）
+- 商品管理：上下架、库存维护
+- 订单管理：订单查询、售后审核
+- 营销配置：优惠券/活动配置（规划中）
 
-## Recommended Browser Setup
+> 当前为脚手架阶段，业务页按 `docs/智购开发任务差距分析报告.md` P0 清单推进（商家后台业务页：上下架 / 订单 / 营销配置）。
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## 启动与验证
 
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
+```bash
 npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
-npm run dev
-```
-
-### Type-Check, Compile and Minify for Production
-
-```sh
-npm run build
+npm run dev             # 开发
+npm run build           # 构建验证
 ```

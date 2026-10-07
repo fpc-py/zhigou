@@ -15,34 +15,59 @@
     <img src="https://img.shields.io/badge/Redis-7-%23DC382D?logo=redis" alt="Redis 7" />
     <img src="https://img.shields.io/badge/PostgreSQL-16-%234169E1?logo=postgresql" alt="PostgreSQL 16" />
   </p>
-
+</p>
 
 ---
 
 ## 项目简介
 
-**智购（ZhiGou）** 是一个 AI 原生超级商城 —— 用户可以用自然语言找商品、比价格、领优惠券，AI 导购「小智」全程陪伴。
+**智购（ZhiGou）** 是一个 **AI 原生超级购物生态 APP**——以个人智能购物助理「小智」为核心入口，重构「人-货-场」关系，实现从「人找货」到「AI 找人货匹配」的范式跃迁：用户用自然语言说需求，AI 理解需求、推荐商品、比价、辅助决策，全程可信高效。
 
-> 「搜索框 → 列表 → 详情 → 加购 → 下单」的传统电商模式 → 「你说需求 → AI 理解 → AI 推荐 → 一键下单」的对话式购物体验
+> 当前已落地 **对话式购物（AI 导购）+ 完整交易闭环**；最终愿景聚合 **商品零售、服务消费、内容种草、社交分享、金融服务** 五大生态（产品愿景详见 [docs/智购功能文档.md](docs/智购功能文档.md)）。
 
 ### 核心特性
 
-- 🤖 **AI 导购** —— 基于 LangChain + LangGraph 的对话式购物助手，SSE 流式回复，支持工具调用（搜索、查价、查库存、推荐优惠券）
-- 🛍️ **完整电商闭环** —— 商品管理 → 购物车 → 下单（幂等）→ 支付（沙箱）→ 库存扣减 → 物流 → 售后逆向流程
+- 🤖 **AI 导购** —— 基于 LangChain + LangGraph 的对话式购物助手「小智」，SSE 流式回复，支持工具调用（搜索、查价、查库存、推荐优惠券），对话结果按关键词拉取真实商品卡
+- 🛍️ **完整电商闭环** —— 商品 → 购物车（服务端）→ 下单（requestId 幂等 + 真实价格）→ 沙箱支付 → 库存扣减（Redis Lua）→ 物流 → 售后逆向流程
 - 🔍 **语义搜索** —— PostgreSQL pgvector 实现商品语义检索，告别 MySQL `LIKE %keyword%`
 - 📊 **可观测** —— Prometheus + Grafana + Loki 全栈监控，RED 指标 + JVM + 业务大盘
-- 📱 **多端覆盖** —— 移动端 H5（Vue 3）+ 商家后台（Element Plus）+ BFF 聚合层（NestJS）
+- 📱 **多端覆盖** —— 移动端 H5（Vue 3，8 屏对齐原型）+ 商家后台（Element Plus）+ BFF 聚合层（NestJS）
 - 🏗️ **企业级工程化** —— Monorepo + 12 微服务 + JWT 鉴权 + Flyway 迁移 + Testcontainers 测试
+
+### 项目状态
+
+| 里程碑 | 状态 |
+|--------|------|
+| M0 脚手架 — Monorepo + 中间件 + auth-center 登录 | ✅ |
+| M1 交易闭环 — 下单→支付→库存→物流 | 🚧 大部分完成 |
+| M2 AI 导购 — SSE + RAG + 降级 + 对话商品卡 | ✅ |
+| M3 大促压测 — 5000 QPS | ⬜ |
+| M4 上线 — 灰度 + 监控 + 回滚 | ⬜ |
+
+> 详细进度见 [docs/progress.md](docs/progress.md)；与目标态的差距与执行顺序见 [docs/智购开发任务差距分析报告.md](docs/智购开发任务差距分析报告.md)。
+
+### 文档导航
+
+**所有文档的统一索引见 [docs/README.md](docs/README.md)**。核心文档：
+
+| 想了解 | 看这里 |
+|--------|--------|
+| 产品愿景（五大生态、AI 全链路） | [docs/智购功能文档.md](docs/智购功能文档.md) |
+| 可交互原型（H5 已对齐） | [docs/智购AI超级商城-企业级可交互原型.html](docs/智购AI超级商城-企业级可交互原型.html) |
+| 生产级架构蓝图 | [docs/智购-企业级工程化技术方案.md](docs/智购-企业级工程化技术方案.md) |
+| 架构决策记录 | [docs/adr/](docs/adr/) |
+| 前端改造与 BFF 接口清单 | [docs/前端改造说明-原型对齐与后端对接.md](docs/前端改造说明-原型对齐与后端对接.md) |
+| 生产就绪度评估（已并入差距报告附录 A） | [docs/智购开发任务差距分析报告.md](docs/智购开发任务差距分析报告.md) |
+| 发布检查清单 | [docs/release-checklist.md](docs/release-checklist.md) |
 
 ## 快速开始
 
 ### 前置条件
 
-- Java 21+（JDK 21）
+- Java 21+（JDK 21）、Maven 3.9+
 - Node.js 20+、npm
 - Python 3.11+
 - Docker & Docker Compose
-- Maven 3.9+
 
 ### 1. 启动中间件
 
@@ -52,56 +77,32 @@ docker compose -f infra/compose/middleware.yml up -d
 
 一键启动：MySQL 8.0、Redis 7、RocketMQ 5.x、MinIO、PostgreSQL 16 + pgvector。
 
-### 2. 启动后端服务
+### 2. 编译并启动后端服务（Windows / PowerShell）
 
-```bash
-# 安装公共库
+```powershell
+# ① 安装公共库
 mvn install -pl packages/common -DskipTests
 
-# 启动所有 Java 微服务（分终端启动）
-##dev
-$root = "D:\aafpc\Java\demo\zhigou\zhigou" $services = @( 'auth-center' , 'product-service' , 'cart-service' , 'order-service' , 'inventory-service' , 'payment-service' , 'marketing-service' , 'logistics-service' , 'aftersale-service' , 'user-service' , 'file-service' ) foreach ( $svc in $services ) {
-  Write-Host "Starting $svc (dev) ..." -ForegroundColor Cyan
-  Start-Process -FilePath "cmd.exe" `
-    -ArgumentList "/k" , "mvn spring-boot:run -pl services/ $svc -Dspring-boot.run.profiles=dev" `
-    -WorkingDirectory $root Start-Sleep -Seconds 2 }
+# ② 编译全部服务（或对单个服务 mvn -pl services/<svc> compile）
+mvn -DskipTests package
 
-##直接跑打包好的 jar（推荐，启动快，不用每次编译）
-$root = "D:\aafpc\Java\demo\zhigou\zhigou"
-$services = @{
-  'auth-center'='zhigou-auth-center'; 'product-service'='zhigou-product-service'
-  'cart-service'='zhigou-cart-service'; 'order-service'='zhigou-order-service'
-  'inventory-service'='zhigou-inventory-service'; 'payment-service'='zhigou-payment-service'
-  'marketing-service'='zhigou-marketing-service'; 'logistics-service'='zhigou-logistics-service'
-  'aftersale-service'='zhigou-aftersale-service'; 'user-service'='zhigou-user-service'
-  'file-service'='zhigou-file-service'
-}
-
-foreach ($svc in $services.Keys) {
-  $jar = "services\$svc\target\$($services[$svc])-0.1.0-SNAPSHOT.jar"
-  Write-Host "Starting $svc (dev) ..." -ForegroundColor Cyan
-  Start-Process -FilePath "cmd.exe" `
-    -ArgumentList "/k","java -jar $jar --spring.profiles.active=dev" `
-    -WorkingDirectory $root
-  Start-Sleep -Seconds 2
-}
-    
-##上线
+# ③ 开发模式启动（带 mock 数据，profile=dev）——推荐直接跑 jar，启动快
 $root = "D:\aafpc\Java\demo\zhigou\zhigou"
 $services = @(
-  'auth-center','product-service','cart-service','order-service',
-  'inventory-service','payment-service','marketing-service',
-  'logistics-service','aftersale-service','user-service','file-service'
+  'auth-center','user-service','file-service','product-service','cart-service',
+  'order-service','inventory-service','payment-service','marketing-service',
+  'logistics-service','aftersale-service'
 )
-
 foreach ($svc in $services) {
-  Write-Host "Starting $svc ..." -ForegroundColor Cyan
-  Start-Process -FilePath "cmd.exe" `
-    -ArgumentList "/k","mvn spring-boot:run -pl services/$svc" `
-    -WorkingDirectory $root
+  $jar = "services\$svc\target\zhigou-$svc-0.1.0-SNAPSHOT.jar"
+  Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "java -jar `"$jar`" --spring.profiles.active=dev" -WorkingDirectory $root
   Start-Sleep -Seconds 2   # 错开启动，避免同时抢 CPU/内存
 }
 ```
+
+> 中间件默认账号密码见 `infra/compose/middleware.yml`；Mock 数据机制与上线清除见 [docs/mock-data-cleanup-guide.md](docs/mock-data-cleanup-guide.md)。
+
+### 服务端口对照
 
 | 服务 | 端口 | 说明 |
 |------|------|------|
@@ -109,13 +110,14 @@ foreach ($svc in $services) {
 | user-service | 8081 | 用户/地址管理 |
 | file-service | 8082 | 文件上传（MinIO） |
 | product-service | 8083 | 商品 SPU/SKU CRUD |
-| cart-service | 8084 | 购物车 |
+| cart-service | 8084 | 购物车（Redis） |
 | order-service | 8085 | 订单管理（含状态机） |
 | inventory-service | 8086 | 库存扣减（Redis Lua） |
 | payment-service | 8087 | 沙箱支付 + T+1 对账 |
 | marketing-service | 8088 | 优惠券/折扣引擎 |
 | logistics-service | 8089 | 运费计算 + 物流轨迹 |
 | aftersale-service | 8090 | 售后/逆向流程（状态机） |
+| ai-orchestrator | 8000 | AI 导购（Python FastAPI） |
 
 ### 3. 启动 AI 服务
 
@@ -127,10 +129,10 @@ cd services/ai-orchestrator && python main.py
 ### 4. 启动 BFF 和前端
 
 ```bash
-# BFF 聚合层（NestJS）
+# BFF 聚合层（NestJS, :3000）
 cd apps/bff-shop && npm install && npm run start:dev
 
-# 移动端 H5（Vue 3）
+# 移动端 H5（Vue 3, :5173，已配 /api 代理到 BFF）
 cd apps/h5-shop && npm install && npm run dev
 
 # 商家后台（Element Plus）
@@ -156,7 +158,7 @@ curl -X POST http://localhost:3000/auth/login \
 # 浏览首页
 curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/home/feed
 
-# AI 对话
+# AI 对话（SSE）
 curl -N -X POST http://localhost:8000/api/v1/chat/sse \
   -H "Content-Type: application/json" \
   -d '{"query":"推荐跑步鞋","userId":"u1001","sessionId":"s001"}'
@@ -180,12 +182,12 @@ curl -N -X POST http://localhost:8000/api/v1/chat/sse \
    │auth-center│   │product │ │order │ │cart│ │inventory │ │payment  │
    │  8080    │   │ 8083   │ │8085  │ │8084│ │ 8086     │ │ 8087    │
    └──────────┘   └────────┘ └──────┘ └────┘ └──────────┘ └─────────┘
-                                                                   
+
    ┌──────────┐   ┌────────┐ ┌──────┐ ┌────┐ ┌──────────┐ ┌─────────┐
    │marketing │   │logistics│ │after │ │user│ │   file   │ │   AI    │
    │  8088    │   │  8089   │ │8090  │ │8081│ │   8082   │ │  8000   │
    └──────────┘   └────────┘ └──────┘ └────┘ └──────────┘ └─────────┘
-                                                                   
+
    ┌──────────────────────────────────────────────────────────────┐
    │                   基础设施层                                  │
    │  MySQL · Redis · RocketMQ · MinIO · PostgreSQL + pgvector    │
@@ -196,7 +198,7 @@ curl -N -X POST http://localhost:8000/api/v1/chat/sse \
    └──────────────────────────────────────────────────────────────┘
 ```
 
-### 数据流
+### AI 数据流
 
 ```
                  ┌───────────────────┐
@@ -218,7 +220,7 @@ curl -N -X POST http://localhost:8000/api/v1/chat/sse \
                           ▼
                ┌─────────────────────┐
                │  SSE 流式回复        │
-               │  token → 卡片 → done │
+               │  token → 商品卡 → done│
                └─────────────────────┘
 ```
 
@@ -253,30 +255,29 @@ curl -N -X POST http://localhost:8000/api/v1/chat/sse \
 |------|------|
 | 编排 | Docker Compose |
 | 部署 | K8s (Helm chart 开发中) |
-| CI | (待接入) |
+| CI | (待接入，见差距报告附录 A P1-6) |
 | 迁移 | Flyway |
 
 ## 项目结构
 
 ```
 zhigou/
-├── services/                    # Java 微服务 (11个)
-│   ├── auth-center/             #   认证中心
-│   ├── user-service/            #   用户服务
-│   ├── product-service/         #   商品服务
-│   ├── cart-service/            #   购物车
-│   ├── order-service/           #   订单
-│   ├── inventory-service/       #   库存
-│   ├── payment-service/         #   支付
-│   ├── marketing-service/       #   营销
-│   ├── logistics-service/       #   物流
-│   ├── aftersale-service/       #   售后
-│   └── file-service/            #   文件
-├── ai-services/                 # AI 服务
-│   └── ai-orchestrator/         #   AI 导购 (Python FastAPI)
+├── services/                    # 微服务 (11 Java + 1 Python)
+│   ├── auth-center/             #   认证中心 :8080
+│   ├── user-service/            #   用户服务 :8081
+│   ├── file-service/            #   文件服务 :8082
+│   ├── product-service/         #   商品服务 :8083
+│   ├── cart-service/            #   购物车 :8084
+│   ├── order-service/           #   订单 :8085
+│   ├── inventory-service/       #   库存 :8086
+│   ├── payment-service/         #   支付 :8087
+│   ├── marketing-service/       #   营销 :8088
+│   ├── logistics-service/       #   物流 :8089
+│   ├── aftersale-service/       #   售后 :8090
+│   └── ai-orchestrator/         #   AI 导购 (Python FastAPI) :8000
 ├── apps/                        # 前端应用
-│   ├── bff-shop/                #   BFF 聚合层 (NestJS)
-│   ├── h5-shop/                 #   移动端 H5 (Vue 3)
+│   ├── bff-shop/                #   BFF 聚合层 (NestJS) :3000
+│   ├── h5-shop/                 #   移动端 H5 (Vue 3) :5173
 │   └── admin-merchant/          #   商家后台 (Element Plus)
 ├── packages/                    # 公共库
 │   ├── common/                  #   Java 公共库 (Result/异常/JWT)
@@ -287,7 +288,8 @@ zhigou/
 ├── scripts/                     # 工具脚本
 │   ├── e2e-order.sh             #   端到端冒烟
 │   ├── backfill_vec.py          #   向量全量回填
-│   └── load-test/               #   压测 (k6)
+│   ├── load-test/               #   压测 (k6 / seed-data)
+│   └── mock-data/               #   mock 清除脚本
 ├── config/                      # 运行时配置
 │   └── fallback.yml             #   AI 降级开关
 ├── conf/                        # 基础设施配置
@@ -296,40 +298,8 @@ zhigou/
 │   └── loki/                    #   Loki 存储配置
 ├── prompts/                     # AI 系统提示词
 │   └── system.md                #   导购「小智」角色设定
-├── docs/                        # 文档
-│   ├── adr/                     #   架构决策记录
-│   ├── progress.md              #   项目进度
-│   ├── load-test/               #   压测报告
-│   └── release-checklist.md     #   发布检查清单
-└── CLAUDE.md                    # Claude Code 项目指令
-```
-
-## 端到端流程
-
-```
-用户发验证码 ─▶ 登录拿 JWT ─▶ 浏览首页 ─▶ AI 对话
-                                  │
-                                  ▼
-                             商品详情 ─▶ 加购
-                                  │
-                                  ▼
-                 ┌─── 下单(requestId 幂等) ───┐
-                 │       │                    │
-                 │       ▼                    │
-                 │   沙箱支付                  │
-                 │       │                    │
-                 │  回调确认状态=PAID          │
-                 │       │                    │
-                 │   库存扣减                  │
-                 │       │                    │
-                 │   物流单生成                │
-                 │       │                    │
-                 │   ┌───┘                    │
-                 │   ▼                        │
-                 │ 售后申请                    │
-                 │    │                       │
-                 │  审核同意                   │
-                 └───────────────────────────┘
+├── docs/                        # 文档中心（索引见 docs/README.md）
+└── CLAUDE.md                    # AI 协作项目指令
 ```
 
 ## 测试
@@ -358,37 +328,6 @@ k6 run scripts/load-test/smoke-test.js
 
 > 完整报告见 [docs/load-test/](docs/load-test/)
 
-## 项目状态
-
-> **当前阶段**: M0 脚手架 / M1 交易闭环（进行中）
-> [docs/progress.md](docs/progress.md)
-
-| 里程碑 | 状态 |
-|--------|------|
-| M0 脚手架 — Monorepo + 中间件 + auth-center 登录 | ✅ |
-| M1 交易闭环 — 下单→支付→库存→物流 | 🚧 |
-| M2 AI 导购 — SSE + RAG + 降级 | ✅ |
-| M3 大促压测 — 5000 QPS | ⬜ |
-| M4 上线 — 灰度 + 监控 + 回滚 | ⬜ |
-
-## 贡献指南
-
-1. Fork 本仓库
-2. 从 `develop` 创建 feature 分支：`feature/<服务名>-<描述>`
-3. 提交遵循 [Conventional Commits](https://www.conventionalcommits.org/)
-4. 确保 `mvn test` 和 `pytest` 通过
-5. 创建 PR 合入 `develop`
-
-### 提交规范
-
-```
-feat(order): 新增创建订单接口，支持 requestId 幂等
-fix(payment): 修复沙箱支付回调重复消费问题
-refactor(inventory): 把 Lua 脚本抽到独立类
-test(cart): 补充购物车并发加购测试
-docs: 更新 ADR-0002
-```
-
 ## 红线
 
 1. ❌ 不允许跨服务直连对方数据库
@@ -397,9 +336,11 @@ docs: 更新 ADR-0002
 4. ❌ 不允许暴露栈信息给前端
 5. ❌ 不允许生产环境开 DEBUG 日志
 
+> 完整规范见 [CLAUDE.md](CLAUDE.md) 与 [CONTRIBUTING.md](CONTRIBUTING.md)；发布流程见 [docs/release-checklist.md](docs/release-checklist.md)。
+
 ## 许可证
 
-[MIT](LICENSE)
+MIT（LICENSE 文件待补充）
 
 ---
 

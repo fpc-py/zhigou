@@ -87,7 +87,7 @@
   ```
 - [ ] AI Orchestrator 构建
   ```bash
-  cd ai-services/ai-orchestrator && docker build -t zhigou/ai-orchestrator:$(git rev-parse --short HEAD) .
+  cd services/ai-orchestrator && docker build -t zhigou/ai-orchestrator:$(git rev-parse --short HEAD) .
   docker push zhigou/ai-orchestrator:$(git rev-parse --short HEAD)
   ```
 - [ ] 镜像 tag 使用 git SHA（**禁止**使用 `latest`）
