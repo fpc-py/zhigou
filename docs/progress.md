@@ -40,6 +40,8 @@
 
 ## 已完成
 
+* 2026-10-08：**P0-C 售后逆向全流程闭环（退款真实资金流 + 退回库存联动）**：① payment-service 新增退款表 `payment_refund`（V20261092，refund_no 幂等键）+ `POST /payment/refund`（校验支付单 SUCCESS、金额 0<amount≤实付、沙箱即时 SUCCESS）；② aftersale-service 退款改真实链路（V20261093 加 sku_id/count/refund_no；refund：SELLER_APPROVED→REFUNDING→调 payment→REFUNDED 记 refundNo→调 inventory 回库存，失败告警"待人工补偿"；REFUNDED 幂等）；③ inventory-service 放行 preDeduct/confirm/rollback（此前 HTTP 通道 403，回库存一直靠 MQ 兜底）；④ BFF 新增 aftersale 透传模块（apply/mine/detail/cancel 注入 X-User-Id 头，修复 mine 恒 0 条）。**实测闭环**：¥1 单 apply→approve→refund→REFUNDED（RFF2452BD37CD04379）→payment_refund 落库→**库存自动回滚 99→100**；PENDING 单退款被正确拒绝；H5 售后 tab 7 条 + 详情页状态卡/退款单号展示正确。详见 CHANGELOG [0.1.5]。
+
 
 
 * 2026-10-07：**P0-B 交易最终一致性落地（outbox + RocketMQ）**：① order-service OutboxDeliveryTask（30s 周期投递 status=0 → MQ → 置 1，at-least-once）；② ORDER_CLOSED 事件体升级（含 items 明细），取消/超时关单统一新格式；③ inventory-service OrderClosedListener 消费兜底 + ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；④ **RocketMQ broker 地址修复**（Windows Docker Desktop：容器内网 IP 宿主不可达 → -c 强制读取 conf/broker.conf + docker cp 覆盖 rokerIP1=127.0.0.1 + restart，clusterList 已显示 127.0.0.1:10911）。实测：投递 41/41 成功（status 全=1）；同 orderId 双消息幂等闭环——首条释放库存 94→96，次条跳过，只释放一次。详见 CHANGELOG [0.1.4]。\n* 2026-10-07：**P0-A 交易完整性第一梯队落地**：① 超时关单（order-service `OrderTimeoutTask` 每 5 分钟 + 启动首扫，INIT 超 15 分钟→CLOSED + outbox + 释放库存，首扫关闭 16 笔）；② 支付对账补偿（payment-service `notify_status` 迁移 V20261091 + reconcile 补偿 SUCCESS 未通知单 + 运维端点 `/payment/reconcile`，实测补偿 4 笔）。详见 CHANGELOG [0.1.3]。
@@ -71,7 +73,7 @@
 
   * 支付回调幂等 + T+1 对账业务逻辑（当前为骨架）
 
-  * 售后逆向全流程（申请→审核→退货入库→退款→拒绝）
+  * ✅ 售后逆向全流程（[0.1.5]：申请→审核→退款→退回库存→拒绝，退款资金流真实化）
 
   * 营销活动逻辑（满减 / 秒杀 / 拼团 / 凑单）与券叠加互斥
 

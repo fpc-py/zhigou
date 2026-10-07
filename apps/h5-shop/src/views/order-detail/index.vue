@@ -45,7 +45,7 @@
       <div class="order-ops">
         <button v-if="order.orderStatus === 'INIT'" class="op line" @click="cancel">取消订单</button>
         <button v-if="order.orderStatus === 'INIT'" class="op brand" @click="pay">立即支付</button>
-        <button v-else-if="['PAID', 'SHIPPED', 'COMPLETED'].includes(order.orderStatus)" class="op line" @click="toast('售后申请功能规划中')">申请售后</button>
+        <button v-else-if="['PAID', 'SHIPPED', 'COMPLETED'].includes(order.orderStatus)" class="op line" @click="goAftersale">申请售后</button>
       </div>
     </template>
   </div>
@@ -133,6 +133,11 @@ async function pay() {
 
 function toast(msg: string) {
   showToast(msg);
+}
+
+/** 跳售后申请页（携带订单信息） */
+function goAftersale() {
+  router.push({ path: '/aftersale/apply', query: { orderId: orderId } });
 }
 
 /** 等待支付回调落库：从结算页支付成功跳转而来时，订单 INIT 状态轮询至 PAID */

@@ -38,10 +38,9 @@ public class AftersaleController {
     public Result<Void> approve(@PathVariable String no) { service.approve(no); return Result.ok(); }
 
     @PostMapping("/{no}/refund")
-    public Result<Void> refund(@PathVariable String no) {
-        service.startRefunding(no);
-        service.onRefundSuccess(no);
-        return Result.ok();
+    public Result<Map<String, String>> refund(@PathVariable String no) {
+        String refundNo = service.refund(no);
+        return Result.ok(Map.of("refundNo", refundNo));
     }
 
     @PostMapping("/{no}/reject")

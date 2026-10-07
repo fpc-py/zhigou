@@ -2,8 +2,8 @@ server.port: ${SERVER_PORT:8090}
 spring:
   application.name: aftersale-service
   cloud.openfeign.client.config.default:
-    connectTimeout: 300
-    readTimeout: 300
+    connectTimeout: 500
+    readTimeout: 3000
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3307/zhigou_aftersale?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
     username: ${DB_USER:root}
@@ -26,6 +26,8 @@ mybatis-plus:
 rocketmq:
   name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
 order-service.url: ${ORDER_SERVICE_URL:http://localhost:8085}
+payment-service.url: ${PAYMENT_SERVICE_URL:http://localhost:8087}
+inventory-service.url: ${INVENTORY_SERVICE_URL:http://localhost:8086}
 # ==================== Actuator / Prometheus ====================
 management:
   endpoints:

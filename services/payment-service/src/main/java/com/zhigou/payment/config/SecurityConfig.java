@@ -29,6 +29,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/webjars/**",
                                 // 支付沙箱回调与未来真实渠道回调：服务端回调无用户上下文，靠签名验签而非登录态
                                 "/payment/sandbox/mock-pay", "/payment/notify/**",
+                                // 售后退款：内网服务调用（aftersale→payment），生产应加内网白名单
+                                "/payment/refund",
                                 // 运维手动对账入口（生产应加内网白名单/管理员鉴权）
                                 "/payment/reconcile"
                         ).permitAll()

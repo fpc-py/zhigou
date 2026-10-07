@@ -6,12 +6,30 @@
 ## [Unreleased]
 
 ### P0 · M1 收尾（进行中）
-- 退款资金流（售后→payment）
-- 售后逆向全流程
 - 营销活动（满减/秒杀/拼团/凑单）
 - 评价增量向量更新
 - 用户画像 / 收藏 / 浏览历史
 - 日志脱敏、Dockerfile（9 服务）、CI/CD
+
+## [0.1.5] - 2026-10-08
+
+### feat
+- **售后退款真实资金流（aftersale→payment）**：payment-service 新增退款表 `payment_refund`（Flyway V20261092，`refund_no` 唯一幂等键）+ 实体/Mapper + `PaymentService.refund(orderNo, amount, reason)`——按订单幂等（已有 SUCCESS 退款单直接返回）、校验原支付单必须 SUCCESS、金额 0<amount≤实付、沙箱即时 SUCCESS；新端点 `POST /payment/refund`（SecurityConfig permitAll，生产需内网白名单）
+- **aftersale-service 退款联动**：迁移 V20261093（aftersale_order 加 `sku_id/count/refund_no`）；`AftersaleServiceImpl.refund(no)` 真实链路：SELLER_APPROVED→REFUNDING（状态机）→调 payment 退款→REFUNDED 记 refundNo→按 skuId/count 调 inventory 回滚库存（失败告警"待人工补偿"，不阻断退款）；REFUNDED 幂等返回原退款单号、REFUNDING 可重试；新增 Feign `PaymentClient`（/payment/refund）与 `InventoryClient`（/inventory/rollback）；**Feign 超时 connectTimeout 500 / readTimeout 3000**（原 300ms 导致退款 500）
+- **inventory-service 内网端点放行**：SecurityConfig 将 `/inventory/preDeduct`、`/inventory/confirm`、`/inventory/rollback` 加入 permitAll（内网服务调用无用户上下文；此前 HTTP 通道全被 403，关单回滚一直靠 MQ 兜底，售后回库存直接失败）
+- **BFF 售后透传模块**：新增 `apps/bff-shop/src/aftersale/`（controller JWT 保护 + service 透传 + types），apply/mine/detail/cancel 统一从 JWT 解析 userId 并注入 `X-User-Id` 头（修复 mine/detail 被 aftersale Security 403 吞错返回空）
+
+### fix
+- **退款 500 = Feign readTimeout 300ms 超时**：payment 首次调用（含 DB 事务）超 300ms → aftersale 抛 RetryableException → 调大 3000ms
+- **售后退回库存失败（403）**：inventory /rollback 被 Security 拦截 → permitAll 后 refund 内自动回库存成功（实测 99→100）
+- **BFF /aftersale/mine 恒返回 0 条**：BFF 透传不带 X-User-Id 头，aftersale 403 被 catchError 吞掉返回 [] → service 层统一注入头（mine/detail/cancel 三处）
+
+### test
+- **售后全流程闭环实测**（¥1 单 2106312063613272064，属主 10001）：apply（APPLYING）→ approve（SELLER_APPROVED）→ refund → **REFUNDED**（refundNo=RFF2452BD37CD04379）→ payment_refund 落库 SUCCESS → **库存自动回滚 99→100**（skuId 2106307884727541760）
+- **退款校验防御实测**：支付单 PENDING 的订单申请退款被正确拒绝（"订单未支付成功，不可退款"），不产生退款单
+- **幂等实测**：REFUNDED 售后单重复调 refund 直接返回原 refundNo；¥99 单（2107842025067634688）退款落库 RFAEE5ABF2639E440C
+- **BFF 冒烟**：登录→`GET /aftersale/mine` 返回 7 条（此前 0 条）、`GET /aftersale/:no` 详情 REFUNDED+refundNo 透传正确
+- **H5 浏览器实测**：订单页"售后"tab 显示 7 条售后单（SELLER_APPROVED→"待退款"、REFUNDED→"已退款"映射正确）；详情页两种状态卡（"审核通过，待退款"/"已退款"）与退款单号展示完整
 
 ## [0.1.4] - 2026-10-07
 

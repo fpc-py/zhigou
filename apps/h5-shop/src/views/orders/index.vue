@@ -12,6 +12,27 @@
     </div>
 
     <Skeleton v-if="loading" w="100%" h="100px" :repeat="3" />
+    <!-- 售后 tab：展示售后单列表（aftersale-service /mine） -->
+    <EmptyState v-else-if="activeTab === 'AFTERSALE' && aftersaleList.length === 0" illustration="📋" text="暂无售后记录" />
+    <div v-else-if="activeTab === 'AFTERSALE'" class="order-list">
+      <div v-for="a in aftersaleList" :key="a.aftersaleNo" class="order card">
+        <div class="order-head" @click="goAftersale(a)">
+          <span class="order-no">售后单 {{ a.aftersaleNo }}</span>
+          <span class="order-status" :class="asStatusClass(a.status)">{{ asStatusText(a.status) }}</span>
+        </div>
+        <div class="as-row">
+          <span class="as-label">{{ a.type === 'RETURN_REFUND' ? '退货退款' : '仅退款' }}</span>
+          <span class="as-amount">¥{{ formatPrice(a.amount) }}</span>
+        </div>
+        <p class="as-order">关联订单：{{ a.orderNo }}</p>
+        <div class="order-foot">
+          <p class="order-amount"><span class="as-reason">{{ a.reason || '—' }}</span></p>
+          <div class="order-ops">
+            <button class="op line" @click="goAftersale(a)">查看详情</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <EmptyState v-else-if="filtered.length === 0" illustration="📦" text="暂无相关订单" />
 
     <div v-else class="order-list">
@@ -49,6 +70,8 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getOrderMine, cancelOrder } from '@/api/order';
 import type { OrderDetail } from '@/api/order';
+import { getAftersaleMine } from '@/api/aftersale';
+import type { AftersaleOrder } from '@/api/aftersale';
 import { createPayment, mockPay } from '@/api/payment';
 import { showToast, formatPrice } from '@/utils';
 import Icon from '@/components/Icon.vue';
@@ -59,6 +82,7 @@ const route = useRoute();
 const router = useRouter();
 const loading = ref(true);
 const list = ref<OrderDetail[]>([]);
+const aftersaleList = ref<AftersaleOrder[]>([]);
 const activeTab = ref('ALL');
 
 const tabs = [
@@ -94,6 +118,20 @@ function statusClass(s: string) {
   return 'st-close';
 }
 
+function asStatusText(s: string) {
+  const map: Record<string, string> = {
+    APPLYING: '待审核', SELLER_APPROVED: '待退款', REFUNDING: '退款中',
+    REFUNDED: '已退款', REJECTED: '已拒绝', CANCELED: '已取消',
+  };
+  return map[s] ?? s;
+}
+
+function asStatusClass(s: string) {
+  if (s === 'REFUNDED') return 'st-ok';
+  if (s === 'REJECTED' || s === 'CANCELED') return 'st-close';
+  return 'st-mid';
+}
+
 async function load() {
   loading.value = true;
   try {
@@ -105,8 +143,24 @@ async function load() {
   }
 }
 
+async function loadAftersale() {
+  loading.value = true;
+  try {
+    aftersaleList.value = await getAftersaleMine();
+  } catch {
+    /* 已提示 */
+  } finally {
+    loading.value = false;
+  }
+}
+
 function switchTab(key: string) {
   activeTab.value = key;
+  if (key === 'AFTERSALE') loadAftersale();
+}
+
+function goAftersale(a: AftersaleOrder) {
+  router.push(`/aftersale/${a.aftersaleNo}`);
 }
 
 function goDetail(o: OrderDetail) {
@@ -177,4 +231,9 @@ onMounted(() => {
 .op { font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 7px 15px; }
 .op.line { color: var(--ink-2); border: 1px solid var(--line-2); }
 .op.brand { color: #fff; background: var(--brand); }
+.as-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 4px; }
+.as-label { font-size: 13px; font-weight: 700; }
+.as-amount { font-size: 15px; font-weight: 800; color: var(--accent); }
+.as-order { font-size: 11px; color: var(--ink-3); padding-bottom: 8px; }
+.as-reason { font-size: 11.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; display: inline-block; }
 </style>

@@ -25,6 +25,8 @@ import { UserController } from './user/user.controller.js';
 import { UserService } from './user/user.service.js';
 import { LogisticsController } from './logistics/logistics.controller.js';
 import { LogisticsService } from './logistics/logistics.service.js';
+import { AftersaleController } from './aftersale/aftersale.controller.js';
+import { AftersaleService } from './aftersale/aftersale.service.js';
 
 @Module({
   imports: [
@@ -45,6 +47,7 @@ import { LogisticsService } from './logistics/logistics.service.js';
     MarketingController,
     UserController,
     LogisticsController,
+    AftersaleController,
   ],
   providers: [
     HomeService,
@@ -57,6 +60,7 @@ import { LogisticsService } from './logistics/logistics.service.js';
     MarketingService,
     UserService,
     LogisticsService,
+    AftersaleService,
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AnalyticsInterceptor },

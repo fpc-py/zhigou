@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zhigou.common.BizException;
 import com.zhigou.payment.client.OrderNotifyClient;
 import com.zhigou.payment.entity.Payment;
+import com.zhigou.payment.entity.PaymentRefund;
 import com.zhigou.payment.mapper.PaymentMapper;
+import com.zhigou.payment.mapper.PaymentRefundMapper;
 import com.zhigou.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,7 @@ import java.util.List;
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentMapper paymentMapper;
+    private final PaymentRefundMapper refundMapper;
     private final OrderNotifyClient orderNotifyClient;
     @Value("${payment.sandbox-secret}") private String sandboxSecret;
 
@@ -67,6 +70,36 @@ public class PaymentServiceImpl implements PaymentService {
         } else {
             log.warn("订单联动通知失败，待 T+1 对账补偿: paymentNo={}", paymentNo);
         }
+    }
+
+    @Override @Transactional
+    public String refund(String orderNo, Long amount, String reason) {
+        // 1. 幂等：同订单已有退款单直接返回（避免重复退款）
+        PaymentRefund existing = refundMapper.selectOne(new LambdaQueryWrapper<PaymentRefund>()
+                .eq(PaymentRefund::getOrderNo, orderNo)
+                .eq(PaymentRefund::getStatus, "SUCCESS"));
+        if (existing != null) {
+            log.info("退款幂等命中: orderNo={}, refundNo={}", orderNo, existing.getRefundNo());
+            return existing.getRefundNo();
+        }
+
+        // 2. 校验原支付单：必须已支付成功
+        Payment payment = paymentMapper.selectOne(new LambdaQueryWrapper<Payment>().eq(Payment::getOrderNo, orderNo));
+        if (payment == null) throw new BizException(404, "支付单不存在: orderNo=" + orderNo);
+        if (!"SUCCESS".equals(payment.getStatus())) throw new BizException(400, "订单未支付成功，不可退款");
+        if (amount == null || amount <= 0 || amount > payment.getAmount())
+            throw new BizException(400, "退款金额非法（0<amount<=实付金额）");
+
+        // 3. 创建退款单。沙箱即时成功；生产替换渠道 SDK：先 REFUNDING，异步回调后置 SUCCESS
+        String refundNo = "RF" + IdUtil.fastSimpleUUID().toUpperCase().substring(0, 16);
+        PaymentRefund refund = new PaymentRefund();
+        refund.setRefundNo(refundNo); refund.setPaymentNo(payment.getPaymentNo());
+        refund.setOrderNo(orderNo); refund.setUserId(payment.getUserId());
+        refund.setAmount(amount); refund.setReason(reason);
+        refund.setStatus("SUCCESS"); refund.setRefundedAt(LocalDateTime.now());
+        refundMapper.insert(refund);
+        log.info("退款成功(沙箱): refundNo={}, paymentNo={}, orderNo={}, amount={}", refundNo, payment.getPaymentNo(), orderNo, amount);
+        return refundNo;
     }
 
     @Override
