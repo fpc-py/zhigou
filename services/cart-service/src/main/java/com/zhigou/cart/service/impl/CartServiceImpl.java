@@ -76,6 +76,17 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    public void remove(Long userId, Long skuId) {
+        String key = KEY_PREFIX + userId;
+        String field = String.valueOf(skuId);
+        if (!Boolean.TRUE.equals(redis.opsForHash().hasKey(key, field))) {
+            throw new BizException(404, "购物车无该商品");
+        }
+        redis.opsForHash().delete(key, field);
+        log.info("删除购物车条目: userId={}, skuId={}", userId, skuId);
+    }
+
+    @Override
     public void clearSelected(Long userId) {
         String key = KEY_PREFIX + userId;
         Map<Object, Object> entries = redis.opsForHash().entries(key);

@@ -8,6 +8,9 @@ export interface ProductItem {
   priceMax: number;
   mainImage?: string;
   salesVolume?: number;
+  subtitle?: string;
+  /** 规格列表（加购取 skus[0].skuId） */
+  skus?: Array<{ skuId: string; specName?: string; specValue?: string; price?: number; stock?: number; image?: string }>;
 }
 
 export interface RecommendItem {

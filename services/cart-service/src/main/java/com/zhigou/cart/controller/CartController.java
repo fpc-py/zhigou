@@ -32,6 +32,11 @@ public class CartController {
         return Result.ok(cartService.mine(UserContext.require()));
     }
 
+    @Operation(summary = "删除单条") @DeleteMapping("/{skuId}")
+    public Result<Void> remove(@PathVariable Long skuId) {
+        cartService.remove(UserContext.require(), skuId); return Result.ok();
+    }
+
     @Operation(summary = "清空选中") @PostMapping("/clear")
     public Result<Void> clear() { cartService.clearSelected(UserContext.require()); return Result.ok(); }
 }

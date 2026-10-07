@@ -1,3 +1,7 @@
+/**
+ * ⚠️ 已废弃：购物车已改为服务端实现（走 BFF /cart/* 接口，见 src/api/cart.ts）。
+ * 保留此文件仅为兼容历史引用，新页面请勿再使用本 store。
+ */
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 

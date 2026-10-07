@@ -1,63 +1,111 @@
 <template>
   <div class="page compare-page">
-    <!-- 搜索框 -->
+    <!-- 头部 -->
+    <header class="cmp-head">
+      <button class="head-btn" @click="router.back()"><Icon name="back" /></button>
+      <span class="head-title">AI 全网比价</span>
+      <span class="head-spacer" />
+    </header>
+
+    <!-- 搜索 -->
     <div class="search-bar">
-      <input
-        v-model="keyword"
-        placeholder="输入商品名搜全网比价..."
-        @keyup.enter="search"
-      />
-      <button class="search-btn" @click="search">搜索</button>
+      <input v-model="keyword" placeholder="输入商品名搜全网比价…" @keyup.enter="search" />
+      <button class="search-btn" @click="search"><Icon name="search" size="sm" /></button>
     </div>
 
-    <!-- Loading -->
     <Skeleton v-if="loading" w="100%" h="80px" :repeat="5" />
+    <ErrorRetry v-else-if="error" text="比价数据加载失败" btn-text="重试" @retry="search" />
+    <EmptyState v-else-if="!product" illustration="🔍" :text="searched ? '未找到该商品' : '输入商品名开始比价'" />
 
-    <!-- Error -->
-    <ErrorRetry
-      v-else-if="error"
-      text="比价数据加载失败"
-      btn-text="重试"
-      @retry="search"
-    />
-
-    <!-- Empty: 未搜索 -->
-    <EmptyState v-else-if="!searched" illustration="🔍" text="输入商品名开始比价" />
-
-    <!-- Empty: 无结果 -->
-    <EmptyState v-else-if="results.length === 0" illustration="📭" text="未找到比价数据" />
-
-    <!-- 结果列表 -->
-    <div v-else class="results">
-      <div v-for="r in results" :key="r.skuId" class="result-item">
-        <div class="result-spec">{{ r.specName }}: {{ r.specValue }}</div>
-        <div class="result-price">¥{{ (r.price / 100).toFixed(2) }}</div>
-        <div class="result-stock" :class="{ low: r.stock < 10 }">
-          {{ r.stock > 0 ? (r.stock < 10 ? '仅剩' + r.stock : '有货') : '缺货' }}
+    <template v-else>
+      <!-- 最优方案 -->
+      <section class="hero">
+        <div class="hero-top">
+          <span class="hero-badge"><Icon name="flash" size="xs" /> 最优方案</span>
+          <span class="hero-save">比最高价省 {{ formatPrice(saveAmount) }}</span>
         </div>
-        <button class="result-cart" @click="add(r)">加购</button>
-      </div>
-    </div>
+        <p class="hero-price"><b>¥{{ formatPrice(bestPrice) }}</b><span class="hero-unit">/ {{ bestName }}</span></p>
+        <p class="hero-name">{{ product.name }}</p>
+        <button class="hero-btn" @click="goBest">去购买 →</button>
+      </section>
 
-    <TabBar />
+      <!-- 渠道比价表 -->
+      <section class="cmp-table card">
+        <h3 class="sec-title">渠道比价</h3>
+        <div v-for="c in channels" :key="c.name" class="cmp-row" :class="{ best: c.isBest }">
+          <span class="cmp-name">{{ c.name }}</span>
+          <span class="cmp-price"><b>¥{{ formatPrice(c.price) }}</b><i v-if="c.isBest" class="best-tag">最优</i></span>
+          <span class="cmp-ship">{{ c.ship }}</span>
+          <span class="cmp-risk" :class="c.riskClass">{{ c.risk }}</span>
+          <button class="cmp-go" @click="goChannel(c)">去</button>
+        </div>
+        <p class="demo-note">* 渠道价格为演示数据，基于智购真实售价估算</p>
+      </section>
+
+      <!-- 省钱明细 -->
+      <section class="save-list card">
+        <h3 class="sec-title">省钱明细</h3>
+        <div class="save-row"><span>智购 AI 实付</span><b>¥{{ formatPrice(bestPrice) }}</b></div>
+        <div class="save-row"><span>全网最高渠道价</span><b>¥{{ formatPrice(maxPrice) }}</b></div>
+        <div class="save-row total"><span>小智帮你省下</span><b class="save-amount">¥{{ formatPrice(saveAmount) }}</b></div>
+      </section>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { getProductDetail } from '@/api/product';
-import { useCartStore } from '@/stores/cart';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { getProductDetail, getProductPage } from '@/api/product';
+import { showToast, formatPrice } from '@/utils';
 import Skeleton from '@/components/Skeleton.vue';
 import ErrorRetry from '@/components/ErrorRetry.vue';
 import EmptyState from '@/components/EmptyState.vue';
-import TabBar from '@/components/TabBar.vue';
+import Icon from '@/components/Icon.vue';
 
+const route = useRoute();
+const router = useRouter();
 const keyword = ref('');
 const loading = ref(false);
 const error = ref(false);
 const searched = ref(false);
-const results = ref<any[]>([]);
-const cartStore = useCartStore();
+const product = ref<any>(null);
+
+/** 演示渠道配置（原型为演示示意，非真实报价） */
+const CHANNELS = [
+  { name: '智购自营', off: 1.0, ship: '明日达', risk: '放心购', riskClass: 'risk-safe' },
+  { name: '品牌官网', off: 1.04, ship: '2-3天', risk: '正品', riskClass: 'risk-mid' },
+  { name: '天猫旗舰店', off: 1.06, ship: '2-3天', risk: '正品', riskClass: 'risk-mid' },
+  { name: '京东自营', off: 1.05, ship: '次日达', risk: '自营', riskClass: 'risk-mid' },
+  { name: '抖音直播间', off: 1.11, ship: '3-5天', risk: '注意甄别', riskClass: 'risk-warn' },
+  { name: '拼多多', off: 1.13, ship: '3-7天', risk: '注意甄别', riskClass: 'risk-warn' },
+];
+
+const channels = computed(() => {
+  const base = product.value?.priceMin ?? 0;
+  const list = CHANNELS.map((c) => ({ ...c, price: Math.round((base * c.off) / 10) * 10 }));
+  const min = Math.min(...list.map((c) => c.price));
+  return list.map((c) => ({ ...c, isBest: c.price === min }));
+});
+
+const bestPrice = computed(() => Math.min(...channels.value.map((c) => c.price)));
+const maxPrice = computed(() => Math.max(...channels.value.map((c) => c.price)));
+const saveAmount = computed(() => maxPrice.value - bestPrice.value);
+const bestName = computed(() => channels.value.find((c) => c.isBest)?.name ?? '智购自营');
+
+async function loadBySpuId(spuId: string) {
+  loading.value = true;
+  error.value = false;
+  try {
+    const detail = await getProductDetail(spuId);
+    product.value = detail.product;
+    keyword.value = detail.product?.name ?? '';
+  } catch {
+    error.value = true;
+  } finally {
+    loading.value = false;
+  }
+}
 
 async function search() {
   const k = keyword.value.trim();
@@ -66,12 +114,13 @@ async function search() {
   error.value = false;
   searched.value = true;
   try {
-    // 先用 RAG 搜相关 spuId，然后用 product-service 拿详情
-    const detail = await getProductDetail(k);
-    if (detail.product?.skus) {
-      results.value = detail.product.skus;
+    const res = await getProductPage({ keyword: k, pageSize: 1 });
+    const first = res.records?.[0];
+    if (first) {
+      const detail = await getProductDetail(first.spuId);
+      product.value = detail.product;
     } else {
-      results.value = [];
+      product.value = null;
     }
   } catch {
     error.value = true;
@@ -80,84 +129,72 @@ async function search() {
   }
 }
 
-function add(item: any) {
-  cartStore.addItem({
-    spuId: item.skuId || item.spuId,
-    name: item.specValue || '',
-    price: item.price || 0,
-    count: 1,
-  });
-  alert('已加入购物车');
+function goBest() {
+  if (product.value) router.push(`/product/${product.value.spuId}`);
 }
+
+function goChannel(c: any) {
+  showToast(`已为你记录「${c.name}」渠道报价，去智购购买更省`);
+  if (product.value) router.push(`/product/${product.value.spuId}`);
+}
+
+onMounted(() => {
+  const spuId = route.query.spuId;
+  if (typeof spuId === 'string' && spuId) {
+    loadBySpuId(spuId);
+  }
+});
 </script>
 
 <style scoped>
-.compare-page {
-  /* 底部预留固定 TabBar 高度 */
-  padding: 16px 16px 74px;
-}
-.search-bar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
+.compare-page { padding: 0 14px 30px; min-height: 100vh; }
+.cmp-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; }
+.head-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+.head-title { font-size: 15px; font-weight: 700; }
+.head-spacer { width: 32px; }
+.search-bar { display: flex; gap: 8px; margin-bottom: 14px; }
 .search-bar input {
   flex: 1;
   height: 40px;
   padding: 0 14px;
   background: var(--card);
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 13.5px;
   border: 1px solid var(--line);
 }
-.search-btn {
-  height: 40px;
-  padding: 0 20px;
-  background: var(--brand);
+.search-btn { width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; flex: none; }
+.hero {
+  background: linear-gradient(120deg, #4C5CFF, #7A6BFF);
+  border-radius: var(--radius);
+  padding: 18px;
   color: #fff;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 500;
+  margin-bottom: 12px;
 }
-.results {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.result-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  background: var(--card);
-  border-radius: var(--radius-sm);
-}
-.result-spec {
-  flex: 1;
-  font-size: 13px;
-}
-.result-price {
-  font-weight: 700;
-  color: var(--accent);
-  font-size: 15px;
-}
-.result-stock {
-  font-size: 11px;
-  color: var(--mint);
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--mint-soft);
-}
-.result-stock.low {
-  color: var(--amber);
-  background: var(--amber-soft);
-}
-.result-cart {
-  padding: 6px 14px;
-  background: var(--brand-soft);
-  color: var(--brand);
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-}
+.hero-top { display: flex; align-items: center; justify-content: space-between; }
+.hero-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,.2); padding: 5px 10px; border-radius: 999px; }
+.hero-save { font-size: 11px; opacity: 0.9; }
+.hero-price { margin-top: 12px; font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 6px; }
+.hero-price b { font-size: 34px; letter-spacing: 0.5px; }
+.hero-unit { font-size: 12px; opacity: 0.85; font-weight: 400; }
+.hero-name { font-size: 13px; opacity: 0.9; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-btn { margin-top: 14px; background: #fff; color: var(--brand); font-size: 13px; font-weight: 700; border-radius: 999px; padding: 9px 22px; }
+.card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+.sec-title { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.cmp-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.cmp-row:last-of-type { border-bottom: none; }
+.cmp-row.best { background: var(--brand-soft); border-radius: 10px; padding: 10px 8px; }
+.cmp-name { flex: 1; font-weight: 600; }
+.cmp-price b { font-size: 14px; }
+.best-tag { font-style: normal; font-size: 9.5px; font-weight: 700; color: #fff; background: var(--brand); padding: 2px 6px; border-radius: 999px; margin-left: 4px; }
+.cmp-ship { color: var(--ink-3); font-size: 10.5px; }
+.cmp-risk { font-size: 10px; padding: 2px 7px; border-radius: 999px; }
+.risk-safe { color: var(--mint); background: var(--mint-soft); }
+.risk-mid { color: var(--brand); background: var(--brand-soft); }
+.risk-warn { color: #b87900; background: var(--amber-soft); }
+.cmp-go { width: 24px; height: 24px; border-radius: 8px; background: var(--bg); color: var(--ink-2); font-size: 11px; }
+.demo-note { margin-top: 10px; font-size: 10px; color: var(--ink-3); }
+.save-row { display: flex; justify-content: space-between; font-size: 13px; padding: 7px 0; color: var(--ink-2); }
+.save-row b { color: var(--ink); }
+.save-row.total { border-top: 1px dashed var(--line-2); margin-top: 6px; padding-top: 12px; font-weight: 700; }
+.save-amount { color: var(--accent) !important; font-size: 17px; }
 </style>

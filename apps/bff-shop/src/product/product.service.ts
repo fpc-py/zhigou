@@ -1,5 +1,5 @@
 /**
- * Product Service — 并行聚合商品详情
+ * Product Service — 商品聚合（详情 + 分页）
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
@@ -12,6 +12,38 @@ export class ProductService {
   private readonly logger = new Logger(ProductService.name);
 
   constructor(private readonly http: HttpService) {}
+
+  /** 商品分页（透传 product-service /product/page） */
+  async page(userId: string, query: {
+    keyword?: string;
+    pageNum?: number;
+    pageSize?: number;
+    categoryId?: number;
+    brandId?: number;
+  }): Promise<Record<string, any> | null> {
+    const params = new URLSearchParams();
+    if (query.keyword) params.set('keyword', query.keyword);
+    params.set('pageNum', String(query.pageNum ?? 1));
+    params.set('pageSize', String(query.pageSize ?? 20));
+    if (query.categoryId != null) params.set('categoryId', String(query.categoryId));
+    if (query.brandId != null) params.set('brandId', String(query.brandId));
+
+    const url = `${SERVICES.productService.url}${SERVICE_PATHS.productPage}?${params.toString()}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: { 'x-user-id': userId } }).pipe(
+        timeout(SERVICES.productService.timeout),
+        catchError((err) => {
+          if (err instanceof TimeoutError) {
+            this.logger.warn('product-service /product/page 超时');
+          } else {
+            this.logger.warn(`product-service /product/page 失败: ${err.message}`);
+          }
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return resp.data?.data ?? null;
+  }
 
   async getDetail(spuId: string, userId: string): Promise<ProductDetailResponse> {
     const [productResult, ragResult] = await Promise.all([
