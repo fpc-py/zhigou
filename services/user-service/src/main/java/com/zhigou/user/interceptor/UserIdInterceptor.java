@@ -21,6 +21,13 @@ public class UserIdInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        // 优先内网透传头（与 common.JwtAuthFilter 一致：BFF 一律带 X-User-Id）
+        String uidHeader = request.getHeader("X-User-Id");
+        if (uidHeader != null && !uidHeader.isBlank()) {
+            try { UserContext.setUserId(Long.valueOf(uidHeader)); }
+            catch (NumberFormatException e) { log.warn("X-User-Id 格式异常: {}", uidHeader); }
+            return true;
+        }
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
             // 放行（由 Security 处理 401），Interceptor 只负责解析

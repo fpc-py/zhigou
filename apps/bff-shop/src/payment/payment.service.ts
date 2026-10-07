@@ -16,7 +16,7 @@ export class PaymentService {
   async create(userId: string, body: PaymentCreateBody): Promise<PaymentCreateResult | null> {
     const url = `${SERVICES.paymentService.url}${SERVICE_PATHS.paymentCreate}`;
     const resp = await firstValueFrom(
-      this.http.post(url, { userId, orderNo: body.orderNo, amount: body.amount }).pipe(
+      this.http.post(url, { userId, orderNo: body.orderNo, amount: body.amount }, { headers: { 'x-user-id': userId } }).pipe(
         timeout(SERVICES.paymentService.timeout),
         catchError((err) => {
           this.logger.warn(`payment-service /payment/create 失败: ${err.message}`);

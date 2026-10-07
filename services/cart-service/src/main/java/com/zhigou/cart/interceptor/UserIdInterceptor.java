@@ -16,6 +16,13 @@ public class UserIdInterceptor implements HandlerInterceptor {
     @Value("${jwt.secret}") private String jwtSecret;
 
     @Override public boolean preHandle(HttpServletRequest req, HttpServletResponse res, Object h) {
+        // 优先内网透传头（与 common.JwtAuthFilter 一致：BFF 一律带 X-User-Id）
+        String uidHeader = req.getHeader("X-User-Id");
+        if (uidHeader != null && !uidHeader.isBlank()) {
+            try { UserContext.set(Long.valueOf(uidHeader)); }
+            catch (NumberFormatException e) { log.warn("X-User-Id 格式异常: {}", uidHeader); }
+            return true;
+        }
         String header = req.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) return true;
         try {

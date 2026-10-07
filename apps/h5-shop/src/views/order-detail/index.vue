@@ -127,7 +127,7 @@ async function pay() {
       showToast('支付创建失败');
     }
   } catch {
-    /* 已提示 */
+    showToast('支付失败，请重试');
   }
 }
 

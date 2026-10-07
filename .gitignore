@@ -62,3 +62,5 @@ coverage/
 # ===== 数据 =====
 data/
 *.db
+
+.sessions

@@ -15,7 +15,9 @@ public class AftersaleController {
     private final AftersaleServiceImpl service;
 
     @PostMapping("/apply")
-    public Result<AftersaleOrder> apply(@Valid @RequestBody ApplyRequest req, @RequestHeader(required = false) Long userId) {
+    public Result<AftersaleOrder> apply(@Valid @RequestBody ApplyRequest req,
+                                        @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        // userId 来自内网透传头 X-User-Id（BFF/冒烟直连均按此约定），缺省回退 mock 用户
         return Result.ok(service.apply(userId != null ? userId : 10001L, req));
     }
 

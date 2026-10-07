@@ -13,12 +13,26 @@ public class PaymentController {
 
     @PostMapping("/create")
     public Result<Map<String, String>> create(@RequestBody Map<String, Object> body) {
-        Long userId = ((Number) body.get("userId")).longValue();
+        // 兼容 userId 为字符串（BFF 透传）或数字两种形态
+        Long userId = toLong(body.get("userId"));
         String orderNo = (String) body.get("orderNo");
-        Long amount = ((Number) body.get("amount")).longValue();
+        Long amount = toLong(body.get("amount"));
+        if (userId == null || orderNo == null || amount == null) {
+            throw new com.zhigou.common.BizException(400, "参数缺失: userId/orderNo/amount");
+        }
         String pno = paymentService.create(userId, orderNo, amount);
         String qrUrl = "https://sandbox.pay.zhigou.com/qr?paymentNo=" + pno;
         return Result.ok(Map.of("paymentNo", pno, "qrUrl", qrUrl));
+    }
+
+    /** 兼容 Number 与 String 两种 JSON 数值形态 */
+    private static Long toLong(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.longValue();
+        if (v instanceof String s && !s.isBlank()) {
+            try { return Long.valueOf(s.trim()); } catch (NumberFormatException ignore) { return null; }
+        }
+        return null;
     }
 
     @PostMapping("/sandbox/mock-pay")

@@ -244,6 +244,8 @@ async function submit() {
       showToast('下单失败，请重试');
       return;
     }
+    // 记录已创建订单，供支付失败时兜底跳转
+    sessionStorage.setItem('lastOrderId', String(order.orderId));
     // 沙箱支付
     const pay = await createPayment(String(order.orderId), order.payAmount ?? payAmount.value);
     if (pay?.paymentNo) {
@@ -251,8 +253,13 @@ async function submit() {
     }
     showToast('支付成功');
     router.replace(`/order/${order.orderId}`);
-  } catch {
-    /* 已提示 */
+  } catch (e) {
+    showToast('支付失败，请重试');
+    // 订单已创建但支付未完成时，仍提供订单详情入口，避免卡死结算页
+    const lastOrder = sessionStorage.getItem('lastOrderId');
+    if (lastOrder) {
+      router.replace(`/order/${lastOrder}`);
+    }
   } finally {
     submitting.value = false;
   }

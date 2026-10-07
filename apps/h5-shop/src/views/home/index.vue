@@ -64,6 +64,12 @@
         <ProductCard v-for="p in products" :key="p.spuId" :product="p" />
       </div>
     </div>
+
+    <!-- 悬浮购物车入口 -->
+    <button v-if="userStore.isLoggedIn" class="cart-fab" aria-label="购物车" @click="router.push('/cart')">
+      <Icon name="cart" size="lg" />
+      <span v-if="cartCount > 0" class="cart-badge">{{ cartCount > 99 ? '99+' : cartCount }}</span>
+    </button>
   </div>
 </template>
 
@@ -72,6 +78,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { getHomeFeed } from '@/api/home';
 import { getProfile } from '@/api/user';
+import { getCartMine } from '@/api/cart';
 import { useUserStore } from '@/stores/user';
 import type { ProductItem } from '@/api/home';
 import Skeleton from '@/components/Skeleton.vue';
@@ -86,6 +93,7 @@ const loading = ref(true);
 const error = ref(false);
 const products = ref<ProductItem[]>([]);
 const nickname = ref('朋友');
+const cartCount = ref(0);
 
 const entries = [
   { icon: 'chart', label: 'AI全网比价', sub: '省到就是赚', bg: '#E9EBFF', color: '#4C5CFF', action: () => router.push('/compare') },
@@ -143,9 +151,21 @@ async function loadFeed() {
   }
 }
 
+/** 加载购物车件数（悬浮入口角标） */
+async function loadCartCount() {
+  if (!userStore.isLoggedIn) return;
+  try {
+    const items = await getCartMine();
+    cartCount.value = items.reduce((s, i) => s + (i.count ?? 0), 0);
+  } catch {
+    cartCount.value = 0;
+  }
+}
+
 onMounted(() => {
   loadProfile();
   loadFeed();
+  loadCartCount();
 });
 </script>
 
@@ -285,4 +305,42 @@ onMounted(() => {
 .login-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
 .login-desc { font-size: 13px; color: var(--ink-3); margin-bottom: 20px; }
 .login-btn { display: inline-block; padding: 10px 32px; background: var(--brand); color: #fff; border-radius: 999px; font-size: 15px; font-weight: 500; }
+
+/* 悬浮购物车入口（与 TabBar 对齐：按 414px 手机容器居中定位） */
+.cart-fab {
+  position: fixed;
+  right: max(16px, calc((100vw - 414px) / 2 + 16px));
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand), #8A94FF);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 22px rgba(76, 92, 255, 0.38);
+  z-index: 90;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.cart-fab:active { transform: scale(0.92); }
+.cart-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(255, 92, 57, 0.4);
+}
 </style>

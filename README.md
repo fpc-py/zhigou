@@ -39,7 +39,7 @@
 | 里程碑 | 状态 |
 |--------|------|
 | M0 脚手架 — Monorepo + 中间件 + auth-center 登录 | ✅ |
-| M1 交易闭环 — 下单→支付→库存→物流 | 🚧 大部分完成 |
+| M1 交易闭环 — 下单→支付→库存→物流 | ✅ 全链路联调 17/17 |
 | M2 AI 导购 — SSE + RAG + 降级 + 对话商品卡 | ✅ |
 | M3 大促压测 — 5000 QPS | ⬜ |
 | M4 上线 — 灰度 + 监控 + 回滚 | ⬜ |
@@ -286,7 +286,7 @@ zhigou/
 │   ├── compose/                 #   Docker Compose (中间件+监控)
 │   └── helm/                    #   K8s Charts (WIP)
 ├── scripts/                     # 工具脚本
-│   ├── e2e-order.sh             #   端到端冒烟
+│   ├── smoke/                   #   全链路冒烟 (zhigou-e2e.ps1, 17 步)
 │   ├── backfill_vec.py          #   向量全量回填
 │   ├── load-test/               #   压测 (k6 / seed-data)
 │   └── mock-data/               #   mock 清除脚本
@@ -311,8 +311,9 @@ mvn test -pl services/auth-center,services/product-service,services/order-servic
 # Python 测试
 cd services/ai-orchestrator && pytest
 
-# 端到端冒烟
-bash scripts/e2e-order.sh
+# 端到端冒烟（全链路 17 步黄金路径；前置：12 微服务 + BFF 3000 + H5 5173 全启动）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke/zhigou-e2e.ps1
+# 期望输出：PASS=17 FAIL=0（最新验证 2026-10-07）
 
 # 压测
 k6 run scripts/load-test/smoke-test.js

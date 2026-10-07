@@ -12,6 +12,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
+from openai import APIError, APIConnectionError, AuthenticationError, RateLimitError
 
 from .config import settings
 from .fallback_config import llm_timeout_ms
@@ -167,6 +168,13 @@ async def chat_stream(
         except TimeoutError:
             logger.warning("LLM 超时 (timeout=%dms)，切换为兜底推荐", llm_timeout_ms())
             # 兜底流内部已 yield done，此处无需重复
+            async for event in timeout_fallback_stream(user_id):
+                yield event
+            return
+
+        except (AuthenticationError, APIConnectionError, APIError, RateLimitError) as e:
+            # LLM 认证失败/不可达/限流 → 降级为本地兜底推荐，不让对话整链路失败
+            logger.warning("LLM 调用失败 (%s)，切换为兜底推荐: %s", type(e).__name__, e)
             async for event in timeout_fallback_stream(user_id):
                 yield event
             return
