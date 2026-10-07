@@ -82,7 +82,10 @@ services:
     environment:
       NAMESRV_ADDR: "rocketmq-namesrv:9876"
       JAVA_OPT_EXT: "-Xms512m -Xmx512m"
-    command: sh mqbroker -n rocketmq-namesrv:9876 --enable-proxy
+    # 注意（Windows Docker Desktop）：broker 默认向 namesrv 注册容器内网 IP，宿主机不可达会导致
+    # Java 生产者 sendDefaultImpl call timeout。修复：执行 scripts/mq-fix-broker-ip.ps1
+    # （docker cp broker.conf 覆盖 $ROCKETMQ_HOME/conf/broker.conf 并 restart，-c 强制读取）。
+    command: sh mqbroker -n rocketmq-namesrv:9876 --enable-proxy -c /home/rocketmq/rocketmq-5.3.0/conf/broker.conf
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/10911'"]
       interval: 10s

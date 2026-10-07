@@ -6,13 +6,26 @@
 ## [Unreleased]
 
 ### P0 · M1 收尾（进行中）
-- RocketMQ 事务消息最终一致性（outbox 投递任务）
-- 超时关单 ✅（[0.1.3]）/ 支付对账 ✅（[0.1.3]）/ 退款资金流
+- 退款资金流（售后→payment）
 - 售后逆向全流程
 - 营销活动（满减/秒杀/拼团/凑单）
 - 评价增量向量更新
 - 用户画像 / 收藏 / 浏览历史
 - 日志脱敏、Dockerfile（9 服务）、CI/CD
+
+## [0.1.4] - 2026-10-07
+
+### feat
+- **outbox 投递任务（order-service）**：新增 `OutboxDeliveryTask`（fixedDelay 30s 扫描 status=0 → RocketMQTemplate.syncSend(topic:tag) → 置 1，失败保留下周期重试，at-least-once 投递）；`OrderServiceImpl` 新增 `buildClosedEventPayload`/`writeClosedOutbox`——ORDER_CLOSED 事件体升级为 `{orderId,userId,closeReason,items:[{skuId,count}]}`（取消与超时关单统一新格式，旧格式无 items 的存量消息消费者安全忽略）
+- **inventory-service 消费兜底**：新增 `OrderClosedListener`（@RocketMQMessageListener topic=ORDER_CLOSED，consumerGroup=inventory-order-closed-group）消费关单事件释放库存；`InventoryService.rollbackOrder(orderId, items)` 按订单整体回滚并以 Redis SETNX（键 `inv:rb:{orderId}`，TTL 7 天）幂等——关单同步调用与 MQ 兜底双通道只释放一次；`/inventory/rollback` 兼容新旧两种消息格式；pom 引入 rocketmq-spring-boot-starter 2.3.0
+
+### fix
+- **RocketMQ broker 地址不可达（Windows Docker Desktop 最大坑）**：broker 默认向 namesrv 注册容器内网 IP（172.18.x.x），宿主 Java 生产者连接超时（`sendDefaultImpl call timeout`）。修复：`middleware.yml` broker command 显式 `-c /home/rocketmq/rocketmq-5.3.0/conf/broker.conf`（镜像自带默认配置路径，非 store），`scripts/mq-fix-broker-ip.ps1` 用 `docker cp` 覆盖该 conf（`brokerIP1 = 127.0.0.1`）+ `docker restart`（**勿 recreate**，会重置配置层）→ 启动段 `brokerIP1=127.0.0.1`，clusterList `Addr=127.0.0.1:10911`。**注意：旧进程缓存旧路由，投递仍失败，必须重启 order-service**
+
+### test
+- outbox 投递：重启后一次性投递 **41/41 条成功**（status 全=1，0 失败）
+- 幂等闭环实测：插入两条同 orderId=999001 的 ORDER_CLOSED 消息（items=[{skuId 9000000000000000020, count 2}]）→ 首条投递消费释放库存 94→96（Redis 实测），第二条**幂等跳过**（`inv:rb:999001` 存在，TTL≈7 天）→ 只释放一次；测试消息已清理
+- 历史存量消息（旧格式无 items）：消费者安全忽略，不误释放
 
 ## [0.1.3] - 2026-10-07
 

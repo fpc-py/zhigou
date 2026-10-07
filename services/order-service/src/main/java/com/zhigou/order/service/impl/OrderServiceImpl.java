@@ -152,14 +152,9 @@ public class OrderServiceImpl implements OrderService {
         order.setCloseReason("用户取消");
         orderMapper.updateById(order);
 
-        // 写 outbox 回滚消息
-        Outbox outbox = new Outbox();
-        outbox.setMessageId(IdUtil.fastSimpleUUID());
-        outbox.setTopic("ORDER_CLOSED"); outbox.setTag("CLOSE");
-        outbox.setPayload(JSONUtil.toJsonStr(order));
-        outboxMapper.insert(outbox);
-
-        log.info("订单取消: orderId={}", orderId);
+            // 写 outbox 回滚消息（含 items，供 MQ 消费者释放库存）
+            writeClosedOutbox(order);
+            log.info("订单取消: orderId={}", orderId);
     }
 
     @Override @Transactional
@@ -205,12 +200,8 @@ public class OrderServiceImpl implements OrderService {
             order.setCloseReason("超时未支付自动关单");
             orderMapper.updateById(order);
 
-            // outbox：超时关单事件（供下游释放库存 / 营销券回滚）
-            Outbox outbox = new Outbox();
-            outbox.setMessageId(IdUtil.fastSimpleUUID());
-            outbox.setTopic("ORDER_CLOSED"); outbox.setTag("TIMEOUT_CLOSE");
-            outbox.setPayload(JSONUtil.toJsonStr(order));
-            outboxMapper.insert(outbox);
+            // outbox：超时关单事件（含 items，供 MQ 消费者释放库存兜底）
+            writeClosedOutbox(order);
 
             // 释放预占库存（失败仅告警，由对账/重试兜底，不阻断关单）
             releaseInventory(order);
@@ -249,6 +240,35 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception e) {
             log.warn("释放库存失败（留待对账兜底）: orderId={}, err={}", order.getOrderId(), e.getMessage());
         }
+    }
+
+    /** 超时关单事件体：含 items 明细，供 MQ 消费者（inventory-service）释放库存 */
+    private String buildClosedEventPayload(OrderMain order) {
+        List<OrderItem> items = itemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getOrderId()));
+        JSONObject body = new JSONObject();
+        body.set("orderId", String.valueOf(order.getOrderId()));
+        body.set("userId", String.valueOf(order.getUserId()));
+        body.set("closeReason", order.getCloseReason());
+        JSONArray arr = new JSONArray();
+        for (OrderItem it : items) {
+            JSONObject item = new JSONObject();
+            item.set("skuId", it.getSkuId());
+            item.set("count", it.getCount());
+            arr.add(item);
+        }
+        body.set("items", arr);
+        return body.toString();
+    }
+
+    /** 统一写 ORDER_CLOSED outbox（超时关单 / 用户取消共用，事件体含 items） */
+    private void writeClosedOutbox(OrderMain order) {
+        Outbox outbox = new Outbox();
+        outbox.setMessageId(IdUtil.fastSimpleUUID());
+        outbox.setTopic("ORDER_CLOSED");
+        outbox.setTag("CLOSE");
+        outbox.setPayload(buildClosedEventPayload(order));
+        outboxMapper.insert(outbox);
     }
 
     private OrderMain requireOrder(Long orderId) {

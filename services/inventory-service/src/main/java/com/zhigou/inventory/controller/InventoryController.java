@@ -28,6 +28,16 @@ public class InventoryController {
 
     @PostMapping("/rollback")
     public Result<Void> rollback(@RequestBody Map<String, Object> body) {
+        // 新版：订单级幂等回滚 {orderId, items:[{skuId,count}]}
+        Object orderId = body.get("orderId");
+        Object itemsObj = body.get("items");
+        if (orderId != null && itemsObj instanceof java.util.List<?> items && !items.isEmpty()) {
+            @SuppressWarnings("unchecked")
+            java.util.List<Map<String, Object>> itemList = (java.util.List<Map<String, Object>>) items;
+            inventoryService.rollbackOrder(String.valueOf(orderId), itemList);
+            return Result.ok();
+        }
+        // 兼容旧版：单条回滚 {skuId, count}
         Long skuId = ((Number) body.get("skuId")).longValue();
         int count = ((Number) body.get("count")).intValue();
         inventoryService.rollback(skuId, count); return Result.ok();

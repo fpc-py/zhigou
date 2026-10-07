@@ -15,8 +15,10 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j @Service @RequiredArgsConstructor
 public class InventoryServiceImpl implements InventoryService {
@@ -62,6 +64,34 @@ public class InventoryServiceImpl implements InventoryService {
     public void rollback(Long skuId, int count) {
         redis.opsForValue().increment(KEY_PREFIX + skuId, count);
         log.info("库存回滚: skuId={}, count={}", skuId, count);
+    }
+
+    /**
+     * 按订单整体回滚库存（幂等）。
+     * 以 Redis SETNX（键 inv:rb:{orderId}，TTL 7 天）保证同一订单只释放一次，
+     * 兼容「关单同步调用」与「ORDER_CLOSED MQ 兜底消费」双通道，避免重复加回。
+     */
+    @Override
+    public void rollbackOrder(String orderId, List<Map<String, Object>> items) {
+        if (orderId == null || orderId.isBlank() || items == null || items.isEmpty()) {
+            log.warn("库存回滚参数缺失: orderId={}, items={}", orderId, items == null ? "null" : items.size());
+            return;
+        }
+        String key = "inv:rb:" + orderId;
+        Boolean first = redis.opsForValue().setIfAbsent(key, "1", Duration.ofDays(7));
+        if (!Boolean.TRUE.equals(first)) {
+            log.info("库存回滚幂等跳过（该订单已释放）: orderId={}", orderId);
+            return;
+        }
+        for (Map<String, Object> item : items) {
+            Object skuObj = item.get("skuId");
+            Object countObj = item.get("count");
+            if (skuObj == null || countObj == null) continue;
+            long skuId = ((Number) skuObj).longValue();
+            int count = ((Number) countObj).intValue();
+            redis.opsForValue().increment(KEY_PREFIX + skuId, count);
+            log.info("库存回滚（订单级）: orderId={}, skuId={}, count={}", orderId, skuId, count);
+        }
     }
 
     @Override @PostConstruct

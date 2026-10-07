@@ -20,6 +20,12 @@ mybatis-plus:
     logic-delete-field: deleted
     logic-delete-value: 1
     logic-not-delete-value: 0
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+  producer:
+    group: inventory-producer-group
+  consumer:
+    group: inventory-consumer-group
 # ==================== Actuator / Prometheus ====================
 management:
   endpoints:
