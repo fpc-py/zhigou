@@ -12,10 +12,10 @@
     </div>
 
     <Skeleton v-if="loading" w="100%" h="100px" :repeat="3" />
-    <EmptyState v-else-if="list.length === 0" illustration="📦" text="暂无相关订单" />
+    <EmptyState v-else-if="filtered.length === 0" illustration="📦" text="暂无相关订单" />
 
     <div v-else class="order-list">
-      <div v-for="o in list" :key="o.orderId" class="order card">
+      <div v-for="o in filtered" :key="o.orderId" class="order card">
         <div class="order-head" @click="goDetail(o)">
           <span class="order-no">订单 {{ o.orderId }}</span>
           <span class="order-status" :class="statusClass(o.orderStatus)">{{ statusText(o.orderStatus) }}</span>
@@ -67,9 +67,17 @@ const tabs = [
   { key: 'PAID', label: '待发货' },
   { key: 'SHIPPED', label: '待收货' },
   { key: 'COMPLETED', label: '已完成' },
+  { key: 'AFTERSALE', label: '售后' },
 ];
 
-const filtered = computed(() => (activeTab.value === 'ALL' ? list.value : list.value.filter((o) => o.orderStatus === activeTab.value)));
+// 售后 tab = 退款中 + 已退款（与「我的」页 orderStats 的 AFTERSALE 入口保持一致）
+const AFTERSALE_STATES = ['REFUNDING', 'REFUNDED'];
+
+const filtered = computed(() => {
+  if (activeTab.value === 'ALL') return list.value;
+  if (activeTab.value === 'AFTERSALE') return list.value.filter((o) => AFTERSALE_STATES.includes(o.orderStatus));
+  return list.value.filter((o) => o.orderStatus === activeTab.value);
+});
 
 function statusText(s: string) {
   const map: Record<string, string> = {

@@ -163,8 +163,11 @@ public class OrderServiceImpl implements OrderService {
     @Override @Transactional
     public void payCallback(Long orderId) {
         OrderMain order = requireOrder(orderId);
-        OrderState current = OrderState.from(order.getOrderStatus());
-        OrderState.validateTransition(current, OrderState.PAID);
+        if (OrderState.PAID.equals(OrderState.from(order.getOrderStatus()))) {
+            log.info("重复支付回调，幂等返回: orderId={}", orderId);
+            return;
+        }
+        OrderState.validateTransition(OrderState.from(order.getOrderStatus()), OrderState.PAID);
         order.setOrderStatus(OrderState.PAID.name());
         orderMapper.updateById(order);
         log.info("订单支付: orderId={}", orderId);

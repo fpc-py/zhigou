@@ -14,6 +14,19 @@
 - 用户画像 / 收藏 / 浏览历史
 - 日志脱敏、Dockerfile（9 服务）、CI/CD
 
+## [0.1.2] - 2026-10-07
+
+### fix
+- **payment-service（支付待付款终极根因）**：Spring Security `anyRequest().authenticated()` 未放行 `/payment/sandbox/mock-pay`，且 BFF 转发不带认证头 → 全部 mock-pay 被 Security 403、**从未到达业务层**；BFF `catchError` 又吞掉 403 伪装成功 → 前端误显示"支付成功"而订单仍待付款。修复：`SecurityConfig` 将 `/payment/sandbox/mock-pay`、`/payment/notify/**` 加入 permitAll（服务端回调靠签名，无用户上下文）；BFF `payment.service.ts` 不再吞错、失败如实上抛
+- **订单状态联动自动化**：支付成功（PENDING→SUCCESS）后新增 `OrderNotifyClient` HTTP 通知 order-service `payCallback`（重试 3 次指数退避 + T+1 对账兜底），`OrderServiceImpl.payCallback` 加幂等（PAID 直接返回）；`payment-service/application.yml` 新增 `payment.order-service-url`
+- **订单详情页不刷新状态**：从结算页支付成功跳转后详情仍显示"等待付款"→ INIT 时自动轮询（6×600ms）至 PAID
+- **订单列表页 tab 筛选从未生效**：模板 `v-for="o in list"` 未使用 `filtered` → 改 `v-for="o in filtered"`、空态判断用 `filtered.length`
+- **「我的→售后」入口失效**：orders 页无售后 tab（AFTERSALE 非订单状态）→ 新增"售后"tab（= REFUNDING+REFUNDED）与"我的"页入口对齐
+- **订单详情页按钮不合状态机**：CLOSED/REFUNDED 仍显示"申请售后"→ 按状态收敛（INIT=取消/支付，PAID/SHIPPED/COMPLETED=申请售后，终态无操作）
+
+### test
+- 浏览器实测 H5 全流程（登录→加购→结算→提交支付→自动跳转订单详情）：**支付成功 → 订单显示"商家备货中"（PAID）**；售后/待付款 tab 均正确过滤；直连 8087 mock-pay 验签通过（返回 404 而非 Security 403）
+
 ## [0.1.1] - 2026-10-07
 
 ### test

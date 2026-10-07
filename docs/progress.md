@@ -42,6 +42,8 @@
 
 
 
+* 2026-10-07：**支付待付款终极根因修复 + 浏览器实测闭环**：① payment-service Spring Security 未放行 mock-pay 致全部支付回调被 403（BFF 吞错伪装成功）→ SecurityConfig permitAll `/payment/sandbox/mock-pay`、`/payment/notify/**`，BFF 不再吞错；② 支付成功自动通知 order-service（新增 `OrderNotifyClient` + payCallback 幂等），订单 INIT→PAID 联动自动化；③ 订单详情页 INIT 轮询刷新；④ 订单列表 tab 筛选修复（模板误用 `list` 而非 `filtered`）+ 新增"售后"tab；⑤ 详情页按钮按状态机收敛。**浏览器全流程实测**：登录→加购→结算→提交→支付成功→自动跳订单详情"商家备货中"（PAID）；售后/待付款 tab 正确过滤。已提交 git（见 CHANGELOG [0.1.2]）。
+
 * 2026-10-07：**全链路联调冒烟 PASS 17/17**（12 微服务 + BFF + H5 全启动；黄金路径 登录→商品→AI 对话→加购→下单幂等→支付→回调→库存→物流→售后→我的订单 全绿）。脚本 `scripts/smoke/zhigou-e2e.ps1`。联调修复 6 处真实 bug：Snowflake ID JSON 精度丢失（order/cart/auth DTO 序列化转字符串）、payment 强转 ClassCastException、aftersale 403 请求头不匹配、cart/file/user 拦截器不认内网透传头、AI 401 降级兜底、ai-orchestrator 启动入口修正。
 
 * 2026-10-07：**前端 8 屏对齐原型 + 交易闭环**（H5 16 路由、5 TabBar、首页 / AI 对话 / 商品详情 / AI 比价 / AR 试穿 / 衣橱 / 社区 / 我的；购物车 / 结算 / 订单 / 支付 / 地址 / 优惠券），BFF 扩展 cart/order/payment/marketing/user/logistics 透传模块；`order-service` 新增 `GET /order/mine` + 下单取真实价格 / 商品名；`cart-service` 新增 `DELETE /cart/{skuId}`；BFF/H5/order/cart 四连构建通过。
@@ -171,7 +173,7 @@
 
 
 
-* 2026-10-07：全链路联调冒烟 17/17（12 服务 + BFF + H5 全启动，黄金路径全绿，6 处联调 bug 修复）；前端 8 屏对齐 + 交易闭环交付；BFF 六模块透传；order/cart 补口与 bug 修复；文档体系统一（docs/README 索引 + README/CLAUDE/progress 对齐）。
+* 2026-10-07：支付待付款终极根因修复（Security permitAll + BFF 不吞错 + 订单自动联动 PAID + 详情页轮询 + 订单列表筛选修复 + 售后 tab）；浏览器实测支付闭环"商家备货中"；悬浮购物车（414px 容器定位）；真实支付接入指南；全链路联调冒烟 17/17（12 服务 + BFF + H5 全启动，黄金路径全绿，6 处联调 bug 修复）；前端 8 屏对齐 + 交易闭环交付；BFF 六模块透传；order/cart 补口与 bug 修复；文档体系统一（docs/README 索引 + README/CLAUDE/progress 对齐）。
 
 * 2026-10-02：BFF 压测；生产就绪度评估；Mock 数据机制。
 

@@ -22,6 +22,8 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 payment.sandbox-secret: sandbox-secret-key
+# 订单服务联动地址（支付成功后通知订单置 PAID；生产环境改为服务发现/网关内网地址）
+payment.order-service-url: ${ORDER_SERVICE_URL:http://localhost:8085}
 # ==================== Actuator / Prometheus ====================
 management:
   endpoints:

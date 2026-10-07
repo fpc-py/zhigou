@@ -4,6 +4,7 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zhigou.common.BizException;
+import com.zhigou.payment.client.OrderNotifyClient;
 import com.zhigou.payment.entity.Payment;
 import com.zhigou.payment.mapper.PaymentMapper;
 import com.zhigou.payment.service.PaymentService;
@@ -20,6 +21,7 @@ import java.util.List;
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentMapper paymentMapper;
+    private final OrderNotifyClient orderNotifyClient;
     @Value("${payment.sandbox-secret}") private String sandboxSecret;
 
     @Override @Transactional
@@ -42,6 +44,7 @@ public class PaymentServiceImpl implements PaymentService {
     public void mockPay(String paymentNo, String sign) {
         // 验签
         String expected = DigestUtil.sha256Hex(paymentNo + sandboxSecret);
+        log.info("mockPay verify: paymentNo={}, secret={}, expected={}, sign={}", paymentNo, sandboxSecret, expected, sign);
         if (!expected.equals(sign)) throw new BizException(403, "签名校验失败");
 
         Payment payment = paymentMapper.selectOne(new LambdaQueryWrapper<Payment>().eq(Payment::getPaymentNo, paymentNo));
@@ -55,6 +58,9 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setStatus("SUCCESS"); payment.setPaidTime(LocalDateTime.now());
         paymentMapper.updateById(payment);
         log.info("支付成功: paymentNo={}, orderNo={}", paymentNo, payment.getOrderNo());
+
+        // 联动订单服务：订单 INIT → PAID（失败不阻断，重试+对账兜底）
+        orderNotifyClient.notifyPaid(payment.getOrderNo());
     }
 
     @Override

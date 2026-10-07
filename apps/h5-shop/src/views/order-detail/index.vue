@@ -41,11 +41,11 @@
         </div>
       </section>
 
-      <!-- 操作 -->
+      <!-- 操作（按订单状态机收敛：INIT=取消/支付，可售后状态=申请售后，终态无操作） -->
       <div class="order-ops">
         <button v-if="order.orderStatus === 'INIT'" class="op line" @click="cancel">取消订单</button>
         <button v-if="order.orderStatus === 'INIT'" class="op brand" @click="pay">立即支付</button>
-        <button v-else class="op line" @click="toast('售后申请功能规划中')">申请售后</button>
+        <button v-else-if="['PAID', 'SHIPPED', 'COMPLETED'].includes(order.orderStatus)" class="op line" @click="toast('售后申请功能规划中')">申请售后</button>
       </div>
     </template>
   </div>
@@ -135,7 +135,19 @@ function toast(msg: string) {
   showToast(msg);
 }
 
-onMounted(load);
+/** 等待支付回调落库：从结算页支付成功跳转而来时，订单 INIT 状态轮询至 PAID */
+async function waitPaidIfInit() {
+  for (let i = 0; i < 6; i++) {
+    if (order.value?.orderStatus !== 'INIT') return;
+    await new Promise((r) => setTimeout(r, 600));
+    await load();
+  }
+}
+
+onMounted(async () => {
+  await load();
+  if (order.value?.orderStatus === 'INIT') await waitPaidIfInit();
+});
 </script>
 
 <style scoped>

@@ -20,5 +20,10 @@
 | 2026-10-07 | 全链路首次联调 6 处真实 bug（Snowflake ID 精度丢失 / payment ClassCastException / aftersale 403 / cart·file·user 401 / AI 401 整链路失败 / ai-orchestrator 启动入口错误） | order/cart/auth DTO ID 转字符串；payment 安全 toLong；aftersale 读 X-User-Id；三服务拦截器兼容内网透传头；chat_service.py 降级兜底；`python main.py` 启动 | 全链路冒烟 **PASS 17/17**（`scripts/smoke/zhigou-e2e.ps1`） |
 | 2026-10-07 | 沙箱支付成功但前端不跳转（mockPay 传 `sign:'sandbox-mock'` 与后端验签不符，403 后被静默吞掉） | H5 `payment.ts` 用 `sha256(paymentNo+sandbox-secret-key)` 正确签名（三处调用统一修复）；checkout/orders/order-detail 失败时不再静默，提示"支付失败，请重试"；checkout 支付失败兜底跳订单详情 | `npm run build` 通过；BFF 链路实测 mock-pay PASS |
 | 2026-10-07 | 主页缺少购物车快捷入口 | home 页新增悬浮购物车按钮（品牌渐变 FAB + 数量角标，数量来自 `/cart/mine`） | `npm run build` 通过 |
+| 2026-10-07 | 悬浮购物车位置按电脑边而非手机容器 | FAB 定位改为 `right:max(16px, calc((100vw-414px)/2+16px)); bottom:calc(76px + safe-area)`，与 414px 手机容器/底部 TabBar 对齐 | 浏览器实测首页显示正常 |
+| 2026-10-07 | **支付显示成功但仍待付款（终极根因）**：`payment-service` 的 Spring Security `anyRequest().authenticated()` 未放行 `/payment/sandbox/mock-pay`，BFF 转发又不带认证头 → 全部 mock-pay 被 Security 403，**从未到达业务层**；而 BFF 的 `catchError` 把 403 吞掉返回 200 → 前端误显示"支付成功" | ① payment-service `SecurityConfig` 将 `/payment/sandbox/mock-pay`、`/payment/notify/**` 加入 permitAll（服务端回调靠签名验签，无用户上下文）；② BFF `payment.service.ts` mockPay 不再吞错，失败如实抛给上层；③ 订单联动自动化：新增 `OrderNotifyClient`（支付成功 HTTP 通知 order-service `payCallback`，重试 3 次+对账兜底），`OrderServiceImpl.payCallback` 幂等；④ 订单详情页 INIT 时自动轮询至 PAID | 浏览器实测全流程：支付成功 → 自动跳订单详情 → **"商家备货中"（PAID）**；直连 8087 验签通过返回 404（此前 403） |
+| 2026-10-07 | 「我的→售后」入口跳转后落在"全部"（orders 页无售后 tab，AFTERSALE 非订单状态） | orders 页新增"售后"tab（= REFUNDING+REFUNDED），与"我的"页 `orderStats` 的 `AFTERSALE` 入口对齐 | 浏览器实测：售后 tab 高亮并正确过滤 |
+| 2026-10-07 | **订单列表页 tab 筛选从未生效**：模板 `v-for="o in list"` 用的是原始列表，`filtered` 计算属性未被模板使用 | 模板改 `v-for="o in filtered"`，空态判断改 `filtered.length === 0` | 浏览器实测：待付款/待发货/售后 tab 均正确过滤 |
+| 2026-10-07 | 订单详情页对 CLOSED/REFUNDED 仍显示"申请售后"（不合状态机） | 操作按钮按状态收敛：INIT=取消+支付，PAID/SHIPPED/COMPLETED=申请售后，终态无操作 | `npm run build` 通过 |
 
 > 新增 bug 时在此追加一行；涉及代码修复的同步更新 `CHANGELOG.md`。
