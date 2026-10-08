@@ -3,6 +3,11 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.6] - 2026-10-08
+
+### CI 诊断
+- chore(CI) build-test 新增「MinIO 镜像探测」步骤：按序预拉 env.MINIO_IMAGE → quay.io RELEASE → latest，成功即写回 GITHUB_ENV（Testcontainers 直接命中本地镜像不再触发拉取）；结果写 Step Summary，Actions 页面可直接查看各源可用性（定位 quay 500 / Docker Hub 404 的实证数据）
+
 ## [0.2.5] - 2026-10-08
 
 ### CI 修复
