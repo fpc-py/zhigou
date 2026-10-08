@@ -3,6 +3,12 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.5] - 2026-10-08
+
+### CI 修复
+- fix(CI) file-service 集成测试 MinIO 镜像拉取失败（404 pull access denied）：Docker Hub `minio/minio:latest` 已停维护/匿名拉取受限 → 默认改用 `quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z`（固定 RELEASE 版，doris 等开源项目同款方案）；支持环境变量 `MINIO_IMAGE` 覆盖（内网/私有镜像）；`withCommand` 参数分离 + `waitingFor` 监听端口 + 120s 启动超时（防 flaky）
+- **验证**：本地 `mvn -pl services/file-service -am test` 6/6 全绿（MINIO_IMAGE 回退缓存镜像验证代码路径）
+
 ## [0.2.4] - 2026-10-08
 
 ### P1 · AI 决策辅助第二批（会话记忆 / 凑单 / 代下单）
