@@ -65,8 +65,8 @@ class FileServiceIntegrationTest {
     static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
             .withExposedPorts(6379).withStartupTimeout(Duration.ofSeconds(120)).waitingFor(Wait.forListeningPort());
 
-    /** MinIO 镜像：默认 quay.io 固定 RELEASE（Docker Hub minio/minio:latest 已停维护/匿名拉取受限，CI 404）；可用环境变量 MINIO_IMAGE 覆盖 */
-    private static final String DEFAULT_MINIO_IMAGE = "quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z";
+    /** MinIO 镜像：默认 Docker Hub 固定 RELEASE tag（latest 已停维护/匿名拉取受限，CI 404；quay.io 匿名亦受限 500）；可用环境变量 MINIO_IMAGE 覆盖（内网/私有镜像源） */
+    private static final String DEFAULT_MINIO_IMAGE = "minio/minio:RELEASE.2024-11-07T00-52-20Z";
     private static final String MINIO_IMAGE = System.getenv().getOrDefault("MINIO_IMAGE", DEFAULT_MINIO_IMAGE);
 
     @Container
