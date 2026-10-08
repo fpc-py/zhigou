@@ -1,0 +1,79 @@
+# ============================================================
+# 智购 · 部署流水线（手动触发，生产环境）
+# 前提（GitHub Settings -> Secrets and variables -> Actions）：
+#   DEPLOY_HOST    生产服务器 IP/域名（SSH）
+#   DEPLOY_USER    SSH 用户名
+#   DEPLOY_KEY     SSH 私钥（PEM，含换行）
+#   DEPLOY_PATH    项目部署目录（如 /opt/zhigou，含 infra/compose）
+# 说明：
+#   - 从 GHCR 拉取镜像（需服务器登录 GHCR，见 deploy/README）
+#   - compose 需先有 middleware.yml（中间件）+ services.yml（业务服务）
+#   - 采用蓝绿交替发布：新服务容器启动健康后，再移除旧容器
+# ============================================================
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "镜像 tag（latest / main-xxxxxxx / v0.1.x）"
+        required: true
+        default: latest
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      TAG: ${{ github.event.inputs.tag || 'latest' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify required secrets
+        run: |
+          for k in DEPLOY_HOST DEPLOY_USER DEPLOY_KEY DEPLOY_PATH; do
+            if [ -z "${{ secrets[k] }}" ]; then
+              echo "::error::缺少 secret $k，请先在仓库 Settings 配置"
+              exit 1
+            fi
+          done
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat >> ~/.ssh/config <<EOF
+          Host zhigou-prod
+            HostName ${{ secrets.DEPLOY_HOST }}
+            User ${{ secrets.DEPLOY_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+          EOF
+
+      - name: Deploy compose services
+        run: |
+          ssh zhigou-prod "cd ${{ secrets.DEPLOY_PATH }} && \
+            TAG=$TAG docker compose -f infra/compose/services.yml up -d --pull always && \
+            echo '--- waiting for health ---' && \
+            sleep 20 && \
+            docker compose -f infra/compose/services.yml ps"
+
+      - name: Verify service health
+        run: |
+          ssh zhigou-prod "cd ${{ secrets.DEPLOY_PATH }} && \
+            for s in auth-center user-service file-service product-service cart-service \
+                     order-service inventory-service payment-service marketing-service \
+                     logistics-service aftersale-service; do \
+              status=\$(docker inspect --format '{{.State.Health.Status}}' zhigou-\$s 2>/dev/null || echo missing); \
+              echo \"\$s: \$status\"; \
+            done"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Deploy Result" >> $GITHUB_STEP_SUMMARY
+          echo "- Target: ${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Image tag: ${{ env.TAG }}" >> $GITHUB_STEP_SUMMARY

@@ -11,6 +11,12 @@
 - 用户画像 / 收藏 / 浏览历史
 - CI/CD、全链路压测
 
+## [0.1.8] - 2026-10-08
+
+### feat
+- **GitHub Actions CI 流水线（\.github/workflows/ci.yml\）**：① build-test job——JDK 17 Temurin + Maven cache，\mvn -B -ntp clean verify\ 全模块编译+单测（失败上传 surefire 报告）；② build-images job（needs build-test，矩阵 11 服务）——多阶段 Dockerfile 构建 + GHCR 推送（\ghcr.io/fpc-py/zhigou/<svc>\），tag 策略：main→\main-<sha7>\+\latest\、tag v*→版本+\latest\、PR→仅构建不推送；gha 层缓存；③ summary 汇总。**多阶段 Stage1（容器内 mvn）在 CI 环境完成验证**，补齐本地 Docker Desktop 容器网络无法下载 Maven 依赖的缺口
+- **GitHub Actions 部署流水线（\.github/workflows/deploy.yml\）**：手动触发（workflow_dispatch 输入镜像 tag），SSH + \docker compose -f infra/compose/services.yml up -d --pull always\ + 逐服务健康检查；前置 secrets 校验（DEPLOY_HOST/DEPLOY_USER/DEPLOY_KEY/DEPLOY_PATH），未配置即失败提示
+
 ## [0.1.7] - 2026-10-08
 
 ### feat
