@@ -65,6 +65,24 @@
       </div>
     </div>
 
+    <!-- 个性化推荐（画像驱动：历史订单 + 购物车 + 评价口碑） -->
+    <div v-if="personal && personal.items.length" class="feed-section personal-section">
+      <h3 class="section-title">
+        {{ personal.sceneText || '猜你喜欢' }}
+        <span class="personal-badge"><Icon name="ai" size="xs" /> 为你定制</span>
+      </h3>
+      <div class="product-grid">
+        <div v-for="it in personal.items" :key="it.spuId" class="personal-card">
+          <ProductCard :product="mapPersonal(it)" />
+          <div class="personal-meta">
+            <span v-for="tag in it.tags" :key="tag" class="p-tag">{{ tag }}</span>
+            <p v-if="it.reasons.length" class="p-reasons">{{ it.reasons.join(' · ') }}</p>
+          </div>
+        </div>
+      </div>
+      <p class="personal-source">{{ personal.sourceDesc }}</p>
+    </div>
+
     <!-- 悬浮购物车入口 -->
     <button v-if="userStore.isLoggedIn" class="cart-fab" aria-label="购物车" @click="router.push('/cart')">
       <Icon name="cart" size="lg" />
@@ -80,7 +98,7 @@ import { getHomeFeed } from '@/api/home';
 import { getProfile } from '@/api/user';
 import { getCartMine } from '@/api/cart';
 import { useUserStore } from '@/stores/user';
-import type { ProductItem } from '@/api/home';
+import type { HomeFeedData, ProductItem } from '@/api/home';
 import Skeleton from '@/components/Skeleton.vue';
 import ErrorRetry from '@/components/ErrorRetry.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -92,6 +110,7 @@ const userStore = useUserStore();
 const loading = ref(true);
 const error = ref(false);
 const products = ref<ProductItem[]>([]);
+const personal = ref<HomeFeedData['personal']>(undefined);
 const nickname = ref('朋友');
 const cartCount = ref(0);
 
@@ -144,11 +163,23 @@ async function loadFeed() {
     }
     const data = await getHomeFeed();
     products.value = data.products;
+    personal.value = data.personal ?? undefined;
   } catch {
     error.value = true;
   } finally {
     loading.value = false;
   }
+}
+
+/** 个性化推荐项 → ProductCard 兼容结构 */
+function mapPersonal(it: NonNullable<HomeFeedData['personal']>['items'][number]): ProductItem {
+  return {
+    spuId: it.spuId,
+    name: it.name,
+    priceMin: it.priceMin,
+    priceMax: it.priceMin,
+    mainImage: it.mainImage,
+  };
 }
 
 /** 加载购物车件数（悬浮入口角标） */
@@ -299,7 +330,33 @@ onMounted(() => {
 .banner-balls i:nth-child(2) { width: 24px; height: 24px; right: -6px; bottom: 26px; }
 .banner-balls i:nth-child(3) { width: 12px; height: 12px; right: 44px; bottom: -14px; }
 .feed-section { padding: 0 16px; }
-.section-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+.section-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.personal-section { margin-top: 18px; }
+.personal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--brand);
+  background: var(--brand-soft, #EEF0FF);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.personal-card { display: flex; flex-direction: column; gap: 6px; }
+.personal-meta { display: flex; flex-direction: column; gap: 3px; padding: 0 2px 8px; }
+.p-tag {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.p-reasons { font-size: 11px; color: var(--ink-3); line-height: 1.5; }
+.personal-source { font-size: 10.5px; color: var(--ink-3); opacity: 0.75; margin-top: 4px; }
 .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .login-prompt { text-align: center; padding: 60px 24px; cursor: pointer; }
 .login-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }

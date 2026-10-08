@@ -34,6 +34,7 @@ export const SERVICE_PATHS = {
   productPage:       '/product/page',
   productDetail:     (spuId: string) => `/product/${spuId}`,
   productSku:        (skuId: string) => `/product/sku/${skuId}`,
+  productRecommend:  '/recommend',
   userCoupons:       '/coupon/mine',
   discountCalculate: '/discount/calculate',
   freightCalculate:  '/freight/calculate',

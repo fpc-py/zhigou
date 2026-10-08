@@ -14,15 +14,17 @@ export class HomeService {
   constructor(private readonly http: HttpService) {}
 
   async getFeed(userId: string): Promise<HomeFeedResponse> {
-    const [productsResult, ragResult] = await Promise.all([
+    const [productsResult, ragResult, personalResult] = await Promise.all([
       this.safeCall<ProductItem[]>(this.fetchProducts(userId)),
       this.safeCall<any[]>(this.fetchRagRecommend()),
+      this.safeCall<any>(this.fetchPersonalRecommend(userId)),
     ]);
 
     return {
       banner: ['/banners/default-1.jpg', '/banners/default-2.jpg'], // 后续接营销 banner 接口
       recommend: ragResult ?? [],
       products: productsResult ?? [],
+      personal: personalResult ?? undefined,
     };
   }
 
@@ -60,6 +62,24 @@ export class HomeService {
     );
     const resp = await firstValueFrom(obs);
     return resp.data?.items ?? [];
+  }
+
+  /** 个性化推荐：product-service /recommend（画像 = 订单 + 购物车 + 评价口碑） */
+  private async fetchPersonalRecommend(userId: string) {
+    const url = `${SERVICES.productService.url}${SERVICE_PATHS.productRecommend}?scene=home&limit=6`;
+    const obs = this.http.get(url, { headers: { 'x-user-id': userId } }).pipe(
+      timeout(SERVICES.productService.timeout + 2_000),
+      catchError((err) => {
+        if (err instanceof TimeoutError) {
+          this.logger.warn('product-service 个性化推荐超时');
+        } else {
+          this.logger.warn(`product-service 个性化推荐失败: ${err.message}`);
+        }
+        return Promise.resolve({ data: { data: null } });
+      }),
+    );
+    const resp = await firstValueFrom(obs);
+    return resp.data?.data ?? null;
   }
 
   // ── 通用安全调用 ──

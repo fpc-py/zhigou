@@ -650,6 +650,47 @@ async def create_order(sku_items: list[dict], coupon_id: int | None = None) -> s
         return "下单失败，请稍后重试"
 
 
+@tool
+async def recommend_products(scene: str = "home", limit: int = 6) -> str:
+    """
+    个性化推荐。基于当前用户的历史订单（品类/价位偏好）、购物车意向与商品真实评价口碑，
+    返回带可解释理由的推荐清单。用户说"给我推荐""有什么适合我的""为我定制""猜你喜欢"
+    或需要个性化选择建议时调用；可与 analyze_user_context（隐性需求挖掘）配合使用。
+    用户身份由服务端注入，无需传参。
+
+    Args:
+        scene: 推荐场景，home（默认，首页猜你喜欢）/ cart（购物车凑单）/ detail（详情页相关）
+        limit: 返回条数上限，默认 6，最大 20
+    """
+    try:
+        user_id = _get_current_user()
+        url = f"{settings.product_service_url}/recommend?scene={scene}&limit={limit}"
+        headers = {"x-user-id": user_id}
+        data = await _http_get(url, timeout=5.0, headers=headers)
+        resp = data.get("data") or {}
+        items = resp.get("items") or []
+        if not items:
+            return "暂无推荐（商品库为空或无上架商品）。"
+
+        lines = [resp.get("sceneText") or "为你推荐："]
+        for it in items:
+            name = it.get("name") or "未知商品"
+            price = _fen_to_yuan(it.get("priceMin") or 0)
+            reasons = "；".join(it.get("reasons") or [])
+            tags = " ".join(it.get("tags") or [])
+            line = f"· {name} | {price} 起"
+            if tags:
+                line += f" [{tags}]"
+            if reasons:
+                line += f" — {reasons}"
+            lines.append(line)
+        lines.append("（推荐依据：历史订单 + 购物车 + 真实评价统计，可解释可追溯）")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("recommend_products 调用失败: %s", e)
+        return "这项信息暂时没查到"
+
+
 # ── 工具注册表 ──
 
 TOOLS = [
@@ -662,6 +703,7 @@ TOOLS = [
     compare_prices,
     review_analysis,
     analyze_user_context,
+    recommend_products,
     optimize_cart,
     create_order,
 ]

@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.9] - 2026-10-08
+
+### P1 · AI 决策辅助第五批（个性化推荐引擎：画像 + 评分 + AI 工具 + 前端）
+
+- feat(P1) product-service 个性化推荐引擎：`GET /recommend?scene=home|cart|detail&limit=N`——画像全部来自**内部真实数据**（历史订单 `/order/mine` 品类偏好/价位带/已购、购物车 `/cart/mine` 当前意向、product_review 评价口碑），加权评分 = 品类命中 1.5 + 价位匹配 1.0 + 口碑分 0.3~1.5 − 刷评降权 0.8 − 已购换新 0.8 + 购物车意向 0.5 + 反常识加成 0.5（冷门高口碑）；输出可解释理由（reasons 标签）+ 特殊标记（⚠ 疑似刷评 / 已购过 / 小众高口碑），用户身份由 `UserContext` 服务端注入；订单/购物车拉取失败自动降级为口碑榜（不报错、不编造）
+- feat(P1) AI 新工具 `recommend_products(scene, limit)`：调 `/recommend` 输出画像驱动推荐清单（含理由与标记），服务端注入身份无 userId 入参；`TOOLS` 注册表补齐
+- feat(P1) BFF `/home/feed` 聚合透传个性化推荐（`personal` 字段，product-service 2s 超时降级）；H5 首页新增**「猜你喜欢 · 为你定制」**区块——`personal.sceneText` 标题 + ProductCard 复用 + 理由标签 + 数据来源说明
+- fix(P1) **LLM 幻觉商品**：旧 system.md 仅基础准则，LLM 分析画像后编造"李宁/安踏/特步"等库外商品——重写 `prompts/system.md`：补齐 12 工具真实清单与使用场景表、六步决策流程（拆解→搜索→比价→避坑→推荐→代下单）、硬红线"推荐必须引用工具返回的真实商品，禁止编造商品名/价格/评价"；spuId/skuId 用途说明（评价用 spuId、查价查库存用 skuId）
+- fix(P1) **/order/mine 参数缺漏**：推荐引擎内网调用未带必填 `userId` 参数返回 500 → 补 `?userId=`；附带发现 order-service 此前以无 profile 启动（缺 mock 数据），恢复 `--spring.profiles.active=dev` 启动
+- fix(P1) recommend_products 输出双 ¥ 符号（`_fen_to_yuan` 已带 ¥，拼接重复）→ 去重
+- **验证**：product /recommend 冒烟——23 件历史购买画像命中（运动鞋/T恤 3.4 分含"你常买这个品类/在你常用价位带内/已在你的购物车/已购过"，耳机 0.4 分带 ⚠ 疑似刷评降权）；SSE 实测「结合我买过的推荐」→ analyze_user_context（22 单/运动鞋 90%+/百元内）→ recommend_products（4 款真实商品带理由）→ LLM 回复全部引用工具数据无编造；BFF/H5 `npm run build` 通过
+
 ## [0.2.8] - 2026-10-08
 
 ### P1 · AI 决策辅助第四批（评价数据底座 + 差评/水军识别）

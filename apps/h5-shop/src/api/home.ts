@@ -23,6 +23,21 @@ export interface HomeFeedData {
   banner: string[];
   recommend: RecommendItem[];
   products: ProductItem[];
+  personal?: {
+    sceneText: string;
+    sourceDesc: string;
+    items: Array<{
+      spuId: string;
+      name: string;
+      mainImage?: string;
+      priceMin: number;
+      score: number;
+      avgRating?: number | null;
+      reviewCount: number;
+      reasons: string[];
+      tags: string[];
+    }>;
+  };
 }
 
 export async function getHomeFeed(): Promise<HomeFeedData> {

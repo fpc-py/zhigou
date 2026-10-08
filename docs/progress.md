@@ -22,6 +22,16 @@
 >
 > 。
 
+## 2026-10-08 · P1 第五批：个性化推荐引擎（画像 + 评分 + AI 工具 + 前端）
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| 推荐引擎 | ✅ | product-service `/recommend`：订单品类/价位带 + 购物车意向 + 评价口碑加权评分，可解释理由 + 刷评/已购/小众标记，API 冒烟通过 |
+| AI 工具 | ✅ | `recommend_products` 接入对话，SSE 实测 analyze_user_context→recommend_products 全链路无编造 |
+| 提示词防幻觉 | ✅ | system.md 重写：12 工具清单 + 六步流程 + 禁编造红线（原 LLM 曾编造库外商品名） |
+| BFF + H5 | ✅ | /home/feed 聚合 personal 字段；首页"猜你喜欢 · 为你定制"区块，双端 build 通过 |
+| 修复 | ✅ | /order/mine 缺 userId 参数 500（补参）；order-service 恢复 dev profile（mock 数据）；双¥ 去重 |
+
 ## 2026-10-08 · P1 第四批：评价数据底座 + 差评/水军识别
 
 | 项 | 状态 | 说明 |
