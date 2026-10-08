@@ -22,6 +22,14 @@
 >
 > 。
 
+## 2026-10-08 · CI 集成测试基建闭环（MinIO/s3mock + RocketMQ 条件化）
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| file-service 集成测试存储镜像 | ✅ | `minio/minio`（Docker Hub 整仓 404 / quay 500）→ `adobe/s3mock` + Testcontainers 官方模块 `s3mock-testcontainers:4.5.0`；本地 `mvn verify` 全模块 SUCCESS，CI 13 checks 全绿 |
+| inventory 测试 RocketMQ 依赖 | ✅ | `OrderClosedListener` 加 `@ConditionalOnProperty` 条件开关，test profile 禁用——CI 无 MQ 环境上下文可正常启动，本地/CI 均 hermetic |
+| CI 流水线 | ✅ | GitHub Actions 13/13 checks passed（build-test 67 项测试 + 11 服务镜像构建） |
+
 ## 当前阶段
 
 **M1 交易闭环收尾**（目标态 P0）+ M2 AI 导购已交付。下一步按差距报告 P0 → P1 推进。
