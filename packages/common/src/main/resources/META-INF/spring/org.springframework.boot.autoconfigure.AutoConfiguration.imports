@@ -1,1 +1,2 @@
 com.zhigou.common.config.MyBatisPlusAutoConfiguration
+com.zhigou.common.mask.MaskAutoConfiguration

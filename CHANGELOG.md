@@ -9,7 +9,23 @@
 - 营销活动（满减/秒杀/拼团/凑单）
 - 评价增量向量更新
 - 用户画像 / 收藏 / 浏览历史
-- 日志脱敏、Dockerfile（9 服务）、CI/CD
+- Dockerfile（9 服务）、CI/CD、全链路压测
+
+## [0.1.6] - 2026-10-08
+
+### feat
+- **日志脱敏 AOP（packages/common mask 模块）**：新增 `SensitiveType`（PHONE/ID_CARD/BANK_CARD/EMAIL/PASSWORD/TOKEN/SECRET/NAME/ADDRESS/DEFAULT）、`MaskUtil`（正则智能识别 + 敏感词 key 全掩，支持按类型掩码）、`SensitiveLog` 注解（METHOD/TYPE 两级）、`SensitiveLogAspect`（@Around 序列化→递归掩码，耗时打印，序列化失败降级 toString+正则，**绝不抛异常影响主流程**）、`MaskAutoConfiguration`（@AutoConfiguration + @EnableAspectJAutoProxy，`zhigou.mask.enabled` 可关，默认开启）；`AutoConfiguration.imports` 注册；common pom 引入 `spring-boot-starter-aop`
+- **auth-center 接入脱敏**：`AuthController.send-sms-code/login` 加 `@SensitiveLog`；`LoginRequest.code` 加 `@SensitiveField(PASSWORD)`（字段名 "code" 不在敏感词表，需注解兜底）
+- **字段注解感知（切面反射）**：入参对象类上存在任一 `@SensitiveField` 时，收集**全部字段**（注解字段按注解类型掩码、其余字段原值交 maskMap 按敏感词/正则处理），修复仅收注解字段导致入参丢 phone 的问题
+
+### fix
+- **长数字被银行卡正则误掩**：Snowflake userId（`210775...1648`）被 `\d{13,19}` 误判为银行卡 → `BANK_CARD_RE` 收紧为 `[3456]\d{12,18}`（仅匹配真实银行卡开头），userId 原样输出
+- **验证码字段漏掩**：`code` 字段名不在敏感词表且 6 位数字不匹配正则 → `@SensitiveField(PASSWORD)` 注解兜底，日志中 `******`
+
+### test
+- `MaskUtilTest` 11/11 通过（手机号/身份证/银行卡/邮箱/密码/token/姓名/地址/长 ID 不误掩/自定义类型）
+- **auth-center 线上实测**（重打 jar 后登录）：`[SensitiveLog] AuthController.login(..) 完成 | 入参=[{"phone":"********","code":"******"}] | 返回={data:{userId:"2107757313435291648",accessToken:"********",refreshToken:"********"}}` —— phone 全掩、验证码全掩、token 全掩、**userId 完整保留**（不误掩）
+- 环境全量重启（Docker Desktop→中间件 6 容器 healthy→11 Java 服务全端口 UP→ai/BFF/H5）后全链路冒烟：登录 200、BFF `/aftersale/mine` 7 条
 
 ## [0.1.5] - 2026-10-08
 

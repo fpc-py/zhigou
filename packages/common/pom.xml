@@ -35,6 +35,11 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-core</artifactId>
         </dependency>
+        <!-- AOP（@SensitiveLog 日志脱敏切面，传递到全部下游服务） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
         <!-- JWT 验签（与 auth-center 一致的 Nimbus JOSE） -->
         <dependency>
             <groupId>com.nimbusds</groupId>
