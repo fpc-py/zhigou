@@ -9,7 +9,21 @@
 - 营销活动（满减/秒杀/拼团/凑单）
 - 评价增量向量更新
 - 用户画像 / 收藏 / 浏览历史
-- Dockerfile（9 服务）、CI/CD、全链路压测
+- CI/CD、全链路压测
+
+## [0.1.7] - 2026-10-08
+
+### feat
+- **11 服务生产级多阶段 Dockerfile**：统一模板（Stage1 `maven:3.9-eclipse-temurin-17` 容器内编译 → Stage2 `eclipse-temurin:17-jre` 运行），关键基线：先拷全部 POM（根 reactor 解析必需，含 11 个服务 + packages/proto + common）最大化层缓存 → `mvn -pl <svc> -am package`；运行时非 root（`app` 用户 uid 1001）、`-Xms256m -Xmx512m -XX:+UseG1GC` JVM 参数、`EXPOSE` 服务端口、`HEALTHCHECK` 打 `/actuator/health`、`ENTRYPOINT` 走 `java $JAVA_OPTS -jar`；auth-center 一并升级（此前仅有旧版）
+- **根目录 .dockerignore**：排除 `**/target`、`.git`、`node_modules`、`dist`、`logs`、`.sessions`、`*.log`、venv 等，压缩构建上下文
+- **11 服务运行时镜像（本地构建）**：`Dockerfile.runtime`（eclipse-temurin:17-jre + COPY 宿主 mvn 打好的 jar，验证/快速部署用）批量构建成功 `zhigou/<svc>:0.1.0`（11 个）；user-service 容器实测：JVM 17 正常启动、**非 root（started by app）**、Spring Boot 3.2.5 启动日志正常
+- **生产编排 `infra/compose/services.yml`**：11 服务接入 `compose_default` 网络（external，与 middleware.yml 共享）；环境变量覆盖 DB_URL（`zhigou-<db>:3306`）、REDIS_HOST、ROCKETMQ_NAME_SERVER、服务间 URL（PRODUCT/INVENTORY/ORDER/PAYMENT_SERVICE_URL）；auth-center 硬编码 datasource 用 Spring 宽松绑定 `SPRING_DATASOURCE_URL` 覆盖；`restart: unless-stopped` 自愈重试（depends_on 不可跨 project）；`docker compose config` 校验通过
+
+### fix
+- **here-string `$JAVA_OPTS` 被 PowerShell 展开为空**：Dockerfile ENTRYPOINT 写成 `java  -jar`（JVM 参数丢失）→ 反引号转义保留字面 `$JAVA_OPTS`（运行时由 sh 展开）
+- **reactor ProjectBuildingException**：根 pom modules 列出全部模块，仅拷当前服务 pom 报 `Child module ... does not exist` → 全部 11 个服务 pom + proto + common 一并 COPY
+- **容器内 mvn 下载依赖卡死（本地 Docker Desktop 网络到 Maven 仓库不通，宿主正常）**：多阶段构建的 Stage1 无法在本地验证 → 提供 `Dockerfile.runtime`（宿主 mvn 打包 + COPY jar）完成本地镜像构建与运行时验证；多阶段构建保留供 CI/CD（有网络）使用
+- **.dockerignore 排除 `**/target` 导致 runtime COPY 宿主 jar 报 not found**：runtime Dockerfile 构建 context 改为服务目录（`docker build -f Dockerfile.runtime -t zhigou/<svc>:0.1.0 services/<svc>`）
 
 ## [0.1.6] - 2026-10-08
 

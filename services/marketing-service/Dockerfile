@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 # ============================================================
-# 智购 · auth-center 生产级多阶段构建
+# 智购 · marketing-service 生产级多阶段构建
 # 构建：maven:3.9-eclipse-temurin-17（与 maven-compiler target=17 一致）
 # 运行：eclipse-temurin:17 JRE，非 root 用户，健康检查
 # 构建命令（项目根执行）：
-#   docker build -f services/auth-center/Dockerfile -t zhigou/auth-center:0.1.0 .
+#   docker build -f services/marketing-service/Dockerfile -t zhigou/marketing-service:0.1.0 .
 # ============================================================
 
 # ---- Stage 1: 构建 ----
@@ -30,8 +30,8 @@ COPY packages/proto/pom.xml /build/packages/proto/pom.xml
 # 2) 拷源码并打包（-am 连带构建依赖的 proto/common）
 COPY packages/proto /build/packages/proto
 COPY packages/common /build/packages/common
-COPY services/auth-center /build/services/auth-center
-RUN mvn -pl services/auth-center -am package -DskipTests -q
+COPY services/marketing-service /build/services/marketing-service
+RUN mvn -pl services/marketing-service -am package -DskipTests -q
 
 # ---- Stage 2: 运行 ----
 FROM eclipse-temurin:17-jre
@@ -44,14 +44,14 @@ WORKDIR /app
 RUN groupadd -r app && useradd -r -g app -u 1001 app && \
     mkdir -p /app/logs && chown -R app:app /app
 
-COPY --from=builder /build/services/auth-center/target/zhigou-auth-center-0.1.0-SNAPSHOT.jar /app/app.jar
+COPY --from=builder /build/services/marketing-service/target/zhigou-marketing-service-0.1.0-SNAPSHOT.jar /app/app.jar
 
 USER app
 
-EXPOSE 8080
+EXPOSE 8088
 
 # 健康检查（服务已引入 spring-boot-starter-actuator）
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD wget -q -O /dev/null http://127.0.0.1:8080/actuator/health || exit 1
+  CMD wget -q -O /dev/null http://127.0.0.1:8088/actuator/health || exit 1
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]

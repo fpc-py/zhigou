@@ -1,0 +1,19 @@
+# ============================================================
+# 智购 · auth-center 运行时镜像（本地构建/快速验证用）
+# 构建命令（context = 服务目录）：
+#   docker build -f Dockerfile.runtime -t zhigou/auth-center:0.1.0 services/auth-center
+# 生产多阶段构建（容器内编译）用同目录 Dockerfile（CI 环境）
+# ============================================================
+FROM eclipse-temurin:17-jre
+ENV TZ=Asia/Shanghai \
+    LANG=C.UTF-8 \
+    JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC -XX:MaxMetaspaceSize=256m -Duser.timezone=Asia/Shanghai"
+WORKDIR /app
+RUN groupadd -r app && useradd -r -g app -u 1001 app && \
+    mkdir -p /app/logs && chown -R app:app /app
+COPY target/zhigou-auth-center-0.1.0-SNAPSHOT.jar /app/app.jar
+USER app
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1:8080/actuator/health || exit 1
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]

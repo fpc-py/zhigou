@@ -1,0 +1,17 @@
+# 智购 · Docker 构建上下文排除
+**/target
+**/.git
+**/.idea
+**/.vscode
+**/node_modules
+**/dist
+**/logs
+**/.preview
+**/.sessions
+**/*.log
+**/*.err.log
+**/.env
+**/venv
+**/.venv
+**/__pycache__
+**/.DS_Store

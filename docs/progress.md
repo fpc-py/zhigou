@@ -40,7 +40,8 @@
 
 ## 已完成
 
-* 2026-10-08：**P0-D1 日志脱敏 AOP（生产非功能第一块）**：packages/common 新增 mask 模块（SensitiveType/MaskUtil/SensitiveLog/SensitiveLogAspect/MaskAutoConfiguration），@SensitiveLog 注解 + 序列化后递归掩码（字段名敏感词 + 正则智能识别 + @SensitiveField 注解兜底，失败降级 toString，绝不抛异常影响主流程）；auth-center login/send-sms-code 接入。**实测**：登录日志 `phone=******** / code=****** / accessToken=********`，**Snowflake userId 完整保留不误掩**（银行卡正则收紧为 [3456] 开头）；MaskUtilTest 11/11。详见 CHANGELOG [0.1.6]。
+* 2026-10-08：**P0-D1 日志脱敏 AOP（生产非功能第一块）**
+* 2026-10-08：**P0-D2 容器化部署能力落地（生产非功能第二块）**：① 11 服务生产级多阶段 Dockerfile（Stage1 maven:3.9-eclipse-temurin-17 容器内编译——先拷全部 POM 复用层缓存再 -am 打包；Stage2 eclipse-temurin:17-jre 非 root（uid 1001）+ G1GC JVM 参数 + EXPOSE + HEALTHCHECK /actuator/health）；② 根 .dockerignore 压缩构建上下文；③ 11 个运行时镜像 zhigou/<svc>:0.1.0 构建成功，user-service 容器实测 JVM 17 启动正常、非 root（started by app）；④ 生产编排 infra/compose/services.yml（compose_default 网络 + 环境变量覆盖 DB/Redis/MQ/服务间 URL + restart 自愈，config 校验通过）。踩坑： here-string 转义、reactor 需全模块 POM、本地容器内 mvn 网络不通（runtime Dockerfile 绕过）。详见 CHANGELOG [0.1.7]。：packages/common 新增 mask 模块（SensitiveType/MaskUtil/SensitiveLog/SensitiveLogAspect/MaskAutoConfiguration），@SensitiveLog 注解 + 序列化后递归掩码（字段名敏感词 + 正则智能识别 + @SensitiveField 注解兜底，失败降级 toString，绝不抛异常影响主流程）；auth-center login/send-sms-code 接入。**实测**：登录日志 `phone=******** / code=****** / accessToken=********`，**Snowflake userId 完整保留不误掩**（银行卡正则收紧为 [3456] 开头）；MaskUtilTest 11/11。详见 CHANGELOG [0.1.6]。
 
 * 2026-10-08：**P0-C 售后逆向全流程闭环（退款真实资金流 + 退回库存联动）**：① payment-service 新增退款表 `payment_refund`（V20261092，refund_no 幂等键）+ `POST /payment/refund`（校验支付单 SUCCESS、金额 0<amount≤实付、沙箱即时 SUCCESS）；② aftersale-service 退款改真实链路（V20261093 加 sku_id/count/refund_no；refund：SELLER_APPROVED→REFUNDING→调 payment→REFUNDED 记 refundNo→调 inventory 回库存，失败告警"待人工补偿"；REFUNDED 幂等）；③ inventory-service 放行 preDeduct/confirm/rollback（此前 HTTP 通道 403，回库存一直靠 MQ 兜底）；④ BFF 新增 aftersale 透传模块（apply/mine/detail/cancel 注入 X-User-Id 头，修复 mine 恒 0 条）。**实测闭环**：¥1 单 apply→approve→refund→REFUNDED（RFF2452BD37CD04379）→payment_refund 落库→**库存自动回滚 99→100**；PENDING 单退款被正确拒绝；H5 售后 tab 7 条 + 详情页状态卡/退款单号展示正确。详见 CHANGELOG [0.1.5]。
 
@@ -130,7 +131,7 @@
 
 * [x] ~~日志脱敏（AOP）~~（P0-D1 完成：packages/common mask 模块 + auth-center 接入，登录日志 phone/验证码/token 全掩、userId 不误掩，见 CHANGELOG [0.1.6]）
 
-* [ ] Dockerfile（9 个缺失服务）+ 镜像构建
+* [x] ~~Dockerfile（9 个缺失服务）+ 镜像构建~~（P0-D2 完成：11 服务生产级多阶段 Dockerfile + 根 .dockerignore + 11 个运行时镜像 zhigou/<svc>:0.1.0 + 生产编排 infra/compose/services.yml，见 CHANGELOG [0.1.7]；本地容器内 mvn 网络受限，多阶段 Stage1 留 CI 验证）
 
 * [ ] CI/CD（build→test→镜像→部署）
 

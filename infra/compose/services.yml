@@ -1,0 +1,151 @@
+# ============================================================
+# 智购 · 业务服务容器化编排（生产模板）
+# 依赖：先启动 infra/compose/middleware.yml（网络 compose_default）
+# 启动：docker compose -f infra/compose/services.yml up -d
+# 说明：
+#   - 镜像：zhigou/<service>:0.1.0
+#     · 生产构建：services/<svc>/Dockerfile（多阶段，容器内 mvn 打包，需网络）
+#     · 本地构建：services/<svc>/Dockerfile.runtime（宿主 mvn 打包后 COPY jar）
+#   - 环境变量覆盖 application.yml 占位符（DB/REDIS/ROCKETMQ/服务间 URL）
+#   - 中间件在 external 网络（compose_default，middleware.yml），
+#     depends_on 不可跨 project，故靠 restart: unless-stopped 自愈重试
+#   - 服务间调用经容器网络（服务名:端口），端口不映射宿主避免冲突
+#   - 健康检查：镜像内 HEALTHCHECK（GET /actuator/health）
+# ============================================================
+name: zhigou-services
+
+networks:
+  default:
+    name: compose_default
+    external: true
+
+x-service-common: &service-common
+  restart: unless-stopped
+  networks:
+    - default
+  environment: &svc-env-base
+    DB_USER: root
+    DB_PASSWORD: "123456"
+    REDIS_HOST: zhigou-redis
+    REDIS_PORT: "6379"
+    JWT_SECRET: change-me-to-a-random-256-bit-string
+    ROCKETMQ_NAME_SERVER: zhigou-rocketmq-namesrv:9876
+
+services:
+  auth-center:
+    <<: *service-common
+    image: zhigou/auth-center:0.1.0
+    container_name: zhigou-auth-center
+    # auth-center application.yml 的 datasource 无占位符，用 Spring 宽松绑定覆盖
+    environment:
+      <<: *svc-env-base
+      SPRING_DATASOURCE_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_auth?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+
+  user-service:
+    <<: *service-common
+    image: zhigou/user-service:0.1.0
+    container_name: zhigou-user-service
+    environment:
+      <<: *svc-env-base
+      DB_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_user?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+
+  file-service:
+    <<: *service-common
+    image: zhigou/file-service:0.1.0
+    container_name: zhigou-file-service
+    environment:
+      <<: *svc-env-base
+      DB_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_file?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+      MINIO_ENDPOINT: http://zhigou-minio:9000
+      MINIO_ACCESS_KEY: zhigou-minio-admin
+      MINIO_SECRET_KEY: zhigou-minio-secret
+      MINIO_BUCKET: zhigou
+
+  product-service:
+    <<: *service-common
+    image: zhigou/product-service:0.1.0
+    container_name: zhigou-product-service
+    environment:
+      <<: *svc-env-base
+      DB_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_product?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+
+  cart-service:
+    <<: *service-common
+    image: zhigou/cart-service:0.1.0
+    container_name: zhigou-cart-service
+    environment:
+      <<: *svc-env-base
+      PRODUCT_SERVICE_URL: http://product-service:8083
+    depends_on:
+      product-service:
+        condition: service_healthy
+
+  order-service:
+    <<: *service-common
+    image: zhigou/order-service:0.1.0
+    container_name: zhigou-order-service
+    environment:
+      <<: *svc-env-base
+      DB_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_order?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+      PRODUCT_SERVICE_URL: http://product-service:8083
+      INVENTORY_SERVICE_URL: http://inventory-service:8086
+      ORDER_TIMEOUT_CLOSE_MINUTES: "30"
+    depends_on:
+      product-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+
+  inventory-service:
+    <<: *service-common
+    image: zhigou/inventory-service:0.1.0
+    container_name: zhigou-inventory-service
+    environment:
+      <<: *svc-env-base
+      DB_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_inventory?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+
+  payment-service:
+    <<: *service-common
+    image: zhigou/payment-service:0.1.0
+    container_name: zhigou-payment-service
+    environment:
+      <<: *svc-env-base
+      DB_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_payment?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+      ORDER_SERVICE_URL: http://order-service:8085
+    depends_on:
+      order-service:
+        condition: service_healthy
+
+  marketing-service:
+    <<: *service-common
+    image: zhigou/marketing-service:0.1.0
+    container_name: zhigou-marketing-service
+    environment:
+      <<: *svc-env-base
+      DB_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_marketing?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+
+  logistics-service:
+    <<: *service-common
+    image: zhigou/logistics-service:0.1.0
+    container_name: zhigou-logistics-service
+    environment:
+      <<: *svc-env-base
+      DB_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_logistics?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+
+  aftersale-service:
+    <<: *service-common
+    image: zhigou/aftersale-service:0.1.0
+    container_name: zhigou-aftersale-service
+    environment:
+      <<: *svc-env-base
+      DB_URL: jdbc:mysql://zhigou-mysql:3306/zhigou_aftersale?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+      ORDER_SERVICE_URL: http://order-service:8085
+      PAYMENT_SERVICE_URL: http://payment-service:8087
+      INVENTORY_SERVICE_URL: http://inventory-service:8086
+    depends_on:
+      order-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
