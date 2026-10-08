@@ -10,6 +10,8 @@
 - fix(CI) MinioInitializer：去掉 test profile 排除，恢复 makeBucket 自动建桶（测试用 s3mock 无预建 bucket 配置）；`setBucketPolicy` 容错——s3mock 对 policy PUT 返回 409 仅告警（生产 MinIO 正常设置）
 - fix(CI) Probe 探测步骤：修复 YAML 字面块引号转义损坏（docker pull invalid reference format）、探测成功写回 `MINIO_IMAGE`（原 PULL_OK 不影响测试）、增加 docker.io 显式候选；默认镜像 adobe/s3mock:latest
 - **验证**：本地 `mvn -pl services/file-service -am test` **6/6 全绿**（s3mock 真机容器）；全模块 verify 无回归
+- fix(test) inventory-service 集成测试在 CI 无 RocketMQ 环境上下文启动失败（OrderClosedListener 连接 name-server 失败）：监听器加 `@ConditionalOnProperty(rocketmq.listeners.enabled)` 条件开关（生产 matchIfMissing=true 默认启用），test profile 显式 `rocketmq.listeners.enabled=false`——测试不再依赖外部 MQ，本地/CI 均 hermetic
+- **验证**：本地 `mvn verify` 全模块 BUILD SUCCESS（11 服务 67 项测试全绿）
 
 ## [0.2.5] - 2026-10-08
 
