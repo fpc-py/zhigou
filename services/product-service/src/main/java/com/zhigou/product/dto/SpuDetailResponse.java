@@ -36,6 +36,9 @@ public class SpuDetailResponse {
         /** Snowflake ID 序列化为字符串避免前端精度丢失 */
         @JsonSerialize(using = ToStringSerializer.class)
         private Long skuId;
+        /** 所属 SPU ID（供 AI review_analysis 按 skuId 反查评价时使用） */
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long spuId;
         private String specName;
         private String specValue;
         private Long price;

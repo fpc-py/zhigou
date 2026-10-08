@@ -128,6 +128,7 @@ public class ProductController {
         if (sku == null) return Result.ok(null);
         return Result.ok(SpuDetailResponse.SkuItem.builder()
                 .skuId(sku.getSkuId())
+                .spuId(sku.getSpuId())
                 .specName(sku.getSpecName())
                 .specValue(sku.getSpecValue())
                 .price(sku.getPrice())

@@ -78,9 +78,12 @@ async def search_products(keyword: str, limit: int = 10) -> str:
         for item in items[:limit]:
             price_min = item.get("priceMin", 0)
             skus = item.get("skus") or []
-            # 带上首个 SKU 的真实 skuId，便于 LLM 后续调用查价/查库存工具
+            # 同时带上 spuId 与首个 SKU 的 skuId：spuId 用于评价分析(review_analysis)、
+            # skuId 用于查价/查库存(get_price/check_inventory)，避免 LLM 拿错 ID 类型
+            spu_id = item.get("spuId")
+            spu_hint = f" | spuId={spu_id}" if spu_id else ""
             sku_hint = f" | skuId={skus[0].get('skuId')}" if skus else ""
-            results.append(f"· {item.get('name', '未知')} | ¥{price_min / 100:.2f} 起{sku_hint}")
+            results.append(f"· {item.get('name', '未知')} | ¥{price_min / 100:.2f} 起{spu_hint}{sku_hint}")
         return "\n".join(results)
     except Exception as e:
         logger.warning("search_products 调用失败: %s", e)
@@ -313,36 +316,88 @@ async def compare_prices(sku_ids: list[str]) -> str:
 @tool
 async def review_analysis(spu_id: str) -> str:
     """
-    避坑 / 选购提醒。查看某商品的参数要点与选购注意点，帮助用户避坑。
-    用户问"这个质量怎么样""有什么坑吗""值得买吗"时调用。
+    避坑 / 选购提醒。查看某商品的真实用户评价（评分/星级分布/差评要点）与选购注意点，
+    并用规则识别刷评/水军风险，帮助用户避坑。用户问"这个质量怎么样""有什么坑吗"
+    "值得买吗""评价怎么样""口碑好吗"时调用。
 
     Args:
         spu_id: 商品 SPU ID
     """
     try:
-        url = f"{settings.product_service_url}/product/{spu_id}"
         headers = {"x-user-id": _get_current_user()}
-        data = await _http_get(url, timeout=5.0, headers=headers)
+        # 1) SPU 基础信息（入参兼容：若 LLM 传的是 skuId，直查 SPU 失败则按 skuId 反查）
+        data = await _http_get(f"{settings.product_service_url}/product/{spu_id}", timeout=5.0, headers=headers)
         spu = data.get("data") or {}
+        if not spu:
+            try:
+                sku_data = await _http_get(
+                    f"{settings.product_service_url}/product/sku/{spu_id}",
+                    timeout=5.0,
+                    headers=headers,
+                )
+                sku_info = sku_data.get("data") or {}
+                real_spu = sku_info.get("spuId")
+                if real_spu:
+                    spu_id = str(real_spu)
+                    data = await _http_get(f"{settings.product_service_url}/product/{spu_id}", timeout=5.0, headers=headers)
+                    spu = data.get("data") or {}
+            except Exception as e:
+                logger.warning("review_analysis 反查 SPU 失败 skuId=%s: %s", spu_id, e)
         if not spu:
             return "该商品信息暂时查不到。"
         name = spu.get("name", "该商品")
         skus = spu.get("skus") or []
-        sku_count = len(skus)
-        price_min = spu.get("priceMin", 0) or 0
-        price_max = spu.get("priceMax", 0) or price_min
         stock_total = sum((s.get("stock") or 0) for s in skus)
 
-        lines = [f"{name} 选购提醒：", f"· 价格区间 ¥{price_min / 100:.2f} ~ ¥{price_max / 100:.2f}"]
-        lines.append(f"· 规格数 {sku_count} 个，总库存 {stock_total} 件")
+        # 2) 真实评价统计
+        stats_data = await _http_get(
+            f"{settings.product_service_url}/product/review/stats?spuId={spu_id}",
+            timeout=5.0,
+            headers=headers,
+        )
+        stats = stats_data.get("data") or {}
+        total = int(stats.get("total") or 0)
+        avg = stats.get("avgRating") or 0
+        dist = stats.get("ratingDist") or {}
+        low_star = int(stats.get("lowStarCount") or 0)
+        dup_cnt = int(stats.get("duplicateCount") or 0)
+
+        lines = [f"{name} 真实评价分析："]
+        if total <= 0:
+            lines.append("· 该商品暂无评价，口碑参考有限，可结合参数说明判断")
+        else:
+            lines.append(f"· 共 {total} 条评价，均分 {avg}/5.0")
+            five = int(dist.get("5", 0) or 0)
+            four = int(dist.get("4", 0) or 0)
+            lines.append(f"· 星级分布：5★x{five}  4★x{four}  3★及以下x{low_star}")
+            if low_star > 0:
+                # 3) 拉差评要点（3 星及以下，最多 5 条）
+                low_data = await _http_get(
+                    f"{settings.product_service_url}/product/review?spuId={spu_id}"
+                    f"&minRating=1&maxRating=3&pageSize=5",
+                    timeout=5.0,
+                    headers=headers,
+                )
+                low_records = (low_data.get("data") or {}).get("records") or []
+                if low_records:
+                    lines.append("· 差评要点：")
+                    for r in low_records[:3]:
+                        content = (r.get("content") or "").strip()[:40]
+                        lines.append(f"  - {content}")
+            # 4) 水军/刷评风险（规则识别，非 LLM 编造）
+            if dup_cnt >= 2:
+                lines.append(f"· ⚠ 疑似刷评：发现 {dup_cnt} 条内容完全相同的评价，请理性看待")
+            low_ratio = low_star * 100.0 / total
+            if low_ratio >= 30:
+                lines.append(f"· ⚠ 差评比例偏高（{low_ratio:.0f}%），下单前请重点确认上述差评要点")
+            if total >= 10 and low_ratio < 15 and five * 100.0 / total >= 80:
+                lines.append("· 整体口碑较好，可结合自身需求决策")
+
+        # 5) 库存提示（保留原能力）
         if stock_total <= 0:
             lines.append("· 当前缺货，建议先看替代款")
         elif stock_total < 10:
             lines.append("· 库存紧张，有意向尽早下单")
-        if sku_count > 1:
-            lines.append("· 多规格商品建议先确认自己要的规格是否有货")
-        # 评价数据尚未接入：如实提示，不编造口碑
-        lines.append("· 差评/口碑分析待评价数据接入后提供，当前可参考页面参数说明")
         return "\n".join(lines)
     except Exception as e:
         logger.warning("review_analysis 调用失败 spuId=%s: %s", spu_id, e)

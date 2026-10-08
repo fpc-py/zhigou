@@ -3,6 +3,17 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.8] - 2026-10-08
+
+### P1 · AI 决策辅助第四批（评价数据底座 + 差评/水军识别）
+
+- feat(P1) product-service 评价数据底座：新增 `product_review` 表（迁移 `V20261090.1__product_review.sql`，review_id Snowflake 唯一、rating 1-5、content ≤1024、deleted 软删、idx_spu_rating/idx_spu_time）+ dev mock 种子（`V20261091__mock_product_review.sql`，3 个 SPU 共 25 条，含差评与 3 条内容完全相同的"好评王"刷评特征）
+- feat(P1) 评价接口三件：`POST /product/review` 发表（校验 rating 1-5、昵称脱敏"用户****尾4位"、isMock=0 真实评价）、`GET /product/review` 列表（spuId + minRating/maxRating + 分页）、`GET /product/review/stats` 统计（total/avgRating/ratingDist/imageCount/lowStarCount/duplicateCount，星级缺失补齐、均分保留 1 位）
+- feat(P1) AI `review_analysis` 从占位升级为真实评价分析：先拉 SPU 基础信息再拉 `/product/review/stats` 真实统计；有差评时拉 `minRating=1&maxRating=3&pageSize=5` 取差评要点前 3 条（截 40 字）；**规则化识别**——duplicateCount≥2 提示"⚠ 疑似刷评"、差评比例≥30% 提示"⚠ 差评比例偏高"、整体口碑好时正向提示；数据全部来自真实接口不编造
+- fix(P1) **skuId/spuId 混淆 bug**：LLM 把 `search_products` 返回的 skuId 当 spuId 传给 review_analysis 导致"查不到"。修复：`search_products` 输出同时带 `spuId` 与 `skuId`（spuId 用于评价分析、skuId 用于查价/查库存）；`review_analysis` 入参兼容 skuId（直查 SPU 失败按 `/product/sku/{id}` 反查 spuId 再查）；后端 `SpuDetailResponse.SkuItem` 补 `spuId` 字段（ToStringSerializer）并由 `querySku` 装配
+- fix(db) **Flyway 版本乱序坑**：mock `V20261091` 曾先于建表执行（outOfOrder=false 跳过低于已应用版本 20261090 的 V20261002）→ 建表迁移改为点号版本 `V20261090.1__product_review.sql`（介于 20261090 与 20261091 之间）+ 清理 `flyway_product_history` 中 success=0 的失败记录，迁移顺序恢复 20261090.1→20261091
+- **验证**：product-service 重启后 API 冒烟——stats 返回 `{"total":10,"avgRating":4.1,"ratingDist":{"5":6,"4":1,"3":1,"2":2,"1":0},"duplicateCount":3}`（3 条重复刷评被检出）；POST 发表评价返回 reviewId（Snowflake 转字符串）；AI 重启后 SSE 实测「测试商品-蓝牙耳机评价怎么样」→ search_products（spuId/skuId 并列）→ review_analysis 返回**真实统计 11 条/均分 4.1/差评要点 3 条/⚠ 疑似刷评 3 条重复**，全链路无编造
+
 ## [0.2.7] - 2026-10-08
 
 ### P1 · AI 决策辅助第三批（隐性需求挖掘 + 提示词对齐）

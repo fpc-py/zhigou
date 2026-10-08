@@ -22,6 +22,15 @@
 >
 > 。
 
+## 2026-10-08 · P1 第四批：评价数据底座 + 差评/水军识别
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| 评价数据底座 | ✅ | product-service 新增 `product_review` 表 + 发表/列表/统计三接口 + dev mock 25 条（含差评与刷评特征），API 冒烟通过 |
+| AI 评价分析 | ✅ | `review_analysis` 升级为真实评价分析：统计+差评要点+规则化识别（疑似刷评/差评比例/口碑），SSE 实测通过 |
+| skuId/spuId 混淆 | ✅ | `search_products` 输出并列 spuId/skuId，`review_analysis` 兼容 skuId 反查，后端 SkuItem 补 spuId |
+| Flyway 版本乱序 | ✅ | 建表迁移改点号版本 `V20261090.1`（介于 20261090/20261091），清理 failed 记录，顺序恢复 |
+
 ## 2026-10-08 · CI 集成测试基建闭环（MinIO/s3mock + RocketMQ 条件化）
 
 | 项 | 状态 | 说明 |
