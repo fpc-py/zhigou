@@ -11,6 +11,13 @@
 - 用户画像 / 收藏 / 浏览历史
 - CI/CD、全链路压测
 
+## [0.2.2] - 2026-10-08
+
+### perf（P1 容量调优 · 写链路瓶颈消除）
+- **HikariCP 连接池全服务化**：批量给 10 个 DB 服务（auth/user/file/inventory/order/payment/marketing/logistics/aftersale + 早前 product）统一 maximum-pool-size:50 / minimum-idle:10 / connection-timeout:3000（pool-name ZhigouHikariPool）——修复 2000VU 下写链路（下单事务/扣库存/支付）连接池耗尽排队
+- **复测③（2000VU 全量）**：**错误率 0.00%**（0/86245，-100%）、峰值 RPS 303（+50%）、P95 5.02s（-36%）、5 类接口 checks 全部 100% 通过
+- **压测报告**：§6 更新三版复测对比 + 结论（剩余瓶颈收敛为单机写事务耗时，生产化路径 §6.3 不变）
+
 ## [0.2.1] - 2026-10-08
 
 ### feat（P1 AI 决策辅助 · 第一批）

@@ -9,6 +9,11 @@ spring:
     url: jdbc:mysql://localhost:3307/zhigou_auth?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
     username: root
     password: "123456"
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 3000
+      pool-name: ZhigouHikariPool
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   flyway:
