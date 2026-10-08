@@ -11,6 +11,10 @@ import type { ProductDetailResponse } from './product.types.js';
 export class ProductService {
   private readonly logger = new Logger(ProductService.name);
 
+  /** RAG 摘要内存缓存：同 spu 5 分钟内复用，避免详情接口每次都打 ai-orchestrator */
+  private static readonly RAG_CACHE_TTL = 5 * 60_000;
+  private readonly ragCache = new Map<string, { text: string; ts: number }>();
+
   constructor(private readonly http: HttpService) {}
 
   /** 商品分页（透传 product-service /product/page） */
@@ -75,16 +79,21 @@ export class ProductService {
   }
 
   private async fetchAiReason(spuId: string) {
-    const url = `${SERVICES.aiOrchestrator.url}${SERVICE_PATHS.ragRetrieve}`;
+    const hit = this.ragCache.get(spuId);
+    if (hit && Date.now() - hit.ts < ProductService.RAG_CACHE_TTL) return hit.text;
+    const url = `${SERVICES.aiRag.url}${SERVICE_PATHS.ragRetrieve}`;
     const obs = this.http.post(url, { query: spuId, top_k: 1 }).pipe(
-      timeout(SERVICES.aiOrchestrator.timeout),
+      // RAG 摘要快速失败（300ms）：AI 不可用时秒降级，不拖慢商品详情
+      timeout(SERVICES.aiRag.timeout),
       catchError((err) => {
         this.logger.warn(`ai-orchestrator RAG 失败: spuId=${spuId} ${err.message}`);
         return Promise.resolve({ data: { items: [] } });
       }),
     );
     const resp = await firstValueFrom(obs);
-    return resp.data?.items?.[0]?.text ?? null;
+    const text = resp.data?.items?.[0]?.text ?? null;
+    if (text) this.ragCache.set(spuId, { text, ts: Date.now() });
+    return text;
   }
 
   private async safeCall<T>(promise: Promise<T>): Promise<T | null> {

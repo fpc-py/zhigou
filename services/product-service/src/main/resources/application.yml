@@ -9,6 +9,12 @@ spring:
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    # P0-D4 压测瓶颈优化：默认连接池 10 在高并发下耗尽，调大至 50
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 3000
+      pool-name: ProductHikariPool
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -22,6 +28,11 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+
+# 商品分页缓存 TTL（秒）：300s 内压测/热点商品列表直接命中，降低高并发下 DB 回填频率
+product:
+  cache:
+    ttl-seconds: 300
 
 mybatis-plus:
   global-config:

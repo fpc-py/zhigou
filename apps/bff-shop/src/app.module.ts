@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import * as http from 'http';
+import * as https from 'https';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -34,6 +36,9 @@ import { AftersaleService } from './aftersale/aftersale.service.js';
     HttpModule.register({
       timeout: 5000,
       maxRedirects: 0,
+      // P0-D4 压测瓶颈优化：下游连接复用（keep-alive），避免每次透传新建 TCP 连接
+      httpAgent: new http.Agent({ keepAlive: true, maxSockets: 50, maxFreeSockets: 10 }),
+      httpsAgent: new https.Agent({ keepAlive: true, maxSockets: 50, maxFreeSockets: 10 }),
     }),
   ],
   controllers: [

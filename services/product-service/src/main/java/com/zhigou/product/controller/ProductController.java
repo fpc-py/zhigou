@@ -1,6 +1,7 @@
 package com.zhigou.product.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhigou.common.Result;
 import com.zhigou.product.dto.SpuCreateRequest;
 import com.zhigou.product.dto.SpuDetailResponse;
@@ -13,11 +14,21 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 商品 Controller。
+ * P0-D4 压测瓶颈优化：/product/page（最高频读接口）加 Redis 缓存，
+ * 命中时不再查 MySQL 装配 SPU+SKU，显著降低高并发下连接池压力。
+ */
+@Slf4j
 @Tag(name = "商品")
 @RestController
 @RequestMapping("/product")
@@ -25,11 +36,41 @@ import java.util.Map;
 public class ProductController {
 
     private final ProductService productService;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+
+    /** 分页缓存 TTL（秒），默认 60，可配 product.cache.ttl-seconds */
+    @Value("${product.cache.ttl-seconds:60}")
+    private long cacheTtlSeconds;
+
+    private static final String PAGE_CACHE_PREFIX = "prod:page:";
 
     @Operation(summary = "分页查商品")
     @GetMapping("/page")
     public Result<Page<SpuDetailResponse>> page(SpuPageQuery query) {
-        return Result.ok(productService.page(query));
+        String key = pageCacheKey(query);
+        // 1) 缓存命中直接返回（高并发读接口，避免重复查库装配）
+        String cached = redisTemplate.opsForValue().get(key);
+        if (cached != null) {
+            try {
+                @SuppressWarnings("unchecked")
+                Result<Page<SpuDetailResponse>> hit = objectMapper.readValue(cached, Result.class);
+                return hit;
+            } catch (Exception e) {
+                log.warn("product page 缓存反序列化失败, key={}, err={}", key, e.getMessage());
+            }
+        }
+        // 2) 未命中查库并回填缓存（空结果不缓存，防穿透）
+        Result<Page<SpuDetailResponse>> result = Result.ok(productService.page(query));
+        if (result.getData() != null && !result.getData().getRecords().isEmpty()) {
+            try {
+                redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(result),
+                        Duration.ofSeconds(cacheTtlSeconds));
+            } catch (Exception e) {
+                log.warn("product page 缓存写入失败, err={}", e.getMessage());
+            }
+        }
+        return result;
     }
 
     @Operation(summary = "商品详情")
@@ -42,6 +83,7 @@ public class ProductController {
     @PostMapping("/spu")
     public Result<Map<String, String>> create(@Valid @RequestBody SpuCreateRequest request) {
         // spuId 为 Snowflake ID，转字符串返回避免前端精度丢失
+        evictPageCache();
         return Result.ok(Map.of("spuId", String.valueOf(productService.createSpu(request))));
     }
 
@@ -49,6 +91,7 @@ public class ProductController {
     @PutMapping("/spu/{spuId}")
     public Result<Void> update(@PathVariable("spuId") Long spuId, @RequestBody SpuCreateRequest request) {
         productService.updateSpu(spuId, request);
+        evictPageCache();
         return Result.ok();
     }
 
@@ -56,6 +99,7 @@ public class ProductController {
     @DeleteMapping("/spu/{spuId}")
     public Result<Void> offShelf(@PathVariable("spuId") Long spuId) {
         productService.offShelf(spuId);
+        evictPageCache();
         return Result.ok();
     }
 
@@ -90,5 +134,26 @@ public class ProductController {
                 .stock(sku.getStock())
                 .image(sku.getImage())
                 .build());
+    }
+
+    /** 写操作后清空分页缓存（商品列表可能已变化） */
+    private void evictPageCache() {
+        try {
+            var keys = redisTemplate.keys(PAGE_CACHE_PREFIX + "*");
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+        } catch (Exception e) {
+            log.warn("product page 缓存清理失败, err={}", e.getMessage());
+        }
+    }
+
+    private String pageCacheKey(SpuPageQuery q) {
+        return PAGE_CACHE_PREFIX
+                + (q.getPageNum() == null ? 1 : q.getPageNum()) + ":"
+                + (q.getPageSize() == null ? 20 : q.getPageSize()) + ":"
+                + (q.getKeyword() == null ? "" : q.getKeyword()) + ":"
+                + (q.getCategoryId() == null ? "" : q.getCategoryId()) + ":"
+                + (q.getBrandId() == null ? "" : q.getBrandId());
     }
 }

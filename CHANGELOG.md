@@ -11,6 +11,21 @@
 - 用户画像 / 收藏 / 浏览历史
 - CI/CD、全链路压测
 
+## [0.2.0] - 2026-10-08
+
+### perf（P1 压测瓶颈修复落地）
+- **product/page Redis 缓存**（\ProductController.page()\）：key \prod:page:{pageNum}:{pageSize}:{keyword}:{categoryId}:{brandId}\，TTL 300s（\product.cache.ttl-seconds\），空结果不缓存防穿透，写操作 evictPageCache；实测缓存命中 83ms vs 查库 1252ms（**15x**）
+- **HikariCP 调优**：product-service \maximum-pool-size:50/minimum-idle:10/connection-timeout:3000\（默认池 10 在压测中耗尽）
+- **BFF keep-alive 连接池**：\HttpModule.register\ 加 \httpAgent/httpsAgent\（keepAlive + maxSockets 50），消除每次透传新建 TCP 连接
+- **RAG 快速失败**：\service.config\ 新增 \iRag: {timeout:300}\，详情 AI 摘要 300ms 超时即降级，不再拖慢详情接口
+- **RAG 结果缓存**：BFF 内存缓存同 spu AI 摘要 5min，消除每次 detail 打 ai-orchestrator（压测曾致 AI 日志 15 万行）
+
+### test
+- **复测①（TTL60）**：61051 请求，错误率 35.65%→**5.82%**，P95 10.23s→8.14s，product/page 33%→**82%** 通过
+- **复测②（TTL300+RAG缓存）**：60445 请求，P95→7.86s，detail/order/aftersale ≥98% 通过，page 67%（高 VU 随机波动）
+- **QUICK 50VU 基线达标**：2451 请求 **0 错误**、P95 **329.33ms**（阈值 <1.5s）——全链路单用户延迟健康
+- **结论**：优化直接命中瓶颈、效果显著；2000VU 未达标为**单机容量**（单 BFF 事件循环 204 RPS 达本地极限 + 写链路重事务排队）；生产化建议（BFF 横向扩展/写链路异步化/分库分表）已入报告 §6.3
+
 ## [0.1.9] - 2026-10-08
 
 ### feat

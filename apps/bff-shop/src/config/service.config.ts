@@ -25,6 +25,9 @@ export const SERVICES: Record<string, ServiceEntry> = {
 
   // AI 服务（SSE 需要长连接）
   aiOrchestrator: { url: 'http://localhost:8000', timeout: 30_000 },
+
+  // RAG 摘要（商品详情 AI 理由）：300ms 快速失败，不拖慢详情接口
+  aiRag: { url: 'http://localhost:8000', timeout: 300 },
 };
 
 export const SERVICE_PATHS = {
