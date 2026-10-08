@@ -28,9 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # MinIO 集成测试镜像：Docker Hub 固定 RELEASE tag（latest 已停维护 / quay 匿名受限）；
-      # 需要换源（内网/私有/GHCR）时仅改此变量，无需动测试代码
-      MINIO_IMAGE: minio/minio:RELEASE.2024-11-07T00-52-20Z
+      # S3 兼容存储测试镜像：默认 adobe/s3mock（Docker Hub 匿名可拉；minio/minio 各源在 runner 均受限：latest 404 / RELEASE 404 / quay 500）；
+      # 需要换源（内网/私有/GHCR/真 MinIO）时仅改此变量，无需动测试代码
+      MINIO_IMAGE: adobe/s3mock:latest
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           set -x
-          for img in "${{ env.MINIO_IMAGE }}" "docker.io/minio/minio:RELEASE.2024-11-07T00-52-20Z" "quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z" "minio/minio:latest"; do
+          for img in "${{ env.MINIO_IMAGE }}" "docker.io/minio/minio:RELEASE.2024-11-07T00-52-20Z" "quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z"; do
             echo "== pull ${img} =="
             if docker pull "${img}"; then
               # 探测成功必须写回 MINIO_IMAGE，否则测试仍用默认镜像重新拉取（ContainerFetchException）

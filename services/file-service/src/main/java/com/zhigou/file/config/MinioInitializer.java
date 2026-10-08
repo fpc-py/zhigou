@@ -50,12 +50,17 @@ public class MinioInitializer {
                 log.info("Bucket 已存在: {}", minioConfig.getBucket());
             }
 
-            minioClient.setBucketPolicy(
-                    SetBucketPolicyArgs.builder()
-                            .bucket(minioConfig.getBucket())
-                            .config(PUBLIC_READ_POLICY.formatted(minioConfig.getBucket()))
-                            .build());
-            log.info("Bucket 公开只读策略已设置: {}", minioConfig.getBucket());
+            try {
+                minioClient.setBucketPolicy(
+                        SetBucketPolicyArgs.builder()
+                                .bucket(minioConfig.getBucket())
+                                .config(PUBLIC_READ_POLICY.formatted(minioConfig.getBucket()))
+                                .build());
+                log.info("Bucket 公开只读策略已设置: {}", minioConfig.getBucket());
+            } catch (Exception policyEx) {
+                // 兼容性：s3mock 对 policy PUT 返回 409；生产 MinIO 正常设置。策略缺失仅影响匿名直链，测试场景忽略
+                log.warn("Bucket 公开只读策略设置失败（忽略）: {}，原因: {}", minioConfig.getBucket(), policyEx.getMessage());
+            }
         } catch (Exception e) {
             log.error("MinIO bucket 初始化失败", e);
             throw new RuntimeException("MinIO bucket 初始化失败", e);

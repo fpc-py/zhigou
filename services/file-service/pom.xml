@@ -105,6 +105,13 @@
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- 官方 S3Mock Testcontainers 模块（S3 兼容存储集成测试；替代 CI 上不可拉的 minio/minio） -->
+        <dependency>
+            <groupId>com.adobe.testing</groupId>
+            <artifactId>s3mock-testcontainers</artifactId>
+            <version>4.5.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

@@ -20,6 +20,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import com.adobe.testing.s3mock.testcontainers.S3MockContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.MySQLContainer;
@@ -65,18 +66,13 @@ class FileServiceIntegrationTest {
     static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine")
             .withExposedPorts(6379).withStartupTimeout(Duration.ofSeconds(120)).waitingFor(Wait.forListeningPort());
 
-    /** MinIO 镜像：默认 Docker Hub 固定 RELEASE tag（latest 已停维护/匿名拉取受限，CI 404；quay.io 匿名亦受限 500）；可用环境变量 MINIO_IMAGE 覆盖（内网/私有镜像源） */
-    private static final String DEFAULT_MINIO_IMAGE = "minio/minio:RELEASE.2024-11-07T00-52-20Z";
+    /** S3 兼容存储镜像：默认 adobe/s3mock（Docker Hub 匿名可拉；minio/minio 各源在 CI 均受限：latest 404 / RELEASE 404 / quay 500）；可用环境变量 MINIO_IMAGE 覆盖（内网/私有镜像源） */
+    private static final String DEFAULT_MINIO_IMAGE = "adobe/s3mock:latest";
     private static final String MINIO_IMAGE = System.getenv().getOrDefault("MINIO_IMAGE", DEFAULT_MINIO_IMAGE);
+    private static final String S3MOCK_TAG = MINIO_IMAGE.contains(":") ? MINIO_IMAGE.substring(MINIO_IMAGE.lastIndexOf(':') + 1) : "latest";
 
     @Container
-    static GenericContainer<?> minio = new GenericContainer<>(MINIO_IMAGE)
-            .withCommand("server", "/data")
-            .withExposedPorts(9000)
-            .withEnv("MINIO_ROOT_USER", "minioadmin")
-            .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
-            .waitingFor(Wait.forListeningPort())
-            .withStartupTimeout(Duration.ofSeconds(120));
+    static S3MockContainer minio = new S3MockContainer(S3MOCK_TAG);
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -86,7 +82,7 @@ class FileServiceIntegrationTest {
         registry.add("spring.datasource.password", mysql::getPassword);
         registry.add("spring.data.redis.host", redis::getHost);
         registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
-        registry.add("minio.endpoint", () -> "http://" + minio.getHost() + ":" + minio.getMappedPort(9000));
+        registry.add("minio.endpoint", minio::getHttpEndpoint);
         registry.add("minio.access-key", () -> "minioadmin");
         registry.add("minio.secret-key", () -> "minioadmin");
     }

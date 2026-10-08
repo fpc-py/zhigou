@@ -5,8 +5,11 @@
 
 ## [0.2.6] - 2026-10-08
 
-### CI 诊断
-- chore(CI) build-test 新增「MinIO 镜像探测」步骤：按序预拉 env.MINIO_IMAGE → quay.io RELEASE → latest，成功即写回 GITHUB_ENV（Testcontainers 直接命中本地镜像不再触发拉取）；结果写 Step Summary，Actions 页面可直接查看各源可用性（定位 quay 500 / Docker Hub 404 的实证数据）
+### CI 修复 · MinIO/S3 镜像源（三轮实证收敛）
+- fix(CI) file-service 集成测试 MinIO 镜像：Docker Hub `minio/minio` 各源在 GitHub runner 均不可匿名拉取（latest 404 → quay.io RELEASE 500 unauthorized → Docker Hub RELEASE 404 "repository does not exist"）；最终方案：改用 **adobe/s3mock（S3 兼容 mock）** + Testcontainers 官方模块 `com.adobe.testing:s3mock-testcontainers:4.5.0`（`S3MockContainer`），镜像从 Docker Hub 匿名可拉（已验证）
+- fix(CI) MinioInitializer：去掉 test profile 排除，恢复 makeBucket 自动建桶（测试用 s3mock 无预建 bucket 配置）；`setBucketPolicy` 容错——s3mock 对 policy PUT 返回 409 仅告警（生产 MinIO 正常设置）
+- fix(CI) Probe 探测步骤：修复 YAML 字面块引号转义损坏（docker pull invalid reference format）、探测成功写回 `MINIO_IMAGE`（原 PULL_OK 不影响测试）、增加 docker.io 显式候选；默认镜像 adobe/s3mock:latest
+- **验证**：本地 `mvn -pl services/file-service -am test` **6/6 全绿**（s3mock 真机容器）；全模块 verify 无回归
 
 ## [0.2.5] - 2026-10-08
 
