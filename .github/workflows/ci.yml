@@ -27,6 +27,10 @@ jobs:
     name: Build & Test (JDK 17)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # MinIO 集成测试镜像：Docker Hub 固定 RELEASE tag（latest 已停维护 / quay 匿名受限）；
+      # 需要换源（内网/私有/GHCR）时仅改此变量，无需动测试代码
+      MINIO_IMAGE: minio/minio:RELEASE.2024-11-07T00-52-20Z
     steps:
       - uses: actions/checkout@v4
 
