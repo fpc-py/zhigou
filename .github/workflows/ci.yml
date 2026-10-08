@@ -47,15 +47,15 @@ jobs:
         shell: bash
         run: |
           set -x
-          for img in \"${{ env.MINIO_IMAGE }}\" \"quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z\" \"minio/minio:latest\"; do
-            echo \"== pull ${img} ==\"
-            if docker pull \"${img}\"; then
-              echo \"PULL_OK=${img}\" >> \"$GITHUB_ENV\"
-              echo \"MinIO 镜像探测成功: ${img}\" >> \"$GITHUB_STEP_SUMMARY\"
+          for img in "${{ env.MINIO_IMAGE }}" "quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z" "minio/minio:latest"; do
+            echo "== pull ${img} =="
+            if docker pull "${img}"; then
+              echo "PULL_OK=${img}" >> "$GITHUB_ENV"
+              echo "MinIO 镜像探测成功: ${img}" >> "$GITHUB_STEP_SUMMARY"
               break
             else
-              echo \"FAIL ${img}\"
-              echo \"MinIO 镜像探测失败: ${img}\" >> \"$GITHUB_STEP_SUMMARY\"
+              echo "FAIL ${img}"
+              echo "MinIO 镜像探测失败: ${img}" >> "$GITHUB_STEP_SUMMARY"
             fi
           done
 
