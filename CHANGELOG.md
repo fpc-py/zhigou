@@ -11,6 +11,16 @@
 - 用户画像 / 收藏 / 浏览历史
 - CI/CD、全链路压测
 
+## [0.2.1] - 2026-10-08
+
+### feat（P1 AI 决策辅助 · 第一批）
+- **需求拆解工具 \nalyze_requirement(message)\**（ai-orchestrator tools.py）：规则拆解模糊需求 → {预算/品类/场景/偏好} 结构化 JSON（预算正则 + 品类/场景/偏好词表 40+ 词）；SSE 实测：\"3000元以内送女朋友的礼物"\ → \{budget:3000, scene:送礼}\，\"500块以内的蓝牙耳机"\ → \{budget:500, category:耳机}\
+- **比价工具 \compare_prices(sku_ids)\**：多 SKU 横向对比（价格/规格/库存），实测 \¥49.00 vs ¥199.00\ 对比清单正常输出
+- **避坑工具 \eview_analysis(spu_id)\**：选购提醒（价格区间/规格数/库存/多规格注意点），差评分析如实降级"待评价数据接入"
+- **提示词升级**（\services/ai-orchestrator/prompts/system.md\）：工具表 +3；新增**决策辅助流程**（拆解→搜索→比价→避坑→推荐）；约束 LLM 搜索用品类词、预算用于过滤而非拼进关键词（修 LLM 将"3000"拼入 keyword 致空结果的实测问题）
+- **修复**：analyze_requirement 的 join 混入 int 抛异常（\str(w)\ 修复）
+- **测试**：tests/test_tools.py 新增 TestP1DecisionTools（拆解预算/品类/场景 + 比价降级），共 9 个用例（本地 pytest 未装，逻辑已通过真实 SSE 链路实测）
+
 ## [0.2.0] - 2026-10-08
 
 ### perf（P1 压测瓶颈修复落地）

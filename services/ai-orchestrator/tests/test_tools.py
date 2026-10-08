@@ -4,7 +4,7 @@
 
 import pytest
 
-from app.tools import _check_user_id, _current_user_id, apply_coupon, check_inventory
+from app.tools import _check_user_id, _current_user_id, analyze_requirement, apply_coupon, check_inventory, compare_prices
 
 
 class TestUserIdValidation:
@@ -62,3 +62,29 @@ class TestToolFallback:
             assert "这项信息暂时没查到" in result
         finally:
             _current_user_id.reset(token)
+
+
+class TestP1DecisionTools:
+    """P1 决策辅助工具：需求拆解 / 比价 / 避坑"""
+
+    def test_analyze_requirement_budget_and_scene(self):
+        """需求拆解：提取预算与场景"""
+        import asyncio
+
+        result = asyncio.run(analyze_requirement.ainvoke({"message": "3000元以内适合送女朋友的礼物"}))
+        assert '"budget": 3000' in result
+        assert '"scene": "送礼"' in result
+
+    def test_analyze_requirement_category(self):
+        """需求拆解：识别品类（蓝牙耳机）"""
+        import asyncio
+
+        result = asyncio.run(analyze_requirement.ainvoke({"message": "500块以内的蓝牙耳机哪个好"}))
+        assert '"budget": 500' in result
+        assert '"category": "耳机"' in result
+
+    @pytest.mark.asyncio
+    async def test_compare_prices_no_user_context(self):
+        """比价：无用户上下文时降级不崩溃"""
+        result = await compare_prices.ainvoke({"sku_ids": ["sku001"]})
+        assert "这项信息暂时没查到" in result or "价格/规格对比" in result
