@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -26,6 +27,7 @@ import java.util.Map;
  */
 @Slf4j @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "rocketmq.listeners.enabled", havingValue = "true", matchIfMissing = true)
 @RocketMQMessageListener(topic = "ORDER_CLOSED", selectorExpression = "*", consumerGroup = "inventory-order-closed-group")
 public class OrderClosedListener implements RocketMQListener<String> {
 

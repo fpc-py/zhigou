@@ -12,3 +12,8 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     repair-on-migrate: true
+
+# 测试环境禁用 RocketMQ 消费者（CI 无 MQ；本地中间件有 MQ 也不影响——测试不覆盖 MQ 消费路径）
+rocketmq:
+  listeners:
+    enabled: false
