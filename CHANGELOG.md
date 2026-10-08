@@ -11,6 +11,16 @@
 - 用户画像 / 收藏 / 浏览历史
 - CI/CD、全链路压测
 
+## [0.1.9] - 2026-10-08
+
+### feat
+- **k6 全链路压测脚本（\scripts/load-test/full-chain-load-test.js\）**：黄金路径（登录→商品列表→详情→加购→下单→支付创建→我的订单→售后），读 80%/写 20% 混合，阶梯 100→500→1000→2000 VU，QUICK=1 冒烟模式；阈值错误率<1%、P95<1.5s
+
+### test
+- **全链路压测基线**（QUICK 50VU/20s）：2101 请求 **0 错误**、checks 99.94%、P95 213.95ms
+- **全量阶梯压测**（100→2000VU/4m30s）：52763 请求、峰值 RPS 176、**错误率 35.65%（超阈值）**、P95 10.23s——**真实瓶颈定位**：① product/page（最高频读接口）33% 通过率（无缓存 + 连接池耗尽 + BFF 事件循环阻塞）；② BFF 峰值 RPS 远低于单层基线 718（axios 连接复用不足）；③ product/detail 隐性拖慢（ai-orchestrator RAG ETIMEDOUT 超时降级）；④ 写链路幂等/事务正常。**优化建议**（P1）：product/page Redis 缓存、BFF keep-alive 连接池+熔断、RAG 300ms 快速失败、HikariCP 调优。报告见 \docs/load-test/全链路压测报告.md\
+- **login 断言修复**：BFF \POST /auth/login\ 返回 HTTP 201（Nest POST 语义，业务 code=200），压测脚本断言改 \status===200||201\（此前 1 次误报失败）
+
 ## [0.1.8] - 2026-10-08
 
 ### feat
