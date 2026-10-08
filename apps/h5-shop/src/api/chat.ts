@@ -21,3 +21,13 @@ export function chatSse(
     signal,
   );
 }
+
+/** 清空指定会话历史（透传 BFF → ai-orchestrator） */
+export async function clearChatSession(sessionId: string): Promise<boolean> {
+  const resp = await fetch(`/api/chat/session/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  });
+  if (!resp.ok) return false;
+  const data = await resp.json().catch(() => null);
+  return data?.code === 200;
+}

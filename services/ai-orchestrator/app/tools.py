@@ -44,10 +44,10 @@ async def _http_get(url: str, timeout: float = 5.0, headers: dict | None = None)
         return resp.json()
 
 
-async def _http_post(url: str, json_data: dict, timeout: float = 5.0) -> dict[str, Any]:
+async def _http_post(url: str, json_data: dict, timeout: float = 5.0, headers: dict | None = None) -> dict[str, Any]:
     """执行 HTTP POST 并返回 JSON body。"""
     async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(url, json=json_data)
+        resp = await client.post(url, json=json_data, headers=headers or {})
         resp.raise_for_status()
         return resp.json()
 
@@ -349,6 +349,186 @@ async def review_analysis(spu_id: str) -> str:
         return "这项信息暂时没查到"
 
 
+# ── P1 第二批工具：凑单优化器 / 一键代下单 ──
+
+
+def _fen_to_yuan(fen: int) -> str:
+    return f"¥{max(int(fen or 0), 0) / 100:.2f}"
+
+
+@tool
+async def optimize_cart() -> str:
+    """
+    凑单优化器。拉取当前用户购物车与可用优惠券，调用满减引擎计算最优结算方案
+    （原价合计、最优券、优惠明细、是否建议加购凑门槛）。用户问"怎么买最划算"
+    "有什么优惠""凑单""用哪张券"时调用。用户身份由服务端注入，无需传参。
+    """
+    try:
+        user_id = _get_current_user()
+
+        # 1) 拉购物车（选中项）
+        cart_headers = {"x-user-id": user_id}
+        cart_data = await _http_get(f"{settings.cart_service_url}/cart/mine", timeout=5.0, headers=cart_headers)
+        items = cart_data.get("data") or []
+        selected = [i for i in items if i.get("selected", True)]
+        if not selected:
+            return "购物车是空的，先加点商品再帮您算优惠～"
+
+        # 2) 逐 SKU 查现价与规格（cart 未存价格时兜底），组满减入参
+        calc_items = []
+        cart_lines = []
+        for i in selected:
+            sku_id = i.get("skuId")
+            if not sku_id:
+                continue
+            count = int(i.get("count", 1))
+            price = int(i.get("priceAtAdd") or 0)
+            spec = "默认规格"
+            if price <= 0:
+                try:
+                    sku_data = await _http_get(
+                        f"{settings.product_service_url}/product/sku/{sku_id}",
+                        timeout=5.0,
+                        headers={"x-user-id": user_id},
+                    )
+                    sku_info = sku_data.get("data") or {}
+                    price = int(sku_info.get("price") or 0)
+                    sv = sku_info.get("specValue")
+                    sn = sku_info.get("specName")
+                    if sv:
+                        spec = f"{sn} {sv}" if sn else str(sv)
+                except Exception as e:
+                    logger.warning("optimize_cart 查 SKU %s 现价失败: %s", sku_id, e)
+            if price <= 0:
+                return f"购物车中 SKU {sku_id} 价格缺失，暂时算不了优惠。"
+            calc_items.append({"skuId": int(sku_id), "count": count, "price": price})
+            cart_lines.append(f"· skuId={sku_id} | 规格 {spec} | x{count} | {_fen_to_yuan(price)}")
+        if not calc_items:
+            return "购物车商品信息不完整，暂时算不了优惠。"
+
+        # 3) 无券基础满减
+        base = await _http_post(
+            f"{settings.marketing_service_url}/discount/calculate",
+            {"userId": int(user_id), "items": calc_items},
+            timeout=5.0,
+            headers={"x-user-id": user_id},
+        )
+        base_data = base.get("data") or {}
+        base_total = base_data.get("totalAmount") or 0
+        base_discount = base_data.get("discountAmount") or 0
+
+        # 4) 逐券试算，选最优
+        coupons_data = await _http_get(
+            f"{settings.marketing_service_url}/coupon/mine?userId={user_id}&status=UNUSED",
+            timeout=5.0,
+            headers={"x-user-id": user_id},
+        )
+        coupons = coupons_data.get("data") or []
+        best = {"couponId": None, "save": 0}
+        best_data = base_data
+        for c in coupons:
+            cid = c.get("id") or c.get("couponId")
+            if cid is None:
+                continue
+            try:
+                r = await _http_post(
+                    f"{settings.marketing_service_url}/discount/calculate",
+                    {"userId": int(user_id), "items": calc_items, "couponId": int(cid)},
+                    timeout=5.0,
+                    headers={"x-user-id": user_id},
+                )
+                rd = r.get("data") or {}
+                save = (rd.get("totalAmount") or 0) - (rd.get("finalAmount") or 0)
+                if save > best["save"]:
+                    best = {"couponId": int(cid), "save": save}
+                    best_data = rd
+            except Exception as e:
+                logger.warning("optimize_cart 券 %s 试算失败: %s", cid, e)
+
+        # 4) 组装结果
+        total = best_data.get("totalAmount") or base_total
+        discount = best_data.get("discountAmount") or base_discount
+        final = best_data.get("finalAmount") or (total - discount)
+        lines = [
+            f"购物车共 {len(selected)} 件商品，当前最优结算方案：",
+            "购物车明细：" + "；".join(cart_lines) if cart_lines else "购物车明细：-",
+            f"· 原价合计 {_fen_to_yuan(total)}",
+            f"· 优惠 {_fen_to_yuan(discount)}（明细: " + (
+                ", ".join(f"{d.get('ruleName')} -{_fen_to_yuan(d.get('discountAmount'))}"
+                          for d in (best_data.get("detail") or [])) or "无") + "）",
+            f"· 实付 {_fen_to_yuan(final)}",
+        ]
+        if best["couponId"]:
+            lines.append(f"· 最优券 #{best['couponId']}，再省 {_fen_to_yuan(best['save'])}")
+            avail = best_data.get("availableCoupons") or []
+            for ac in avail[:3]:
+                lines.append(f"  - 券 #{ac.get('couponId')} 可省 {_fen_to_yuan(ac.get('saveAmount'))}")
+        else:
+            lines.append("· 当前无更优券可用（基础满减已计入）")
+        lines.append("提示：差一点门槛时，可加购同品类小件商品触发更高档满减（可让我推荐凑单品）。")
+        return "\n".join(lines)
+    except PermissionError:
+        return "这项信息暂时没查到"
+    except Exception as e:
+        logger.warning("optimize_cart 调用失败 userId=%s: %s", user_id, e)
+        return "这项信息暂时没查到"
+
+
+@tool
+async def create_order(sku_items: list[dict], coupon_id: int | None = None) -> str:
+    """
+    一键代下单。在用户明确确认购买后，按指定 SKU 与数量下单（幂等 requestId 防重复）。
+    注意：本工具只应在用户明确表达"买/下单/就要这个"时调用，下单前必须向用户复述
+    商品与金额并取得确认。用户身份由服务端注入，无需传参。
+
+    Args:
+        sku_items: 商品列表 [{"skuId": 123, "count": 1}, ...]
+        coupon_id: 优惠券 ID（可选，由凑单优化器给出）
+    """
+    try:
+        user_id = _get_current_user()
+
+        if not sku_items:
+            return "没有要下单的商品。"
+        if len(sku_items) > 5:
+            return "一次最多下 5 个商品，请分批下单。"
+
+        import uuid
+        request_id = f"ai-{uuid.uuid4().hex[:16]}"
+        body = {
+            "requestId": request_id,
+            "skuItems": [{"skuId": int(i.get("skuId")), "count": int(i.get("count", 1))} for i in sku_items],
+        }
+        if coupon_id:
+            body["couponId"] = int(coupon_id)
+
+        headers = {"Content-Type": "application/json", "x-user-id": user_id}
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
+                f"{settings.order_service_url}/order/create",
+                json=body,
+                headers=headers,
+            )
+            resp.raise_for_status()
+        data = resp.json().get("data") or {}
+        order_id = data.get("orderId") or data.get("orderNo")
+        if not order_id:
+            return "下单失败，订单服务未返回订单号，请稍后重试。"
+        lines = [
+            "✅ 订单已创建，请尽快支付（超时自动关单）：",
+            f"· 订单号 {order_id}",
+            f"· 应付金额 {_fen_to_yuan(data.get('payAmount') or 0)}",
+        ]
+        if data.get("itemList"):
+            lines.append("· 商品: " + ", ".join(f"{i.get('productName')}x{i.get('count')}" for i in data["itemList"]))
+        return "\n".join(lines)
+    except PermissionError:
+        return "这项信息暂时没查到"
+    except Exception as e:
+        logger.warning("create_order 调用失败 userId=%s: %s", user_id, e)
+        return "下单失败，请稍后重试"
+
+
 # ── 工具注册表 ──
 
 TOOLS = [
@@ -360,4 +540,6 @@ TOOLS = [
     analyze_requirement,
     compare_prices,
     review_analysis,
+    optimize_cart,
+    create_order,
 ]

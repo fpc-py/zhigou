@@ -1,15 +1,18 @@
 """
 智购 AI Orchestrator — 对话服务（SSE 流式处理）
+
+会话记忆：当前实现为「本地 JSON 文件持久化」（零依赖，单实例部署重启不丢）。
+生产环境替换为 RedisSaver / Redis 会话存储（key: ai:session:{session_id}，TTL 7 天）。
 """
 
 import asyncio
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Optional
 
-from langchain_core.messages import HumanMessage, SystemMessage
-from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 from openai import APIError, APIConnectionError, AuthenticationError, RateLimitError
@@ -21,8 +24,11 @@ from .tools import TOOLS, _current_user_id
 
 logger = logging.getLogger(__name__)
 
-# ── 会话内存（生产环境应换 RedisSaver） ──
-_memory = MemorySaver()
+# ── 会话持久化（生产环境应换 RedisSaver / Redis） ──
+# 存储目录：services/ai-orchestrator/data/sessions/{session_id}.json
+# 结构：[{"role": "human"|"ai", "content": "..."}]
+_SESSION_DIR = Path(__file__).resolve().parent.parent / "data" / "sessions"
+_MAX_HISTORY_ROUNDS = 12  # 注入最近 N 轮，避免 context 膨胀
 
 # ── 读取系统提示词 ──
 _system_prompt: str = ""
@@ -35,6 +41,58 @@ def _load_system_prompt() -> str:
         logger.warning("系统提示词文件不存在: %s，使用默认提示词", path)
         return "你是智购 AI 导购助手「小智」，热情友好，用数据说话。"
     return path.read_text(encoding="utf-8").strip()
+
+
+# ── 会话存储（本地文件，生产换 Redis） ──
+
+
+def _session_file(session_id: str) -> Path:
+    """会话文件路径（session_id 做安全清洗，防路径穿越）。"""
+    safe = "".join(c for c in session_id if c.isalnum() or c in "-_.") or "default"
+    return _SESSION_DIR / f"{safe}.json"
+
+
+def _load_history(session_id: str) -> list[dict]:
+    """读取会话历史（最近 N 轮），文件不存在返回空列表。"""
+    path = _session_file(session_id)
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            return []
+        return data[-_MAX_HISTORY_ROUNDS * 2 :]  # 每轮 2 条（human+ai）
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("会话历史读取失败 session=%s: %s", session_id, e)
+        return []
+
+
+def _save_history(session_id: str, history: list[dict]) -> None:
+    """追加写入会话历史（截断至最近 N 轮防膨胀）。"""
+    try:
+        _SESSION_DIR.mkdir(parents=True, exist_ok=True)
+        path = _session_file(session_id)
+        data = history[-_MAX_HISTORY_ROUNDS * 2 :]
+        path.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except OSError as e:
+        logger.warning("会话历史写入失败 session=%s: %s", session_id, e)
+
+
+def clear_session(session_id: str) -> bool:
+    """清空指定会话（删除持久化文件）。返回是否实际删除。"""
+    path = _session_file(session_id)
+    if path.exists():
+        try:
+            path.unlink()
+            logger.info("会话已清空 session=%s", session_id)
+            return True
+        except OSError as e:
+            logger.warning("会话清空失败 session=%s: %s", session_id, e)
+            return False
+    return False
 
 
 # ── 构建 LangGraph 图 ──
@@ -76,21 +134,32 @@ def _get_graph():
     global _graph_app
     if _graph_app is None:
         graph = _build_graph()
-        _graph_app = graph.compile(checkpointer=_memory)
+        # 无 checkpointer：跨轮记忆由本地会话存储（_load_history/_save_history）自管理，
+        # 避免 MemorySaver 进程内存 + 持久化双重续接导致历史重复
+        _graph_app = graph.compile()
     return _graph_app
 
 
-# ── 构建初始消息列表 ──
+# ── 构建消息列表（系统提示 + 会话历史 + 当前 query） ──
 
 
-def _build_messages(query: str) -> list:
+def _build_messages(query: str, history: Optional[list[dict]] = None) -> list:
     global _system_prompt
     if not _system_prompt:
         _system_prompt = _load_system_prompt()
-    return [
-        SystemMessage(content=_system_prompt),
-        HumanMessage(content=query),
-    ]
+
+    messages: list = [SystemMessage(content=_system_prompt)]
+    for item in history or []:
+        role = item.get("role")
+        content = item.get("content", "")
+        if not content:
+            continue
+        if role == "human":
+            messages.append(HumanMessage(content=content))
+        elif role == "ai":
+            messages.append(AIMessage(content=content))
+    messages.append(HumanMessage(content=query))
+    return messages
 
 
 # ── SSE 事件生成器 ──
@@ -120,12 +189,14 @@ async def chat_stream(
             _system_prompt = _load_system_prompt()
 
         graph = _get_graph()
-        thread_config = {"configurable": {"thread_id": session_id or "default"}}
+        sid = session_id or "default"
 
-        input_messages = _build_messages(query)
+        # 注入会话历史（本地持久化），保证多轮长对话跨进程/重启延续
+        history = _load_history(sid)
+        input_messages = _build_messages(query, history)
         inputs = {"messages": input_messages}
 
-        # 收集完整回复，用于后续可能的消息持久化
+        # 收集完整回复，对话结束后写回会话存储
         response_text = ""
 
         # ── LLM 超时兜底 ──
@@ -133,7 +204,7 @@ async def chat_stream(
 
         try:
             async with asyncio.timeout(timeout_s):
-                async for event in graph.astream_events(inputs, thread_config, version="v2"):
+                async for event in graph.astream_events(inputs, version="v2"):
                     kind = event.get("event", "")
 
                     # ── LLM token 输出 ──
@@ -178,6 +249,14 @@ async def chat_stream(
             async for event in timeout_fallback_stream(user_id):
                 yield event
             return
+
+        # 对话成功：把本轮 (human, ai) 写回会话存储（跨进程/重启延续）
+        if response_text.strip():
+            new_history = history + [
+                {"role": "human", "content": query},
+                {"role": "ai", "content": response_text},
+            ]
+            _save_history(sid, new_history)
 
         # 完成
         yield {"event": "done", "data": "null"}

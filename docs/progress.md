@@ -45,6 +45,7 @@
 * 2026-10-08：**P0-D3 CI/CD 流水线（生产非功能第三块）**
 * 2026-10-08：**P0-D4 全链路压测（生产非功能第四块）**
 * 2026-10-08：**P1 性能优化落地（压测瓶颈修复）**：product/page Redis 缓存（TTL300s，命中 15x）+ HikariCP 50 + BFF keep-alive 连接池 + RAG 300ms 快速失败 + RAG 结果缓存；复测 ① 错误率 35.65%→5.82%、P95 10.2s→8.1s、page 33%→82%；② QUICK 50VU **0 错误 P95 329ms 达标**；2000VU 未达标为单机容量（生产化建议见报告 §6.3）。详见 CHANGELOG [0.2.0]。：k6 脚本 \scripts/load-test/full-chain-load-test.js\（黄金路径读 80%/写 20%、阶梯 100→2000VU、QUICK 冒烟模式）；基线 50VU 0 错误 P95 213ms；全量 52763 请求错误率 35.65%（product/page 33% 通过为瓶颈）+ 优化建议 P1（Redis 缓存/BFF 连接池/RAG 快速失败）。报告 \docs/load-test/全链路压测报告.md\。详见 CHANGELOG [0.1.9]。：\.github/workflows/ci.yml\（push main/PR/tag 触发；build-test JDK17+mvn verify 全模块单测；build-images 矩阵 11 服务多阶段 Dockerfile 构建 + GHCR 推送，tag 策略 main-/latest/版本；gha 层缓存；多阶段 Stage1 在 CI 补验证）+ \.github/workflows/deploy.yml\（手动触发，SSH + compose pull && up + 逐服务健康检查，secrets 校验）。YAML 校验通过。详见 CHANGELOG [0.1.8]。：① 11 服务生产级多阶段 Dockerfile（Stage1 maven:3.9-eclipse-temurin-17 容器内编译——先拷全部 POM 复用层缓存再 -am 打包；Stage2 eclipse-temurin:17-jre 非 root（uid 1001）+ G1GC JVM 参数 + EXPOSE + HEALTHCHECK /actuator/health）；② 根 .dockerignore 压缩构建上下文；③ 11 个运行时镜像 zhigou/<svc>:0.1.0 构建成功，user-service 容器实测 JVM 17 启动正常、非 root（started by app）；④ 生产编排 infra/compose/services.yml（compose_default 网络 + 环境变量覆盖 DB/Redis/MQ/服务间 URL + restart 自愈，config 校验通过）。踩坑： here-string 转义、reactor 需全模块 POM、本地容器内 mvn 网络不通（runtime Dockerfile 绕过）。详见 CHANGELOG [0.1.7]。：packages/common 新增 mask 模块（SensitiveType/MaskUtil/SensitiveLog/SensitiveLogAspect/MaskAutoConfiguration），@SensitiveLog 注解 + 序列化后递归掩码（字段名敏感词 + 正则智能识别 + @SensitiveField 注解兜底，失败降级 toString，绝不抛异常影响主流程）；auth-center login/send-sms-code 接入。**实测**：登录日志 `phone=******** / code=****** / accessToken=********`，**Snowflake userId 完整保留不误掩**（银行卡正则收紧为 [3456] 开头）；MaskUtilTest 11/11。详见 CHANGELOG [0.1.6]。
+* 2026-10-08：**P1 AI 决策辅助第二批（会话记忆/凑单/代下单）**：① 会话记忆持久化（MemorySaver→本地 JSON 文件，跨进程/重启延续 + `DELETE /chat/session/{sid}` 清空 + BFF 透传 + H5 清空按钮）；② AI 凑单优化器（`optimize_cart`：购物车+SKU 现价/规格 + marketing 满减引擎 + 逐券试算最优）；③ 一键代下单（`create_order`：真实调 order-service 下单 + 用户确认流）。**实测**：SSE 全链路「怎么买最划算」→ 购物车 2 件 ¥148 明细+最优方案；跨轮「确认下单」→ 订单 2108152430193233920 真实落库（¥148）；会话清空接口 200。详见 CHANGELOG [0.2.4]。
 * 2026-10-08：**CI 集成测试基建修复（全量 78 项测试全绿）**：① Testcontainers 加固——`@DynamicPropertySource` 注册标准键 `spring.datasource.url/username/password` + `spring.data.redis.host/port`（修 TEST_JDBC_URL 键名不被 Spring 识别）、MySQL/Redis 容器显式等待 + 120s 超时、payment/marketing/aftersale 补 Redis 容器、auth schema.sql 对齐生产迁移（user_id 列）；② test profile 安全链——9 服务 `SecurityConfig @Profile("!test")` 导致默认安全链全拒 401，新建 10 个 `TestSecurityConfig`（permitAll）接入测试类（inventory 非 Web 不导入）；③ 对齐测试与实现——cart mock product 校验 URL/响应、order 重复支付回调幂等断言改验状态机非法跃迁、OutboxDeliveryTask `@Profile("!test")`（test 无 MQ）、清理 payment 残留旧迁移（V20261007 → Flyway 重复 ADD 列）。**`mvn verify` 全模块 0 失败 0 错误（auth 3 / user 6 / file 6 / product 5 / cart 4 / order 10 / inventory 4 / payment 7 / marketing 8 / logistics 6 / aftersale 8 + MaskUtil 11）**，GitHub Actions CI `build-test` 可全绿。详见 CHANGELOG [0.2.3]。
 * 2026-10-08：**P1 容量调优（写链路瓶颈消除）**：HikariCP 连接池全服务化（10 个 DB 服务统一 pool 50，pool-name ZhigouHikariPool）；复测③ 2000VU **错误率 0.00%**（0/86245）、RPS 303（+50%）、P95 5.02s（-36%，持续收敛 10.23→8.14→7.86→5.02）、5 类接口 checks 全 100%；P95 未达 1.5s 为单机写事务耗时，生产化路径（BFF 横向扩展/写链路异步化/分库分表）见报告 §6.3。详见 CHANGELOG [0.2.2]。
 
@@ -151,9 +152,9 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 - [ ] 真伪测评/水军识别（依赖评价数据，待评价模块）
 - [ ] 个性化推荐升级（推荐引擎，待画像数据积累）
 - [ ] 图片搜款/多模态（待立项）
-- [ ] AI 凑单优化器（券+满减最优组合）
-- [ ] 一键代下单（Agent 对接下单 + 用户确认流）
-- [ ] 会话记忆持久化（当前 MemorySaver 进程内存）
+- [x] ~~AI 凑单优化器（券+满减最优组合）~~（[0.2.4] optimize_cart 工具交付：购物车+SKU 现价+满减引擎+逐券试算）
+- [x] ~~一键代下单（Agent 对接下单 + 用户确认流）~~（[0.2.4] create_order 工具交付：真实下单 + 用户确认流实测）
+- [x] ~~会话记忆持久化（当前 MemorySaver 进程内存）~~（[0.2.4] 本地文件持久化 + DELETE 清空接口 + H5 清空按钮；生产注释换 Redis）
 
 
 

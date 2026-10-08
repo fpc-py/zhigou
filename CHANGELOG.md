@@ -3,6 +3,14 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.4] - 2026-10-08
+
+### P1 · AI 决策辅助第二批（会话记忆 / 凑单 / 代下单）
+- feat(P1) 会话记忆持久化：ai-orchestrator 从进程内 MemorySaver 改为本地 JSON 文件持久化（data/sessions/{session_id}.json，注入最近 12 轮防 context 膨胀，生产注释换 RedisSaver/Redis）；新增 DELETE /api/v1/chat/session/{sid} 清空接口；BFF 透传 DELETE /chat/session/:id；H5 对话页新增"清空会话"按钮（Icon 新增 trash）
+- feat(P1) AI 凑单优化器（optimize_cart 工具）：拉取购物车选中项 + 逐 SKU 实时查价/规格 → 调 marketing 满减引擎 discount/calculate 无券基准 + 逐券试算选最优 → 输出购物车明细、原价合计、优惠明细、实付、凑单建议；config.py 新增 cart_service_url/order_service_url
+- feat(P1) 一键代下单（create_order 工具）：调用 order-service POST /order/create（幂等 requestId，x-user-id 透传），工具仅限用户明确确认后调用，LLM 需复述商品金额再下单（用户确认流实测通过）
+- fix(P1) 工具入参安全：新工具改为服务端 ContextVar 注入当前用户（_get_current_user()），不再让 LLM 猜测/伪造 userId
+- **实测**：SSE 全链路——"怎么买最划算"→ optimize_cart（购物车 2 件 ¥148 明细+最优方案）；"确认下单"→ create_order 真实下单成功（订单 2108152430193233920，¥148.00）；跨轮会话记忆与清空接口均验证通过
 ## [Unreleased]
 
 ### P0 · M1 收尾（进行中）

@@ -58,4 +58,18 @@ export class ChatService {
       res.end();
     }
   }
+
+  /** 清空指定会话历史（透传 ai-orchestrator DELETE /api/v1/chat/session/:id） */
+  async clearSession(sessionId: string): Promise<boolean> {
+    try {
+      const resp = await axios.delete(
+        `${SERVICES.aiOrchestrator.url}/api/v1/chat/session/${encodeURIComponent(sessionId)}`,
+        { timeout: SERVICES.aiOrchestrator.timeout },
+      );
+      return resp.data?.code === 200;
+    } catch (err: any) {
+      this.logger.warn(`清空会话失败 session=%s: ${err.message}`, sessionId);
+      return false;
+    }
+  }
 }

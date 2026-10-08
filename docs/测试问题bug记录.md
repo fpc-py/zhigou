@@ -11,6 +11,7 @@
 | 2 | 需以完整用户视角在浏览器跑一遍全流程 | 全链路 | ⏳ 待验证 | 首页→AI 对话→详情→加购→下单→支付→订单，前端已就绪，待全服务启动联调 |
 | 3 | 验证码获取（临时排查命令） | auth-center | ✅ | `docker exec zhigou-redis redis-cli GET "auth:sms:15120598756"` |
 | 4 | **CI 集成测试全失败（AuthIntegrationTest HTTP 500）**：① `TEST_JDBC_URL` 键名错误（Spring 不认该键）；② MySQL/Redis 容器无显式等待策略与超时；③ payment/marketing/aftersale 测试类无 Redis 容器；④ 9 服务 `SecurityConfig @Profile("!test")` → test 下默认安全链全拒 401；⑤ cart mock URL/响应脱节、order OutboxDeliveryTask 强依赖 MQ、payment 残留旧迁移、order 断言过时 | 全服务集成测试 | ✅ | ①~③：@DynamicPropertySource 注册标准键 + waitingFor + 120s 超时 + 补 Redis 容器；④：10 服务新建 `TestSecurityConfig`（permitAll，inventory 非 Web 不导入）；⑤：cart mock 对齐、OutboxDeliveryTask `@Profile("!test")`、清理残留迁移、order 改验状态机。**`mvn verify` 全模块 78 项测试 0 失败 0 错误** |
+| 5 | **AI 决策辅助工具联调问题**：① `optimize_cart/create_order` 初版入参含 userId，LLM 无法得知真实 ID 会编造（如 U87654321）→ 越权校验拒绝，工具不可用；② 购物车接口 `priceAtAdd=0`（加购未存价格）→ 凑单计算缺价失败；③ create_order 无确认流时 LLM 直接下单有风险 | ai-orchestrator | ✅ | ① 新工具移除 userId 入参，改用服务端 ContextVar 注入当前用户（LLM 无法伪造）；② optimize_cart 逐 SKU 实时查 `product/sku` 现价与规格兜底；③ 工具 docstring 强制确认 + LLM 实测先复述商品金额再等用户确认（确认流通过） |
 
 ## 已修复记录（历史）
 

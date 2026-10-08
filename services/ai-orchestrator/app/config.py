@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     inventory_service_url: str = "http://localhost:8086"
     user_service_url: str = "http://localhost:8081"
     marketing_service_url: str = "http://localhost:8088"
+    cart_service_url: str = "http://localhost:8084"
+    order_service_url: str = "http://localhost:8085"
 
     # ── JWT（用于转发认证） ──
     jwt_secret: str = "change-me-to-a-random-256-bit-string"

@@ -9,6 +9,7 @@
         <p class="head-sub">AI 购物助理 · 实时比价</p>
       </div>
       <span class="head-online"><i />在线</span>
+      <button class="head-clear" title="清空会话" @click="onClear"><Icon name="trash" size="xs" /></button>
     </header>
 
     <!-- 快捷 chips -->
@@ -70,7 +71,7 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { chatSse } from '@/api/chat';
+import { chatSse, clearChatSession } from '@/api/chat';
 import { getProductPage } from '@/api/product';
 import type { ProductPageItem } from '@/api/product';
 import { addCart } from '@/api/cart';
@@ -128,6 +129,20 @@ async function onMiniAdd(p: ProductPageItem) {
 function sendWith(text: string) {
   inputText.value = text;
   send();
+}
+
+async function onClear() {
+  if (sending.value) {
+    showToast('回复生成中，请稍后再清空');
+    return;
+  }
+  const ok = await clearChatSession(sessionId.value);
+  if (ok) {
+    messages.value = [];
+    showToast('已清空会话记忆');
+  } else {
+    showToast('清空失败，请重试');
+  }
 }
 
 async function send() {
@@ -231,6 +246,14 @@ onMounted(() => {
   font-weight: 600;
 }
 .head-online i { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); }
+.head-clear {
+  flex: none;
+  color: var(--ink-3);
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .chips {
   flex: none;
   display: flex;
