@@ -11,7 +11,20 @@
 - 用户画像 / 收藏 / 浏览历史
 - CI/CD、全链路压测
 
+## [0.2.3] - 2026-10-08
+
+### fix（测试基建 · CI 集成测试 Testcontainers 修复）
+- **根因**：CI 上 AuthIntegrationTest 返回 500——① auth 的 `@DynamicPropertySource` 注册了 `TEST_JDBC_URL`（Spring 不认，datasource 走 main yml 硬编码 localhost:3307）；② MySQL/Redis 容器无显式等待策略/超时（CI 网络慢时容器未就绪即启动 Spring）；③ payment/marketing/aftersale 测试类缺 Redis 容器但 test yml 引用 `${spring.data.redis.host}` 占位 → 占位符解析/Hikari/Lettuce 连接失败
+- **修复**（11 个服务统一加固）：`@DynamicPropertySource` 注册标准键 `spring.datasource.url/username/password` + `spring.data.redis.host/port`（保留 TEST_JDBC_URL 兼容）；MySQL `withStartupTimeout(120s)`；Redis `waitingFor(Wait.forListeningPort())` + 120s 超时；payment/marketing/aftersale 补 Redis 容器；auth 补 `spring.sql.init.mode=always` 执行 schema.sql
+- **验证**：全模块 `mvn verify` 集成测试全绿——**78 项测试 0 失败 0 错误**：auth 3 / user 6 / file 6 / product 5 / cart 4 / order 10 / inventory 4 / payment 7 / marketing 8 / logistics 6 / aftersale 8（+ common MaskUtil 11）
+
+### fix（CI 集成测试第二梯队 · test profile 安全链与迁移一致性）
+- **根因**：① 9 个服务 `SecurityConfig` 均 `@Profile("!test")`，test profile 下无自定义 SecurityFilterChain → Spring Boot 默认安全链拒绝全部请求（401）；② cart 测试 mock 的 product 校验 URL/响应体与实现脱节（`/product/{id}` → `/product/sku/{id}/validate`、`data` 对象 → `data:true`）；③ order 的 `OutboxDeliveryTask` 构造注入 RocketMQTemplate，test yml 已 exclude MQ 自动配置 → 上下文加载失败；④ order 测试断言过时（重复支付回调已幂等放行，非非法跃迁）；⑤ payment 迁移版本重排后 target/classes 残留旧版本 `V20261007` → Flyway 重复 ADD 列（新库从头部署必现）；⑥ inventory 为 `WebEnvironment.NONE` 非 Web 测试，导入 SecurityFilterChain 配置导致无 HttpSecurity bean
+- **修复**：① 10 个服务新建 `TestSecurityConfig`（@TestConfiguration + permitAll 链，@Import 接入，inventory 因非 Web 不导入）；② cart 测试 mock URL 与响应对齐实现；③ `OutboxDeliveryTask` 加 `@Profile("!test")`；④ order 测试改为直接验证状态机 `INIT→SHIPPED` 非法跃迁（40050）；⑤ 清理残留迁移文件 + 全部服务 target 迁移与 src 比对防回归；⑥ 其余服务（auth 参考实现）统一
+- **验证**：`mvn verify` 全模块 78 项测试全绿（含上文 11 服务）；GitHub Actions CI `build-test` 应可全绿
+
 ## [0.2.2] - 2026-10-08
+
 
 ### perf（P1 容量调优 · 写链路瓶颈消除）
 - **HikariCP 连接池全服务化**：批量给 10 个 DB 服务（auth/user/file/inventory/order/payment/marketing/logistics/aftersale + 早前 product）统一 maximum-pool-size:50 / minimum-idle:10 / connection-timeout:3000（pool-name ZhigouHikariPool）——修复 2000VU 下写链路（下单事务/扣库存/支付）连接池耗尽排队
@@ -23,7 +36,8 @@
 ### feat（P1 AI 决策辅助 · 第一批）
 - **需求拆解工具 \nalyze_requirement(message)\**（ai-orchestrator tools.py）：规则拆解模糊需求 → {预算/品类/场景/偏好} 结构化 JSON（预算正则 + 品类/场景/偏好词表 40+ 词）；SSE 实测：\"3000元以内送女朋友的礼物"\ → \{budget:3000, scene:送礼}\，\"500块以内的蓝牙耳机"\ → \{budget:500, category:耳机}\
 - **比价工具 \compare_prices(sku_ids)\**：多 SKU 横向对比（价格/规格/库存），实测 \¥49.00 vs ¥199.00\ 对比清单正常输出
-- **避坑工具 \eview_analysis(spu_id)\**：选购提醒（价格区间/规格数/库存/多规格注意点），差评分析如实降级"待评价数据接入"
+- **避坑工具 \
+eview_analysis(spu_id)\**：选购提醒（价格区间/规格数/库存/多规格注意点），差评分析如实降级"待评价数据接入"
 - **提示词升级**（\services/ai-orchestrator/prompts/system.md\）：工具表 +3；新增**决策辅助流程**（拆解→搜索→比价→避坑→推荐）；约束 LLM 搜索用品类词、预算用于过滤而非拼进关键词（修 LLM 将"3000"拼入 keyword 致空结果的实测问题）
 - **修复**：analyze_requirement 的 join 混入 int 抛异常（\str(w)\ 修复）
 - **测试**：tests/test_tools.py 新增 TestP1DecisionTools（拆解预算/品类/场景 + 比价降级），共 9 个用例（本地 pytest 未装，逻辑已通过真实 SSE 链路实测）

@@ -64,3 +64,5 @@ data/
 *.db
 
 .sessions
+# ===== 运行时日志 =====
+logs/

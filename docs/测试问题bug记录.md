@@ -10,6 +10,7 @@
 | 1 | 管理端登录进去后，浏览目录会跳出登录 | admin-merchant | 🆕 | 疑似 token 校验/路由守卫问题，待复现定位 |
 | 2 | 需以完整用户视角在浏览器跑一遍全流程 | 全链路 | ⏳ 待验证 | 首页→AI 对话→详情→加购→下单→支付→订单，前端已就绪，待全服务启动联调 |
 | 3 | 验证码获取（临时排查命令） | auth-center | ✅ | `docker exec zhigou-redis redis-cli GET "auth:sms:15120598756"` |
+| 4 | **CI 集成测试全失败（AuthIntegrationTest HTTP 500）**：① `TEST_JDBC_URL` 键名错误（Spring 不认该键）；② MySQL/Redis 容器无显式等待策略与超时；③ payment/marketing/aftersale 测试类无 Redis 容器；④ 9 服务 `SecurityConfig @Profile("!test")` → test 下默认安全链全拒 401；⑤ cart mock URL/响应脱节、order OutboxDeliveryTask 强依赖 MQ、payment 残留旧迁移、order 断言过时 | 全服务集成测试 | ✅ | ①~③：@DynamicPropertySource 注册标准键 + waitingFor + 120s 超时 + 补 Redis 容器；④：10 服务新建 `TestSecurityConfig`（permitAll，inventory 非 Web 不导入）；⑤：cart mock 对齐、OutboxDeliveryTask `@Profile("!test")`、清理残留迁移、order 改验状态机。**`mvn verify` 全模块 78 项测试 0 失败 0 错误** |
 
 ## 已修复记录（历史）
 

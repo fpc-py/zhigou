@@ -7,6 +7,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,6 +24,7 @@ import java.util.List;
 @Slf4j @Component
 @RequiredArgsConstructor
 @EnableScheduling
+@Profile("!test")  // test profile 无 RocketMQ，投递任务不加载（Outbox 写入逻辑仍被单测覆盖）
 public class OutboxDeliveryTask {
 
     private final OutboxMapper outboxMapper;

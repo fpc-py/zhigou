@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -17,8 +18,10 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -27,10 +30,11 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @Testcontainers
+@Import(TestSecurityConfig.class)
 class CartServiceIntegrationTest {
 
     @Container
-    static GenericContainer<?> redisContainer = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static GenericContainer<?> redisContainer = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379).withStartupTimeout(Duration.ofSeconds(120)).waitingFor(Wait.forListeningPort());
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry r) {
@@ -52,8 +56,8 @@ class CartServiceIntegrationTest {
     }
 
     private void mockProductOk(Long skuId) {
-        String json = "{\"code\":200,\"message\":\"success\",\"data\":{\"spuId\":1,\"status\":1}}";
-        mockServer.expect(requestTo("http://localhost:9999/product/" + skuId))
+        String json = "{\"code\":200,\"message\":\"success\",\"data\":true}";
+        mockServer.expect(requestTo("http://localhost:9999/product/sku/" + skuId + "/validate"))
                 .andRespond(withSuccess(json, org.springframework.http.MediaType.APPLICATION_JSON));
     }
 

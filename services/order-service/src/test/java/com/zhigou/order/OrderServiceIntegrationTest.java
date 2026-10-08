@@ -11,14 +11,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import java.time.Duration;
 
 import java.util.Collections;
 import java.util.List;
@@ -30,12 +33,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @Testcontainers
+@Import(TestSecurityConfig.class)
 class OrderServiceIntegrationTest {
 
-    @Container static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0").withDatabaseName("zhigou").withUsername("test").withPassword("test");
-    @Container static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    @Container static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0").withDatabaseName("zhigou").withUsername("test").withPassword("test").withStartupTimeout(Duration.ofSeconds(120));
+    @Container static GenericContainer<?> redis = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379).withStartupTimeout(Duration.ofSeconds(120)).waitingFor(Wait.forListeningPort());
     @DynamicPropertySource static void cfg(DynamicPropertyRegistry r) {
         r.add("TEST_JDBC_URL", mysql::getJdbcUrl);
+        r.add("spring.datasource.url", mysql::getJdbcUrl);
+        r.add("spring.datasource.username", mysql::getUsername);
+        r.add("spring.datasource.password", mysql::getPassword);
         r.add("spring.data.redis.host", redis::getHost);
         r.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
     }
@@ -70,11 +77,10 @@ class OrderServiceIntegrationTest {
         assertThat(r1.getOrderId()).isEqualTo(r2.getOrderId());
     }
 
-    // 3: 非法状态跃迁 PAID→PAID 应抛 40050
+    // 3: 状态机非法跃迁 INIT→SHIPPED 应抛 40050
+    // 注：重复支付回调（PAID→PAID）已按幂等语义处理，见测试 10
     @Test void shouldFailInvalidStateTransition() {
-        OrderResponse r = orderService.create(USER, newReq());
-        orderService.payCallback(r.getOrderId()); // INIT→PAID
-        assertThatThrownBy(() -> orderService.payCallback(r.getOrderId()))
+        assertThatThrownBy(() -> OrderState.validateTransition(OrderState.INIT, OrderState.SHIPPED))
                 .isInstanceOf(BizException.class).extracting("code").isEqualTo(40050);
     }
 
