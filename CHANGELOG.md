@@ -3,7 +3,16 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
-## [0.2.6] - 2026-10-08
+## [0.2.7] - 2026-10-08
+
+### P1 · AI 决策辅助第三批（隐性需求挖掘 + 提示词对齐）
+
+- feat(P1) 新工具 `analyze_user_context()`：隐性需求挖掘——拉取当前用户历史订单（order-service `/order/mine`），按 SKU 名称词表归类**常购品类**、按订单金额分桶**常用价位带**、统计**订单数/购买件数**，输出结构化上下文供 LLM 补全用户未明说的约束（默认品类/价位带/复购倾向）；无历史订单时如实提示不编造；用户身份由服务端注入（无 userId 入参，防 LLM 编造 ID）
+- docs(AI) `prompts/system.md` 对齐真实工具集：工具清单补齐 `analyze_user_context` / `optimize_cart` / `create_order`；决策辅助流程升级为 **拆解 → 隐性补全 → 搜索 → 比价 → 避坑 → 推荐** 六步；工具失败处理表补齐三个新工具
+- docs(AI) 红线修正：原「禁止代替用户下单」改为「**禁止自主下单**」——用户表达购买意向后必须先复述商品/数量/金额并取得明确确认，才允许调用 `create_order`（与 P1 二批确认流一致，消除提示词与工具集矛盾）
+- **验证**：本地 py_compile 通过；重启 ai-orchestrator（pid 13676）后 SSE 实测——提问「帮我推荐个耳机，预算不太高，参考我买过的」触发 `analyze_user_context`（返回 orderCount=22 / topCategories=运动鞋21 / priceBand=百元内）→ 继续 `search_products` 搜索耳机，全链路 token→tool_call→tool_result→token 正常，无编造
+
+
 
 ### CI 修复 · MinIO/S3 镜像源（三轮实证收敛）
 - fix(CI) file-service 集成测试 MinIO 镜像：Docker Hub `minio/minio` 各源在 GitHub runner 均不可匿名拉取（latest 404 → quay.io RELEASE 500 unauthorized → Docker Hub RELEASE 404 "repository does not exist"）；最终方案：改用 **adobe/s3mock（S3 兼容 mock）** + Testcontainers 官方模块 `com.adobe.testing:s3mock-testcontainers:4.5.0`（`S3MockContainer`），镜像从 Docker Hub 匿名可拉（已验证）

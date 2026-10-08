@@ -349,6 +349,72 @@ async def review_analysis(spu_id: str) -> str:
         return "这项信息暂时没查到"
 
 
+@tool
+async def analyze_user_context() -> str:
+    """
+    隐性需求挖掘。分析当前用户的历史订单，提炼购买偏好：常购品类、常用价位带、复购倾向。
+    用户在表达需求时没说清偏好，或说"参考我买过的""我之前买过""跟上次差不多"时调用，
+    用于补全隐性约束，让推荐更贴合用户历史习惯。用户身份由服务端注入，无需传参。
+    """
+    try:
+        user_id = _get_current_user()
+        url = f"{settings.order_service_url}/order/mine?userId={user_id}"
+        headers = {"x-user-id": user_id}
+        data = await _http_get(url, timeout=5.0, headers=headers)
+        orders = data.get("data") or []
+        if not orders:
+            return "用户暂无历史订单，无法提炼购买偏好（推荐将按通用流程进行）。"
+
+        # 品类统计（按 skuName 关键词归类）
+        category_count: dict[str, int] = {}
+        price_points: list[int] = []
+        total_items = 0
+        for o in orders:
+            amount = int(o.get("payAmount") or o.get("totalAmount") or 0)
+            price_points.append(amount)
+            for it in o.get("items") or []:
+                name = it.get("skuName") or ""
+                cnt = int(it.get("count") or 1)
+                total_items += cnt
+                cat = _match_word(name, _CATEGORY_WORDS)
+                if cat:
+                    category_count[cat] = category_count.get(cat, 0) + cnt
+
+        # 价位带分桶
+        def _bucket(fen: int) -> str:
+            yuan = fen / 100
+            if yuan < 100:
+                return "百元内"
+            if yuan < 500:
+                return "100-500元"
+            if yuan < 2000:
+                return "500-2000元"
+            if yuan < 5000:
+                return "2000-5000元"
+            return "5000元以上"
+
+        buckets: dict[str, int] = {}
+        for p in price_points:
+            b = _bucket(p)
+            buckets[b] = buckets.get(b, 0) + 1
+        top_band = max(buckets, key=buckets.get) if buckets else None
+
+        top_cats = sorted(category_count.items(), key=lambda kv: -kv[1])[:3]
+        result = {
+            "orderCount": len(orders),
+            "totalItems": total_items,
+            "topCategories": [{"category": cat, "count": n} for cat, n in top_cats],
+            "priceBand": top_band,
+            "hint": "以上来自用户历史订单统计，可作为隐性需求补全依据（默认品类/价位带/复购倾向）；无历史时不编造",
+        }
+        return json.dumps(result, ensure_ascii=False)
+    except PermissionError:
+        return "这项信息暂时没查到"
+    except Exception as e:
+        logger.warning("analyze_user_context 调用失败 userId=%s: %s", user_id, e)
+        return "这项信息暂时没查到"
+
+
 # ── P1 第二批工具：凑单优化器 / 一键代下单 ──
 
 
@@ -540,6 +606,7 @@ TOOLS = [
     analyze_requirement,
     compare_prices,
     review_analysis,
+    analyze_user_context,
     optimize_cart,
     create_order,
 ]

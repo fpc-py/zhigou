@@ -30,6 +30,7 @@
 | 2026-10-07 | 订单详情页对 CLOSED/REFUNDED 仍显示"申请售后"（不合状态机） | 操作按钮按状态收敛：INIT=取消+支付，PAID/SHIPPED/COMPLETED=申请售后，终态无操作 | `npm run build` 通过 |
 
 > 新增 bug 时在此追加一行；涉及代码修复的同步更新 `CHANGELOG.md`。
+| 2026-10-08 | AI 隐性需求挖掘工具未接入（P1 三批功能增量） | ai-orchestrator 新增 `analyze_user_context()`：读历史订单统计常购品类/价位带/复购倾向，服务端注入 userId（无入参防编造）；system.md 同步补齐工具清单+六步决策流程，红线改「禁止自主下单（确认后允许代下单）」 | py_compile 通过；SSE 实测：「参考我买过的」 → analyze_user_context 返回 orderCount=22/运动鞋21/百元内 → search_products 耳机，全链路正常 |
 | 2026-10-07 | **RocketMQ 生产者 sendDefaultImpl call timeout（Windows Docker Desktop）**：broker 向 namesrv 注册容器内网 IP 172.18.x.x，宿主不可达；compose 挂载到 /root/store/config 路径不存在（AccessDenied）、命令行 brokerIP1 在 --enable-proxy 下不生效、recreate 重置 docker cp 配置层，均失败 | middleware.yml command 显式 \-c /home/rocketmq/rocketmq-5.3.0/conf/broker.conf\（镜像默认路径）+ \scripts/mq-fix-broker-ip.ps1\ docker cp 覆盖（brokerIP1=127.0.0.1）+ \docker restart\（勿 recreate）；修复后重启 order-service 清旧路由缓存，投递 41/41 成功 | clusterList Addr=127.0.0.1:10911；outbox status 全=1 |
 | 2026-10-08 | **售后退款 500 = aftersale Feign readTimeout 300ms 超时**：payment 首次调用（含 DB 事务）超过 300ms → RetryableException，售后单停在 REFUNDING（事务回滚） | aftersale `application.yml` Feign 默认超时改 connectTimeout 500 / readTimeout 3000 | 重启后 refund 成功：REFUNDED + payment_refund 落库 |
 | 2026-10-08 | **售后退回库存失败（403，告警"待人工补偿"）**：inventory `/rollback` 被 Spring Security 拦截——HTTP 通道全 403（此前关单回滚一直靠 MQ 兜底，掩盖了此问题） | inventory `SecurityConfig` 将 `/inventory/preDeduct`、`/inventory/confirm`、`/inventory/rollback` permitAll（内网服务调用，生产需白名单） | refund 内自动回库存成功：¥1 单库存 99→100 |
