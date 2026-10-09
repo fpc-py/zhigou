@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2048, description="用户输入文本")
     userId: str = Field(..., min_length=1, max_length=64, description="当前用户 ID")
     sessionId: str = Field("", max_length=64, description="会话 ID（留空则新建）")
+    imageUrl: str = Field("", max_length=2048, description="图片 URL（图片搜款时传入，如商品图）")
 
 
 # ── SSE 事件 ──

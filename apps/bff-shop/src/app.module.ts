@@ -29,6 +29,8 @@ import { LogisticsController } from './logistics/logistics.controller.js';
 import { LogisticsService } from './logistics/logistics.service.js';
 import { AftersaleController } from './aftersale/aftersale.controller.js';
 import { AftersaleService } from './aftersale/aftersale.service.js';
+import { PriceCompareController } from './price-compare/price-compare.controller.js';
+import { PriceCompareService } from './price-compare/price-compare.service.js';
 
 @Module({
   imports: [
@@ -53,6 +55,7 @@ import { AftersaleService } from './aftersale/aftersale.service.js';
     UserController,
     LogisticsController,
     AftersaleController,
+    PriceCompareController,
   ],
   providers: [
     HomeService,
@@ -66,6 +69,7 @@ import { AftersaleService } from './aftersale/aftersale.service.js';
     UserService,
     LogisticsService,
     AftersaleService,
+    PriceCompareService,
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AnalyticsInterceptor },

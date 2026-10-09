@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.10] - 2026-10-08
+
+### P1 · AI 决策辅助第六批（跨平台比价 + 图片搜款）
+
+- feat(P1) product-service 跨平台比价：`POST /price/compare`——`PriceSourceAdapter` 适配器模式聚合京东/天猫/拼多多三渠道（本地模拟源，**生产环境实现同一接口替换为真实第三方比价 API 即可**，接口不变）；报价含售价/运费/总价/预计到货/优惠说明，按总价最低 + 到货更快标最优，输出一句话可解释建议；渠道全失败降级为本平台自营价兜底（不报错）
+- feat(P1) AI `compare_prices` 升级：从仅比本平台 SKU → 跨平台聚合（调 /price/compare，输出各渠道含运费报价 + ★最优 + 建议）
+- feat(P1) AI 新工具 `search_by_image(image_url, limit)`：多模态图片搜款——视觉模型识别商品特征（品类/颜色/风格/搜索关键词）→ 基于特征调 `search_products` 搜真实商品；60s 超时 + 一次重试，识别失败/网络不可达时优雅降级提示，绝不编造商品
+- feat(P1) 对话图片链路：`ChatRequest.imageUrl` 贯通 H5 → BFF → AI（多模态 HumanMessage + 强制系统指令"上传图片必须先调 search_by_image"）；H5 对话页新增相机按钮（file-service 上传 → 缩略图预览 → 带图发送）；BFF `/price/compare` 透传
+- feat(P1) H5 比价页接通真实接口：删除前端模拟 CHANNELS 常量，改为 `POST /price/compare` 渲染真实渠道报价（含运费/到货/最优标记/省钱明细/建议文案）
+- **验证**：/price/compare 冒烟——SKU22 耳机 京东 ¥209 / 天猫 ¥195 / 拼多多 ¥178.10（★最优，含建议文案）；SSE 实测「跨平台比价」→ compare_prices 输出三平台 + 最优，LLM 回复引用真实报价无编造；SSE 实测「图片搜款」→ 强制触发 search_by_image（本机到 OpenAI vision 拉图超时为外部网络限制，降级提示生效，云端生产可用）
+- **限制说明**：本地模拟渠道价（基于本地 SKU 价 ± 渠道系数）非真实第三方报价；search_by_image 视觉识别依赖 LLM vision 端点网络可达性，不可达时返回降级提示
+
 ## [0.2.9] - 2026-10-08
 
 ### P1 · AI 决策辅助第五批（个性化推荐引擎：画像 + 评分 + AI 工具 + 前端）

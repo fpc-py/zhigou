@@ -68,6 +68,7 @@ async def chat_sse(req: ChatRequest):
             query=req.query,
             user_id=req.userId,
             session_id=req.sessionId,
+            image_url=req.imageUrl or "",
         ),
         media_type="text/event-stream",
         headers={

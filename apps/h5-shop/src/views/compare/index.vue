@@ -17,36 +17,36 @@
     <ErrorRetry v-else-if="error" text="比价数据加载失败" btn-text="重试" @retry="search" />
     <EmptyState v-else-if="!product" illustration="🔍" :text="searched ? '未找到该商品' : '输入商品名开始比价'" />
 
-    <template v-else>
+    <template v-else-if="product">
       <!-- 最优方案 -->
       <section class="hero">
         <div class="hero-top">
           <span class="hero-badge"><Icon name="flash" size="xs" /> 最优方案</span>
           <span class="hero-save">比最高价省 {{ formatPrice(saveAmount) }}</span>
         </div>
-        <p class="hero-price"><b>¥{{ formatPrice(bestPrice) }}</b><span class="hero-unit">/ {{ bestName }}</span></p>
+        <p class="hero-price"><b>¥{{ formatPrice(bestTotal) }}</b><span class="hero-unit">/ {{ bestSource }}</span></p>
         <p class="hero-name">{{ product.name }}</p>
+        <p class="hero-sug">{{ suggestion }}</p>
         <button class="hero-btn" @click="goBest">去购买 →</button>
       </section>
 
       <!-- 渠道比价表 -->
       <section class="cmp-table card">
-        <h3 class="sec-title">渠道比价</h3>
-        <div v-for="c in channels" :key="c.name" class="cmp-row" :class="{ best: c.isBest }">
-          <span class="cmp-name">{{ c.name }}</span>
-          <span class="cmp-price"><b>¥{{ formatPrice(c.price) }}</b><i v-if="c.isBest" class="best-tag">最优</i></span>
-          <span class="cmp-ship">{{ c.ship }}</span>
-          <span class="cmp-risk" :class="c.riskClass">{{ c.risk }}</span>
+        <h3 class="sec-title">渠道比价（含运费）</h3>
+        <div v-for="c in channels" :key="c.source" class="cmp-row" :class="{ best: c.isBest }">
+          <span class="cmp-name">{{ c.source }}</span>
+          <span class="cmp-price"><b>¥{{ formatPrice(c.totalPrice) }}</b><i v-if="c.isBest" class="best-tag">最优</i></span>
+          <span class="cmp-ship">{{ c.deliveryDays }}天 · {{ c.promoText }}</span>
           <button class="cmp-go" @click="goChannel(c)">去</button>
         </div>
-        <p class="demo-note">* 渠道价格为演示数据，基于智购真实售价估算</p>
+        <p class="demo-note">* 渠道报价为本地比价引擎聚合（演示数据源，生产可替换为真实第三方比价 API）</p>
       </section>
 
       <!-- 省钱明细 -->
       <section class="save-list card">
         <h3 class="sec-title">省钱明细</h3>
-        <div class="save-row"><span>智购 AI 实付</span><b>¥{{ formatPrice(bestPrice) }}</b></div>
-        <div class="save-row"><span>全网最高渠道价</span><b>¥{{ formatPrice(maxPrice) }}</b></div>
+        <div class="save-row"><span>最优渠道总价</span><b>¥{{ formatPrice(bestTotal) }}</b></div>
+        <div class="save-row"><span>全网最高总价</span><b>¥{{ formatPrice(maxTotal) }}</b></div>
         <div class="save-row total"><span>小智帮你省下</span><b class="save-amount">¥{{ formatPrice(saveAmount) }}</b></div>
       </section>
     </template>
@@ -57,6 +57,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getProductDetail, getProductPage } from '@/api/product';
+import { comparePrices, type CompareOffer } from '@/api/price';
 import { showToast, formatPrice } from '@/utils';
 import Skeleton from '@/components/Skeleton.vue';
 import ErrorRetry from '@/components/ErrorRetry.vue';
@@ -70,36 +71,30 @@ const loading = ref(false);
 const error = ref(false);
 const searched = ref(false);
 const product = ref<any>(null);
+const channels = ref<CompareOffer[]>([]);
+const suggestion = ref('');
 
-/** 演示渠道配置（原型为演示示意，非真实报价） */
-const CHANNELS = [
-  { name: '智购自营', off: 1.0, ship: '明日达', risk: '放心购', riskClass: 'risk-safe' },
-  { name: '品牌官网', off: 1.04, ship: '2-3天', risk: '正品', riskClass: 'risk-mid' },
-  { name: '天猫旗舰店', off: 1.06, ship: '2-3天', risk: '正品', riskClass: 'risk-mid' },
-  { name: '京东自营', off: 1.05, ship: '次日达', risk: '自营', riskClass: 'risk-mid' },
-  { name: '抖音直播间', off: 1.11, ship: '3-5天', risk: '注意甄别', riskClass: 'risk-warn' },
-  { name: '拼多多', off: 1.13, ship: '3-7天', risk: '注意甄别', riskClass: 'risk-warn' },
-];
+const bestTotal = computed(() => Math.min(...channels.value.map((c) => c.totalPrice)));
+const maxTotal = computed(() => Math.max(...channels.value.map((c) => c.totalPrice)));
+const saveAmount = computed(() => maxTotal.value - bestTotal.value);
+const bestSource = computed(() => channels.value.find((c) => c.isBest)?.source ?? '智购自营');
 
-const channels = computed(() => {
-  const base = product.value?.priceMin ?? 0;
-  const list = CHANNELS.map((c) => ({ ...c, price: Math.round((base * c.off) / 10) * 10 }));
-  const min = Math.min(...list.map((c) => c.price));
-  return list.map((c) => ({ ...c, isBest: c.price === min }));
-});
-
-const bestPrice = computed(() => Math.min(...channels.value.map((c) => c.price)));
-const maxPrice = computed(() => Math.max(...channels.value.map((c) => c.price)));
-const saveAmount = computed(() => maxPrice.value - bestPrice.value);
-const bestName = computed(() => channels.value.find((c) => c.isBest)?.name ?? '智购自营');
-
-async function loadBySpuId(spuId: string) {
+async function loadCompare(spuId: string) {
   loading.value = true;
   error.value = false;
   try {
     const detail = await getProductDetail(spuId);
     product.value = detail.product;
     keyword.value = detail.product?.name ?? '';
+    const firstSku = detail.product?.skus?.[0] ?? detail.product?.skuList?.[0];
+    if (!firstSku?.skuId) {
+      channels.value = [];
+      return;
+    }
+    const items = await comparePrices([Number(firstSku.skuId)]);
+    const item = items[0];
+    channels.value = item?.offers ?? [];
+    suggestion.value = item?.suggestion ?? '';
   } catch {
     error.value = true;
   } finally {
@@ -117,10 +112,10 @@ async function search() {
     const res = await getProductPage({ keyword: k, pageSize: 1 });
     const first = res.records?.[0];
     if (first) {
-      const detail = await getProductDetail(first.spuId);
-      product.value = detail.product;
+      await loadCompare(first.spuId);
     } else {
       product.value = null;
+      channels.value = [];
     }
   } catch {
     error.value = true;
@@ -133,15 +128,15 @@ function goBest() {
   if (product.value) router.push(`/product/${product.value.spuId}`);
 }
 
-function goChannel(c: any) {
-  showToast(`已为你记录「${c.name}」渠道报价，去智购购买更省`);
+function goChannel(c: CompareOffer) {
+  showToast(`已为你记录「${c.source}」渠道报价：总价 ¥${formatPrice(c.totalPrice)}，约 ${c.deliveryDays} 天到货`);
   if (product.value) router.push(`/product/${product.value.spuId}`);
 }
 
 onMounted(() => {
   const spuId = route.query.spuId;
   if (typeof spuId === 'string' && spuId) {
-    loadBySpuId(spuId);
+    loadCompare(spuId);
   }
 });
 </script>
@@ -177,6 +172,7 @@ onMounted(() => {
 .hero-price b { font-size: 34px; letter-spacing: 0.5px; }
 .hero-unit { font-size: 12px; opacity: 0.85; font-weight: 400; }
 .hero-name { font-size: 13px; opacity: 0.9; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-sug { font-size: 11px; opacity: 0.85; margin-top: 4px; }
 .hero-btn { margin-top: 14px; background: #fff; color: var(--brand); font-size: 13px; font-weight: 700; border-radius: 999px; padding: 9px 22px; }
 .card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
 .sec-title { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
@@ -186,12 +182,8 @@ onMounted(() => {
 .cmp-name { flex: 1; font-weight: 600; }
 .cmp-price b { font-size: 14px; }
 .best-tag { font-style: normal; font-size: 9.5px; font-weight: 700; color: #fff; background: var(--brand); padding: 2px 6px; border-radius: 999px; margin-left: 4px; }
-.cmp-ship { color: var(--ink-3); font-size: 10.5px; }
-.cmp-risk { font-size: 10px; padding: 2px 7px; border-radius: 999px; }
-.risk-safe { color: var(--mint); background: var(--mint-soft); }
-.risk-mid { color: var(--brand); background: var(--brand-soft); }
-.risk-warn { color: #b87900; background: var(--amber-soft); }
-.cmp-go { width: 24px; height: 24px; border-radius: 8px; background: var(--bg); color: var(--ink-2); font-size: 11px; }
+.cmp-ship { color: var(--ink-3); font-size: 10.5px; flex: 1.2; text-align: right; }
+.cmp-go { width: 24px; height: 24px; border-radius: 8px; background: var(--bg); color: var(--ink-2); font-size: 11px; flex: none; }
 .demo-note { margin-top: 10px; font-size: 10px; color: var(--ink-3); }
 .save-row { display: flex; justify-content: space-between; font-size: 13px; padding: 7px 0; color: var(--ink-2); }
 .save-row b { color: var(--ink); }

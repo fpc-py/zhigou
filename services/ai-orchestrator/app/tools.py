@@ -281,8 +281,8 @@ async def analyze_requirement(message: str) -> str:
 @tool
 async def compare_prices(sku_ids: list[str]) -> str:
     """
-    比价。对多个 SKU 逐一查最新价格、规格、库存，生成横向对比清单。
-    用户问"哪个划算""哪款性价比高""对比一下几款"时调用。
+    跨平台比价。对多个 SKU 聚合京东/天猫/拼多多等多渠道报价，计算最优购买方案。
+    用户问"哪个平台便宜""哪里买划算""全网比价""对比各平台价格"时调用。
 
     Args:
         sku_ids: 要对比的 SKU ID 列表（2~5 个）
@@ -290,27 +290,32 @@ async def compare_prices(sku_ids: list[str]) -> str:
     try:
         if not sku_ids:
             return "没有可对比的 SKU。"
-        rows = []
-        for sid in sku_ids[:5]:
-            try:
-                url = f"{settings.product_service_url}/product/sku/{sid}"
-                headers = {"x-user-id": _get_current_user()}
-                data = await _http_get(url, timeout=5.0, headers=headers)
-                sku = data.get("data") or {}
-                price_fen = sku.get("price", 0)
-                spec = sku.get("specValue") or sku.get("specName") or "默认规格"
-                stock = sku.get("stock", 0)
-                stock_txt = "有货" if stock > 10 else ("紧张" if stock > 0 else "缺货")
-                rows.append(f"· SKU {sid} | ¥{price_fen / 100:.2f} | 规格 {spec} | 库存 {stock_txt}")
-            except Exception as e:
-                logger.warning("compare_prices 查 SKU %s 失败: %s", sid, e)
-                rows.append(f"· SKU {sid} | 价格信息暂时查不到")
+        headers = {"x-user-id": _get_current_user()}
+        data = await _http_post(
+            f"{settings.product_service_url}/price/compare",
+            json_data=[s for s in sku_ids[:5]],
+            timeout=8.0,
+            headers=headers,
+        )
+        rows = data.get("data") or []
         if not rows:
             return "这项信息暂时没查到，稍后再试试？"
-        return "价格/规格对比：\n" + "\n".join(rows)
+        lines = []
+        for item in rows:
+            lines.append(f"· {item.get('skuName', item.get('skuId'))}（SKU {item.get('skuId')}）")
+            for offer in item.get("offers", []):
+                best = " ★最优" if offer.get("isBest") else ""
+                lines.append(
+                    f"  - {offer.get('source')} ¥{offer.get('totalPrice', 0) / 100:.2f}"
+                    f"（售价 ¥{offer.get('price', 0) / 100:.2f} + 运费 ¥{offer.get('shippingFee', 0) / 100:.2f}"
+                    f"）{offer.get('deliveryDays', '-')}天到货{best}"
+                )
+            lines.append(f"  → 建议：{item.get('suggestion', '')}")
+        return "跨平台比价（含运费与到货时间）：\n" + "\n".join(lines)
     except Exception as e:
         logger.warning("compare_prices 调用失败: %s", e)
         return "这项信息暂时没查到"
+
 
 
 @tool
@@ -691,6 +696,70 @@ async def recommend_products(scene: str = "home", limit: int = 6) -> str:
         return "这项信息暂时没查到"
 
 
+@tool
+async def search_by_image(image_url: str, limit: int = 5) -> str:
+    """
+    图片搜款（多模态）。输入商品图片 URL，先用视觉模型识别商品特征（品类/颜色/风格/关键属性），
+    再基于特征搜索本平台商品。用户上传图片问"有没有同款/类似的""图片里的商品"时调用。
+
+    Args:
+        image_url: 商品图片 URL（file-service 上传返回的公开 URL）
+        limit: 返回商品数量上限
+    """
+    try:
+        if not image_url or not image_url.startswith(("http://", "https://")):
+            return "请提供有效的图片地址。"
+        # 视觉识别 → 结构化特征
+        features = await _vision_extract(image_url)
+        if not features or not features.get("keywords"):
+            return "图片识别失败：暂时无法看清图中的商品，请换一张更清晰的图试试？"
+        # 基于特征搜索真实商品
+        keyword = features.get("keywords")[0]
+        matched = await search_products.ainvoke({"keyword": keyword, "limit": limit})
+        return (
+            f"从图片中识别到：{features.get('category', '未知品类')}"
+            f"（颜色 {features.get('colors', '未知')}，风格 {features.get('style', '未知')}）\n"
+            f"基于特征「{keyword}」搜到以下商品（真实在售）：\n{matched}\n"
+            f"（说明：图片识别仅供参考，商品以实际搜索结果为准）"
+        )
+    except Exception as e:
+        logger.warning("search_by_image 调用失败: %s", e)
+        return "这项信息暂时没查到"
+
+
+async def _vision_extract(image_url: str) -> dict | None:
+    """调 LLM 视觉模型提取商品特征（OpenAI 兼容 image_url）。60s 超时 + 一次重试，失败返回 None。"""
+    from openai import AsyncOpenAI
+    last_err: Exception | None = None
+    for attempt in (1, 2):
+        try:
+            client = AsyncOpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key, timeout=60.0)
+            resp = await client.chat.completions.create(
+                model=settings.llm_model,
+                temperature=0.2,
+                max_tokens=300,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "识别这张商品图，只输出 JSON：{'category': '品类', 'colors': ['颜色'], 'style': '风格', 'keywords': ['2-3个搜索关键词']}，不要解释。"},
+                        {"type": "image_url", "image_url": {"url": image_url}},
+                    ],
+                }],
+            )
+            text = resp.choices[0].message.content or ""
+            text = text.strip()
+            if text.startswith("```"):
+                text = text.strip("`").removeprefix("json").strip()
+            parsed = json.loads(text)
+            if parsed.get("keywords"):
+                return parsed
+        except Exception as e:
+            last_err = e
+            logger.warning("视觉识别第 %d 次失败 %s: %s", attempt, image_url, e)
+    logger.warning("视觉识别最终失败 %s: %s", image_url, last_err)
+    return None
+
+
 # ── 工具注册表 ──
 
 TOOLS = [
@@ -704,6 +773,7 @@ TOOLS = [
     review_analysis,
     analyze_user_context,
     recommend_products,
+    search_by_image,
     optimize_cart,
     create_order,
 ]

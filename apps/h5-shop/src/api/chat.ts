@@ -5,18 +5,20 @@ import type { SseCallback } from './sse-polyfill';
  * POST SSE 聊天
  * @param query 用户消息
  * @param sessionId 会话 ID
+ * @param imageUrl 图片 URL（图片搜款，可空）
  * @param onMessage 事件回调 (event, data)
  * @param signal 取消信号
  */
 export function chatSse(
   query: string,
   sessionId: string,
+  imageUrl: string,
   onMessage: SseCallback,
   signal?: AbortSignal,
 ): Promise<void> {
   return postSse(
     '/api/chat/sse',
-    { query, userId: '', sessionId }, // userId 由 BFF 从 JWT 提取
+    { query, userId: '', sessionId, imageUrl }, // userId 由 BFF 从 JWT 提取
     onMessage,
     signal,
   );

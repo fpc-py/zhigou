@@ -35,6 +35,7 @@ export const SERVICE_PATHS = {
   productDetail:     (spuId: string) => `/product/${spuId}`,
   productSku:        (skuId: string) => `/product/sku/${skuId}`,
   productRecommend:  '/recommend',
+  priceCompare:      '/price/compare',
   userCoupons:       '/coupon/mine',
   discountCalculate: '/discount/calculate',
   freightCalculate:  '/freight/calculate',

@@ -52,18 +52,25 @@
       </div>
     </div>
 
+    <!-- 待发送图片预览 -->
+    <div v-if="pendingImg" class="pending-img">
+      <img :src="pendingImg" alt="待发送图片" />
+      <button class="pending-del" @click="pendingImg = ''">×</button>
+    </div>
+
     <!-- 底部输入 -->
     <div class="input-bar">
-      <button class="mic-btn"><Icon name="mic" /></button>
+      <button class="mic-btn" title="上传商品图片搜款" @click="pickImage"><Icon name="cam" /></button>
       <input
         v-model="inputText"
         placeholder="输入你想买的商品..."
         @keyup.enter="send"
         :disabled="sending"
       />
-      <button class="send-btn" @click="send" :disabled="sending || !inputText.trim()">
+      <button class="send-btn" @click="send" :disabled="sending || (!inputText.trim() && !pendingImg)">
         <Icon name="send" size="sm" />
       </button>
+      <input ref="fileInput" type="file" accept="image/*" hidden @change="onPickImage" />
     </div>
   </div>
 </template>
@@ -74,6 +81,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { chatSse, clearChatSession } from '@/api/chat';
 import { getProductPage } from '@/api/product';
 import type { ProductPageItem } from '@/api/product';
+import { uploadImage } from '@/api/file';
 import { addCart } from '@/api/cart';
 import { useUserStore } from '@/stores/user';
 import { showToast, formatPrice } from '@/utils';
@@ -82,6 +90,7 @@ import Icon from '@/components/Icon.vue';
 interface Message {
   role: 'user' | 'ai';
   content?: string;
+  image?: string;
   tokens?: string[];
   typing?: boolean;
   toolHint?: string;
@@ -95,8 +104,39 @@ const sending = ref(false);
 const messages = ref<Message[]>([]);
 const msgList = ref<HTMLElement | null>(null);
 const sessionId = ref(Math.random().toString(36).slice(2, 10));
+const fileInput = ref<HTMLInputElement | null>(null);
+const pendingImg = ref('');
 
 const chips = ['海边度假装备', '帮我送礼', '200 元以内的吹风机'];
+
+/** 打开图片选择（图片搜款入口） */
+function pickImage() {
+  if (sending.value) return;
+  fileInput.value?.click();
+}
+
+/** 选择后上传 file-service，拿 URL 待发送 */
+async function onPickImage(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  if (!/^image\//.test(file.type)) {
+    showToast('请选择图片文件');
+    return;
+  }
+  if (!useUserStore().isLoggedIn) {
+    router.push('/login');
+    return;
+  }
+  try {
+    const resp = await uploadImage(file);
+    pendingImg.value = resp.url;
+    showToast('图片已就绪，点击发送即可搜款');
+  } catch {
+    showToast('图片上传失败，请重试');
+  }
+}
 
 function scrollBottom() {
   nextTick(() => {
@@ -147,10 +187,12 @@ async function onClear() {
 
 async function send() {
   const text = inputText.value.trim();
-  if (!text || sending.value) return;
+  if ((!text && !pendingImg.value) || sending.value) return;
+  const imgUrl = pendingImg.value;
   inputText.value = '';
+  pendingImg.value = '';
 
-  messages.value.push({ role: 'user', content: text });
+  messages.value.push({ role: 'user', content: text || '帮我看下这张图的商品', image: imgUrl || undefined });
   const aiMsg: Message = { role: 'ai', tokens: [], typing: true, toolHint: '' };
   messages.value.push(aiMsg);
   scrollBottom();
@@ -159,7 +201,7 @@ async function send() {
   let pendingKeyword = '';
 
   try {
-    await chatSse(text, sessionId.value, (event, data) => {
+    await chatSse(text, sessionId.value, imgUrl, (event, data) => {
       if (event === 'token') {
         aiMsg.tokens = aiMsg.tokens || [];
         aiMsg.tokens.push(data.content);
@@ -386,6 +428,36 @@ onMounted(() => {
   background: var(--card);
 }
 .mic-btn { color: var(--ink-3); display: flex; padding: 6px; }
+.pending-img {
+  flex: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 0;
+}
+.pending-img img {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--brand);
+}
+.pending-del {
+  position: absolute;
+  top: 4px;
+  left: 56px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .input-bar input {
   flex: 1;
   height: 38px;

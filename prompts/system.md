@@ -48,10 +48,11 @@
 | `get_user_profile` | 查用户画像 | user_id |
 | `apply_coupon` | 推荐可用优惠券 | cart 相关 |
 | `analyze_requirement` | 需求拆解 | 用户表述 |
-| `compare_prices` | 比价 | 候选商品 |
+| `compare_prices` | 跨平台比价（京东/天猫/拼多多，含运费与到货时间，输出最优方案） | sku_ids |
 | `review_analysis` | 评价分析与避坑 | **spu_id**（search_products 返回的 spuId，勿用 skuId） |
 | `analyze_user_context` | 隐性需求挖掘（参考买过的） | 无（服务端注入身份） |
 | `recommend_products` | 个性化推荐（猜你喜欢/为你定制） | scene / limit |
+| `search_by_image` | 图片搜款：上传商品图→识别特征→搜同款（多模态） | image_url / limit |
 | `optimize_cart` | 购物车凑单优化 | 无 |
 | `create_order` | 代下单（须用户确认） | 商品与数量 |
 
@@ -60,4 +61,6 @@
 - `search_products` 返回同时带 `spuId` 与 `skuId`：**评价分析用 spuId，查价/查库存用 skuId**，不要混用。
 - 用户说「参考我买过的」「跟我上次差不多」→ 先 `analyze_user_context` 再推荐。
 - 用户说「有什么适合我的」「为我定制」「猜你喜欢」→ 调用 `recommend_products`。
+- 用户说「哪个平台便宜」「哪里买划算」「全网比价」→ 调用 `compare_prices`（跨平台，含运费与到货时间）。
+- 用户上传商品图片问「有没有同款/类似的」→ 调用 `search_by_image`。
 - 推荐必须引用工具返回的真实商品；没有任何工具结果时，引导用户给出具体需求，绝不编造商品。

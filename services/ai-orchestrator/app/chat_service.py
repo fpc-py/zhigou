@@ -143,7 +143,7 @@ def _get_graph():
 # ── 构建消息列表（系统提示 + 会话历史 + 当前 query） ──
 
 
-def _build_messages(query: str, history: Optional[list[dict]] = None) -> list:
+def _build_messages(query: str, history: Optional[list[dict]] = None, image_url: str = "") -> list:
     global _system_prompt
     if not _system_prompt:
         _system_prompt = _load_system_prompt()
@@ -158,7 +158,16 @@ def _build_messages(query: str, history: Optional[list[dict]] = None) -> list:
             messages.append(HumanMessage(content=content))
         elif role == "ai":
             messages.append(AIMessage(content=content))
-    messages.append(HumanMessage(content=query))
+
+    # 图片搜款：强制系统指令 + 多模态首条消息（文本 + 图片），必须调 search_by_image
+    if image_url:
+        messages.append(SystemMessage(content="用户上传了商品图片。你必须先调用 search_by_image 工具（入参 image_url 为图片地址）识别图片特征并搜索同款/类似商品，禁止直接文字回答跳过工具。"))
+        messages.append(HumanMessage(content=[
+            {"type": "text", "text": query or "帮我看下这张图里的商品，找同款"},
+            {"type": "image_url", "image_url": {"url": image_url}},
+        ]))
+    else:
+        messages.append(HumanMessage(content=query))
     return messages
 
 
@@ -169,6 +178,7 @@ async def chat_stream(
     query: str,
     user_id: str,
     session_id: str,
+    image_url: str = "",
 ) -> AsyncGenerator[str, None]:
     """
     对话流式处理，产出 SSE 格式事件。
@@ -193,7 +203,7 @@ async def chat_stream(
 
         # 注入会话历史（本地持久化），保证多轮长对话跨进程/重启延续
         history = _load_history(sid)
-        input_messages = _build_messages(query, history)
+        input_messages = _build_messages(query, history, image_url)
         inputs = {"messages": input_messages}
 
         # 收集完整回复，对话结束后写回会话存储

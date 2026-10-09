@@ -15,13 +15,14 @@ export class ChatService {
    * @param query 用户输入
    * @param userId 用户 ID
    * @param sessionId 会话 ID
+   * @param imageUrl 图片 URL（图片搜款，可空）
    * @param res Express Response 对象
    */
-  async streamChat(query: string, userId: string, sessionId: string, res: any): Promise<void> {
+  async streamChat(query: string, userId: string, sessionId: string, imageUrl: string, res: any): Promise<void> {
     try {
       const aiResp = await axios.post(
         `${SERVICES.aiOrchestrator.url}${SERVICE_PATHS.chatSse}`,
-        { query, userId, sessionId },
+        { query, userId, sessionId, imageUrl },
         {
           responseType: 'stream',
           timeout: SERVICES.aiOrchestrator.timeout,

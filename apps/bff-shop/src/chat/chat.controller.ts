@@ -20,11 +20,12 @@ export class ChatController {
   async chat(
     @Body('query') query: string,
     @Body('sessionId') sessionId: string,
+    @Body('imageUrl') imageUrl: string,
     @Req() req: Request,
     @Res() res: Response,
   ) {
     const userId = (req as any).userId ?? 'anonymous';
-    await this.chatService.streamChat(query ?? '', userId, sessionId ?? '', res);
+    await this.chatService.streamChat(query ?? '', userId, sessionId ?? '', imageUrl ?? '', res);
   }
 
   /** 清空指定会话历史（透传 ai-orchestrator） */
