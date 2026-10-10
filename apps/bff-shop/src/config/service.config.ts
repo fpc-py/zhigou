@@ -22,6 +22,7 @@ export const SERVICES: Record<string, ServiceEntry> = {
   marketingSvc:     { url: 'http://localhost:8088', timeout: 2_000 },
   logisticsSvc:     { url: 'http://localhost:8089', timeout: 2_000 },
   aftersaleSvc:     { url: 'http://localhost:8090', timeout: 2_000 },
+  communitySvc:     { url: 'http://localhost:8091', timeout: 2_000 },
 
   // AI 服务（SSE 需要长连接）
   aiOrchestrator: { url: 'http://localhost:8000', timeout: 30_000 },
@@ -64,4 +65,12 @@ export const SERVICE_PATHS = {
   addressList:       '/address/list',
   addressRoot:       '/address',
   addressDefault:    (id: string) => `/address/${id}/default`,
+  communityNotePublish: '/community/note',
+  communityNotePage:   '/community/note/page',
+  communityNoteDetail: (id: string) => `/community/note/${id}`,
+  communityNoteLike:   (id: string) => `/community/note/${id}/like`,
+  communityNoteFavorite: (id: string) => `/community/note/${id}/favorite`,
+  communityComment:    '/community/comment',
+  communityMine:       '/community/mine',
+  communityAiWriter:   '/api/v1/community/writer',
 };

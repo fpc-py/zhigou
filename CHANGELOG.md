@@ -3,6 +3,20 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.12] - 2026-10-10
+
+### P2 · 内容社区 MVP（community-service 后端 + AI 种草文案 writer + BFF 透传 + H5 社区页换真）
+
+- feat(P2) **community-service（新服务 8091）**：库 `zhigou_community` + Flyway `V1__community.sql`（3 表：`community_note`/`community_comment`/`community_interaction` + 3 条 seed 笔记关联 SPU 9000000000000000011/0010/0012）
+  - 接口：`GET /community/note/page`（信息流）、`POST /community/note`（发布）、`GET /community/note/{id}`（详情+评论）、`POST /community/note/{id}/like|favorite`（幂等切换）、`POST /community/comment`、`GET /community/mine`（我的笔记）
+  - **虚假内容识别**：SPAM_WORDS 营销信号词（加V/正品保证/低价出售/点击链接/返现/刷单/好评返等）+ 10 分钟内同正文重复 → `fakeFlag=1`（seed「清仓甩卖」实测命中）
+- feat(P2) **AI 种草文案 writer**（ai-orchestrator `/api/v1/community/writer`，body {spuId, style}）：拉 product `/product/{spuId}` + `/product/review/stats` 真实数据锚点（名称/价格/评分/评价数），风格 日常/测评/种草/清单，禁编造与营销话术
+- feat(P2) **BFF 透传**（community 模块 8 路由 + aiWriter 45s 超时 + TimeoutInterceptor 豁免 `/community/ai-writer`）
+- feat(P2) **H5 社区页换真**：`views/community/index.vue`（推荐/我的 tab、信息流卡片、发布弹层+AI 写文案、详情弹层+评论、点赞/收藏、疑似营销标记）+ `api/community.ts` 8 函数
+- fix(P2) **雪花 ID 超 JS Number 精度**（2107757313435291648 → JS 失真为 2107757313435291600，BFF 按失真 id 查后端恒 400「笔记不存在」）：community 实体/VO 的 `id/authorId/spuId` 与 comments map 统一 `@JsonSerialize(ToStringSerializer)` / `String.valueOf`，JSON 层 id 全字符串
+- fix(P2) **BFF ai-writer「服务超时」500**：TimeoutInterceptor 3s 一刀切 → EXEMPT_PREFIXES 追加 `/community/ai-writer`；AI writer 返回裸 JSON（无 code/data 包装）→ 透传不再走 unwrapOrThrow
+- 验证：community 直连 11/11 PASS；BFF JWT 全链路 7/7 PASS（page/detail/like/publish/comment/mine/ai-writer）；H5 `vite build` + BFF `nest build` 通过；社区页浏览器渲染文本验证（信息流/疑似营销标记/导航正常；bu 会话 viewport 异常未能 UI 点按实测，交互链路以 BFF API 验收为准）
+
 ## [0.2.11] - 2026-10-10
 
 ### P2 · 拼团社交购物（marketing-service 拼团 + AI groupbuy_finder + BFF + H5） + AI 链路迁移修复 + 上线就绪资产

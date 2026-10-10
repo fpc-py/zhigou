@@ -18,6 +18,7 @@ from app.config import settings
 from app.fallback_config import init_config as init_fallback_config
 
 from app.rag.router import router as rag_router
+from app.community import router as community_router
 from app.rag.service import init_db
 from app.rag.mq_consumer import start_mq_consumer_thread
 
@@ -48,6 +49,7 @@ app.add_middleware(
 # ── 路由注册 ──
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(rag_router)
+app.include_router(community_router)
 
 
 @app.on_event("startup")

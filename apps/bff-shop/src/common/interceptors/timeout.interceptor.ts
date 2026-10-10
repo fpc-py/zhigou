@@ -7,7 +7,7 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable, catchError, timeout, TimeoutError } from 'rxjs';
 
-const EXEMPT_PREFIXES = ['/chat/sse', '/auth/login', '/auth/refresh', '/health'];
+const EXEMPT_PREFIXES = ['/chat/sse', '/auth/login', '/auth/refresh', '/health', '/community/ai-writer'];
 
 @Injectable()
 export class TimeoutInterceptor implements NestInterceptor {

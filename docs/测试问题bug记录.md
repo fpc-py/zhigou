@@ -43,6 +43,12 @@
 | 2026-10-07 | 订单详情页对 CLOSED/REFUNDED 仍显示"申请售后"（不合状态机） | 操作按钮按状态收敛：INIT=取消+支付，PAID/SHIPPED/COMPLETED=申请售后，终态无操作 | `npm run build` 通过 |
 
 > 新增 bug 时在此追加一行；涉及代码修复的同步更新 `CHANGELOG.md`。
+| 2026-10-10 | **雪花 ID 超 JS Number 精度**：BFF 透传后 `2107757313435291648` 被 JSON 解析失真为 `2107757313435291600`，后端按失真 id 查库恒 400「笔记不存在」（detail/like/comment 全挂，publish/mine 数据里 authorId 已失真） | community 实体/VO `id/authorId/spuId` + comments map 统一 `@JsonSerialize(ToStringSerializer)` / `String.valueOf`（JSON 层全字符串；不改全局 Long 序列化以免 priceFen 变字符串破坏前端计算） | BFF 全链路 7/7：detail/like/comment 恢复 PASS，id 返回字符串 |
+| 2026-10-10 | **BFF ai-writer 恒 500「服务超时」**：① TimeoutInterceptor 全局 3s 一刀切未豁免 AI 长任务；② AI writer 返回裸 JSON（无 code/data 包装），unwrapOrThrow 取不到 `data` 降级 null | ① EXEMPT_PREFIXES 追加 `/community/ai-writer`；② aiWriter 直接透传响应体 | BFF ai-writer PASS（draft 完整返回） |
+| 2026-10-10 | **BFF 补丁脚本重复执行**：config 出现重复键、service/controller 重复方法（TS2393/TS1117）；去重脚本按「首 marker→我的笔记」区间删除误删整个 aiWriter 方法 | 去重改为精确块替换（config 删相邻重复行、service/controller 删首个完整块）→ 重插 aiWriter → 构建通过 | `nest build` 通过 |
+| 2026-10-10 | **浏览器 UI 点按实测受限**：bu 会话对该 tab `viewport=0x0`、snapshot/find/js 均拿不到元素（get_page_text 正常，页面渲染正常） | 不绕过；交互链路以 BFF API 全链路 7/7 + 页面渲染文本验证为验收依据，UI 点按留待下次实测 | 信息流/疑似营销标记/导航渲染文本验证通过 |
+
+
 | 2026-10-08 | AI 隐性需求挖掘工具未接入（P1 三批功能增量） | ai-orchestrator 新增 `analyze_user_context()`：读历史订单统计常购品类/价位带/复购倾向，服务端注入 userId（无入参防编造）；system.md 同步补齐工具清单+六步决策流程，红线改「禁止自主下单（确认后允许代下单）」 | py_compile 通过；SSE 实测：「参考我买过的」 → analyze_user_context 返回 orderCount=22/运动鞋21/百元内 → search_products 耳机，全链路正常 |
 | 2026-10-07 | **RocketMQ 生产者 sendDefaultImpl call timeout（Windows Docker Desktop）**：broker 向 namesrv 注册容器内网 IP 172.18.x.x，宿主不可达；compose 挂载到 /root/store/config 路径不存在（AccessDenied）、命令行 brokerIP1 在 --enable-proxy 下不生效、recreate 重置 docker cp 配置层，均失败 | middleware.yml command 显式 \-c /home/rocketmq/rocketmq-5.3.0/conf/broker.conf\（镜像默认路径）+ \scripts/mq-fix-broker-ip.ps1\ docker cp 覆盖（brokerIP1=127.0.0.1）+ \docker restart\（勿 recreate）；修复后重启 order-service 清旧路由缓存，投递 41/41 成功 | clusterList Addr=127.0.0.1:10911；outbox status 全=1 |
 | 2026-10-08 | **售后退款 500 = aftersale Feign readTimeout 300ms 超时**：payment 首次调用（含 DB 事务）超过 300ms → RetryableException，售后单停在 REFUNDING（事务回滚） | aftersale `application.yml` Feign 默认超时改 connectTimeout 500 / readTimeout 3000 | 重启后 refund 成功：REFUNDED + payment_refund 落库 |
