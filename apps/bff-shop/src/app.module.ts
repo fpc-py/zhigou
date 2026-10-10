@@ -35,6 +35,8 @@ import { CommunityController } from './community/community.controller.js';
 import { CommunityService } from './community/community.service.js';
 import { LifeController } from './life/life.controller.js';
 import { LifeService } from './life/life.service.js';
+import { ClosetController } from './closet/closet.controller.js';
+import { ClosetService } from './closet/closet.service.js';
 
 @Module({
   imports: [
@@ -62,6 +64,7 @@ import { LifeService } from './life/life.service.js';
     PriceCompareController,
     CommunityController,
     LifeController,
+    ClosetController,
   ],
   providers: [
     HomeService,
@@ -78,6 +81,7 @@ import { LifeService } from './life/life.service.js';
     PriceCompareService,
     CommunityService,
     LifeService,
+    ClosetService,
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AnalyticsInterceptor },

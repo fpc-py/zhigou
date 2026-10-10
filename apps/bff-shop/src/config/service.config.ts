@@ -24,6 +24,7 @@ export const SERVICES: Record<string, ServiceEntry> = {
   aftersaleSvc:     { url: 'http://localhost:8090', timeout: 2_000 },
   communitySvc:     { url: 'http://localhost:8091', timeout: 2_000 },
   lifeSvc:           { url: 'http://localhost:8092', timeout: 2_000 },
+  closetSvc:         { url: 'http://localhost:8093', timeout: 2_000 },
 
   // AI 服务（SSE 需要长连接）
   aiOrchestrator: { url: 'http://localhost:8000', timeout: 30_000 },
@@ -87,4 +88,12 @@ export const SERVICE_PATHS = {
   lifeAppointment:    '/life/appointment',
   lifeAppointmentMine:'/life/appointment/mine',
   lifeAppointmentCancel: (id: string) => `/life/appointment/${id}/cancel`,
+  closetItems:        '/closet/items',
+  closetItem:         '/closet/item',
+  closetItemWear:     (id: string) => `/closet/item/${id}/wear`,
+  closetItemDelete:   (id: string) => `/closet/item/${id}`,
+  closetOutfitRecommend: '/closet/outfit/recommend',
+  closetHomeList:     '/closet/home/list',
+  closetHomeItem:     '/closet/home/item',
+  closetHomeReplenish: '/closet/home/replenish',
 };

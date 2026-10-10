@@ -3,6 +3,20 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.15] - 2026-10-10
+
+### P2 · 智能衣橱 + 家居管理（新业务域：closet-service + BFF + H5）
+
+- feat(P2) 新建 `closet-service`（端口 8093、库 zhigou_closet、Flyway `flyway_closet_history`）：
+  - `closet_item`（衣物单品：分类 上装/下装/外套/鞋履/配饰、季节、颜色、穿着次数、最近穿着、逻辑删）、`outfit_plan`（穿搭方案：场合/衣物组合/评分）、`home_asset`（家居盘点：食品/日用品/家电/清洁、数量/单位/到期日）
+  - Seed：用户 13800138001 示例 8 件衣物 + 6 项家居（含低量/临期触发补货），演示口径明确标注
+  - 接口：`GET /closet/items`（分类/季节过滤）、`POST /closet/item`、`POST /closet/item/{id}/wear`（穿着打卡）、`DELETE /closet/item/{id}`（逻辑删）、`GET /closet/outfit/recommend?occasion=`（规则引擎）、`GET /closet/home/list`、`POST /closet/home/item`、`GET /closet/home/replenish`（补货清单）；全量 JWT 鉴权 + 雪花 ID 字符串化 + 业务失败 HTTP200+code≠200
+- feat(P2) 穿搭推荐 = **规则引擎**（场合→所需类别 通勤/休闲/运动/约会，同类目按穿着次数最少+最近未穿轮换），响应带 note 明确标注「规则引擎按场合+穿着次数轮换生成（演示，非 AI 模型）」
+- feat(P2) BFF：`closetSvc` 配置 + 8 路由透传（JwtAuthGuard + req.userId + ApiResponse）
+- feat(P2) H5：衣橱页整体改造（衣物/穿搭/家居三 tab）：衣物列表（分类筛选/穿着打卡/移除/收录新衣物）、穿搭推荐（场合选择 + 规则引擎结果 + 海报占位）、家居盘点（补货清单 + 分类筛选 + 添加物品）；首页宫格「智能衣橱」入口指向真实页
+- 说明：衣物识别/图像导入规划中（页面显式标注）；穿搭推荐为规则引擎演示；补货 = 数量≤1 或 7 天内到期
+- 验证：closet 直连 11/11、BFF 9/9（含未登录 401）、H5 type-check+build 通过、浏览器实测（添加衣物→列表→穿搭推荐→家居空态）
+
 ## [0.2.14] - 2026-10-10
 
 ### P2 · 本地生活 MVP（新业务域：life-service + BFF + H5）
