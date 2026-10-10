@@ -66,6 +66,8 @@ export const SERVICE_PATHS = {
   orderMine:         '/order/mine',
   orderStatsOverview: '/order/stats/overview',
   orderPendingFulfillment: '/order/stats/pending-fulfillment',
+  merchantForecast:      '/product/merchant/forecast',
+  merchantSelection:     '/product/merchant/selection',
   inventoryLowStock:  '/inventory/low-stock?threshold=10',
   inventoryReplenish: '/inventory/replenish',
   inventoryAutoReplenish: '/inventory/auto-replenish',

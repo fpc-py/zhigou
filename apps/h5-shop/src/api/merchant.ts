@@ -110,3 +110,25 @@ export async function getFulfillmentActions(limit = 10): Promise<FulfillmentActi
   const res = await http.get<{ code: number; data: FulfillmentActionRecord[] | null }>('/merchant/fulfillment/actions?limit=' + limit);
   return res.data.data;
 }
+
+
+/** 销量预测（7/30 天，演示口径：近 7 日日均×天数×(1+趋势)） */
+export interface ForecastItem {
+  skuId: string; productName: string; currentStock: number; last7Total: number
+  avgDaily: number; trendPct: number; forecastDays: number; forecastQty: number
+  suggestStock: number; hotLevel: string
+}
+export async function getMerchantForecast(days = 7): Promise<ForecastItem[] | null> {
+  const res = await http.get<{ code: number; data: ForecastItem[] | null }>('/merchant/forecast?days=' + days);
+  return res.data.data;
+}
+
+/** 智能选品（热度/库存/趋势，演示口径） */
+export interface SelectionItem {
+  skuId: string; productName: string; currentStock: number; last7Total: number
+  trendPct: number; hotLevel: string; reason: string
+}
+export async function getMerchantSelection(): Promise<SelectionItem[] | null> {
+  const res = await http.get<{ code: number; data: SelectionItem[] | null }>('/merchant/selection');
+  return res.data.data;
+}

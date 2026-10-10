@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.25] - 2026-10-10
+
+### P2 · 3.3 商家端 AI 经营大脑（一期）：销量预测 + 智能选品
+
+- feat(P2) `product-service` 经营大脑模块：Flyway `V20261092__merchant_forecast.sql` 新增 `daily_sales`（SKU 日销量演示底座，3 SKU × 14 天：耳机增长/手环平稳/榨汁杯下滑）+ `DailySales` 实体/Mapper（**注意：product 库已应用 V20261091 mock，新迁移必须更大版本**）
+- feat(P2) `GET /product/merchant/forecast?days=7|30`：近 7 日日均 × 天数 × (1+环比趋势) 预测 + 建议备货量（预测×1.3−库存，演示算法，正式版接入时序模型）；`GET /product/merchant/selection`：智能选品（热度/库存/趋势 → 补货/上架/降价建议）
+- fix(P2) product SecurityConfig 全量 JWT 拦截 AI 内网直连 → 放行 `/product/merchant/**`（BFF 用户侧仍走 Bearer）
+- feat(P2) AI `sales_forecast` 工具（TOOLS 26）：`days`(7/30) + `selection` 开关；system.md 新增「商家经营角色」段落（用户自称商家/运营或问预测/备货/选品时切换）；chat_service `_ROUTE_RULES` 增加商家经营确定性路由强制触发
+- fix(P2) **TOOLS 显式列表注册**：新工具 `@tool` 定义在 TOOLS 列表之后且未加入列表 → 工具不注册（模型/路由均不可用）；已把 TOOLS 列表移至文件末尾并加入 sales_forecast
+- feat(P2) BFF `GET /merchant/forecast`、`GET /merchant/selection`（JwtAuthGuard）；H5 商家中心新增「经营大脑」区块（7/30 天预测切换 + 智能选品建议 + 建议备货）
+- 验证：后端直连 PASS（7 天：耳机 153/+50%/补 187、手环 105/+15.2%、榨汁杯 11/−50%；30 天 3 条；选品 3 条含原因）；BFF 三层 PASS（forecast7=3、forecast30=3、selection=3）；AI SSE PASS（商家 query → sales_forecast → 经营总结）；BFF/H5 构建 PASS
+
 ## [0.2.24] - 2026-10-10
 
 ### P2 · AI 售后助手：质保提醒 + 维修预约

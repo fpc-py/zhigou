@@ -1554,6 +1554,44 @@ async def after_sale_repair(
         return "售后助手暂时不可用，请稍后再试。"
 
 
+
+
+@tool
+async def sales_forecast(days: int = 7, selection: bool = False) -> str:
+    """商家经营大脑：7/30 天销量预测指导备货 + 智能选品（趋势/库存/热度）。days 预测天数（7 或 30）；selection=True 时输出智能选品建议清单。用于商家问销量趋势、该备多少货、哪些商品值得重点经营。"""
+    url = settings.product_service_url + "/product/merchant/forecast?days=" + str(days)
+    try:
+        resp = await _http_get(url)
+    except Exception as e:
+        return f"经营大脑暂时不可用，请稍后再试（{e.__class__.__name__}）"
+    rows = (resp or {}).get("data") or []
+    if not rows:
+        return "暂无销量预测数据（演示底座 daily_sales 尚未初始化）"
+    if selection:
+        sel_url = settings.product_service_url + "/product/merchant/selection"
+        try:
+            sel = await _http_get(sel_url)
+        except Exception as e:
+            return f"智能选品暂时不可用，请稍后再试（{e.__class__.__name__}）"
+        sl = (sel or {}).get("data") or []
+        lines = [f"【智能选品建议】共 {len(sl)} 项"]
+        for x in sl:
+            lines.append(
+                f"- {x.get('productName')}（SKU {x.get('skuId')}）库存 {x.get('currentStock')}，"
+                f"近 7 日销量 {x.get('last7Total')}，趋势 {x.get('trendPct')}%，"
+                f"{x.get('hotLevel')}；建议：{x.get('reason')}"
+            )
+        return "\n".join(lines)
+    out = [f"【{days} 天销量预测 · 演示口径（近 7 日日均 × 天数 × (1+趋势)，正式版接入时序模型）】"]
+    for x in rows:
+        out.append(
+            f"- {x.get('productName')}（SKU {x.get('skuId')}）库存 {x.get('currentStock')}，"
+            f"近 7 日 {x.get('last7Total')} 件、日均 {x.get('avgDaily')}、趋势 {x.get('trendPct')}%"
+            f"（{x.get('hotLevel')}）；预测未来 {x.get('forecastDays')} 天销量约 {x.get('forecastQty')} 件，"
+            f"建议备货补足 {x.get('suggestStock')} 件"
+        )
+    return "\n".join(out)
+
 TOOLS = [
     search_products,
     get_price,
@@ -1580,4 +1618,5 @@ TOOLS = [
     fulfillment_alert,
     supply_replenish,
     fulfillment_action,
+    sales_forecast,
 ]

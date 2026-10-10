@@ -21,6 +21,13 @@
 - **修复**：① 两个新 Mapper 补 `@Mapper`；② 直接 `parse(substring(0,19))` 保留 ISO T；③ SecurityConfig permitAll 增 `/aftersale/warranty/**`、`/aftersale/repair/**`（BFF 用户侧仍走 Bearer）
 - **教训**：无 @MapperScan 的服务新增 Mapper 必须带 @Mapper；LocalDateTime.parse 只认 ISO `T` 分隔；AI 直连的端点须在 SecurityConfig 显式放行（内网口径），否则工具异常分支静默兜底
 
+## #29 · [0.2.25] 经营大脑 4 坑：Flyway 版本撞车 / selectCount 强转 / TOOLS 未注册 / system.md 缺商家角色（已修复）
+
+- **现象**：① forecast 接口返回空（daily_sales 未建表）；② mvn 编译报 `java.lang.Long 无法转换为 int`；③ SSE 商家 query 走兜底且模型自称「消费者导购」拒经营场景；④ 注册后模型仍不调用工具
+- **根因**：① product 库 flyway_product_history 已应用 **V20261091（mock product review）**，新迁移同名被 Flyway 校验为已应用而忽略 → 新迁移必须比已应用最大版本更大（教训再次验证）；② `selectCount` 返回 `Long` 直接 `(int)` 强转非法 → 简化演示库存映射；③ **TOOLS 是显式列表**，新 `@tool` 定义在列表之后且未加入列表 → 工具未注册（`_tool_schemas` 无该 schema，路由强制也找不到）；④ system.md 顶部「AI 导购助手 / 目标用户是消费者」单角色定义，模型拒绝商家经营场景
+- **修复**：① 迁移改名 `V20261092__merchant_forecast.sql`；② 删除 selectCount 分支，按 SKU 尾部映射演示库存；③ TOOLS 列表移至 tools.py 文件末尾并加入 `sales_forecast`（26 个）；④ system.md 顶部改双角色描述 + 新增「商家经营角色」工具表段落，chat_service `_ROUTE_RULES` 增商家经营确定性路由（`我是商家|店主|销量预测|智能选品|备货|该备多少货...`）强制首轮触发
+- **教训**：TOOLS 显式列表场景下新增工具 = 定义 + 入列表（列表放文件末尾可避免顺序问题）；system.md 角色描述必须覆盖全部服务场景，模型默认会固守首段角色；商家侧工具要有确定性路由，不能只靠模型 auto 决策
+
 # 智购 · 测试问题与 Bug 记录
 
 > 记录测试过程中发现的问题、临时排查命令与修复状态。已修复的条目保留留痕，不删除。

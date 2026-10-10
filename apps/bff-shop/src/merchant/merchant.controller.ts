@@ -32,6 +32,20 @@ export class MerchantController {
     return ApiResponse.ok(data);
   }
 
+  /** 销量预测（7/30 天，演示口径） */
+  @Get('merchant/forecast')
+  async forecast(@Query('days') days?: string) {
+    const data = await this.merchant.forecast(days ? Number(days) : 7);
+    return ApiResponse.ok(data);
+  }
+
+  /** 智能选品（热度/库存/趋势，演示口径） */
+  @Get('merchant/selection')
+  async selection() {
+    const data = await this.merchant.selection();
+    return ApiResponse.ok(data);
+  }
+
   /** 供应链补货中心：最近补货记录 */
   @Get('merchant/supply/records')
   async replenishRecords(@Query('limit') limit?: string) {

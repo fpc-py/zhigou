@@ -9,6 +9,7 @@ import com.zhigou.product.dto.SpuPageQuery;
 import com.zhigou.product.entity.Brand;
 import com.zhigou.product.entity.Category;
 import com.zhigou.product.entity.ProductSku;
+import com.zhigou.product.service.MerchantForecastService;
 import com.zhigou.product.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,8 +37,21 @@ import java.util.Map;
 public class ProductController {
 
     private final ProductService productService;
+    private final MerchantForecastService merchantForecastService;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+
+    @Operation(summary = "商家销量预测（7/30 天，演示口径）")
+    @GetMapping("/merchant/forecast")
+    public Result<List<Map<String, Object>>> forecast(@RequestParam(defaultValue = "7") int days) {
+        return Result.ok(merchantForecastService.forecast(days));
+    }
+
+    @Operation(summary = "商家智能选品（热度/库存/趋势，演示口径）")
+    @GetMapping("/merchant/selection")
+    public Result<List<Map<String, Object>>> selection() {
+        return Result.ok(merchantForecastService.smartSelection());
+    }
 
     /** 分页缓存 TTL（秒），默认 60，可配 product.cache.ttl-seconds */
     @Value("${product.cache.ttl-seconds:60}")

@@ -107,6 +107,7 @@ _ROUTE_RULES: list[tuple[str, "re.Pattern"]] = [
     ("logistics_tracker", re.compile(r"物流|快递|运单|发货|配送|包裹|签收|到货|到哪了|送到")),
     ("usage_cycle_assistant", re.compile(r"补货|囤货|保质期|快用完|用完|换新|复购|该买|提醒我|还剩多少")),
     ("groupbuy_finder", re.compile(r"拼团|拼单|开团|参团|成团|团购")),
+    ("sales_forecast", re.compile(r"我是商家|我是店主|我是运营|商家|店主|销量预测|智能选品|备货|选品建议|该备多少货|预测.{0,6}(销量|卖得好|卖得)|进货建议|经营大脑")),
 ]
 
 

@@ -166,4 +166,31 @@ export class MerchantService {
     );
     return unwrapOrThrow(resp, this.logger, 'merchant/supply/replenish', null);
   }
+  /** 销量预测（7/30 天，演示口径：近 7 日日均×天数×(1+趋势)） */
+  async forecast(days = 7): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${SERVICES.productService.url}${SERVICE_PATHS.merchantForecast}?days=${days}`).pipe(
+        timeout(SERVICES.productService.timeout),
+        catchError((err) => {
+          this.logger.warn(`product-service /product/merchant/forecast 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/forecast', null);
+  }
+
+  /** 智能选品（热度/库存/趋势，演示口径） */
+  async selection(): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${SERVICES.productService.url}${SERVICE_PATHS.merchantSelection}`).pipe(
+        timeout(SERVICES.productService.timeout),
+        catchError((err) => {
+          this.logger.warn(`product-service /product/merchant/selection 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/selection', null);
+  }
 }

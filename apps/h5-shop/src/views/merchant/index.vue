@@ -140,6 +140,41 @@
       <div v-if="!supplyRecords.length" class="empty">暂无补货记录</div>
     </div>
 
+    <!-- 经营大脑：销量预测 + 智能选品 -->
+    <div class="section brain-sec">
+      <div class="sec-title">经营大脑 · 销量预测 <span class="brain-badge">演示</span></div>
+      <div class="brain-tabs">
+        <span class="brain-tab" :class="{ on: fcDays === 7 }" @click="switchDays(7)">7 天</span>
+        <span class="brain-tab" :class="{ on: fcDays === 30 }" @click="switchDays(30)">30 天</span>
+      </div>
+      <div v-if="forecast.length" class="fc-list">
+        <div v-for="f in forecast" :key="f.skuId" class="fc-row">
+          <div class="fc-main">
+            <div class="fc-name">{{ f.productName }} <span class="fc-hot" :class="f.hotLevel === '热销' ? 'up' : f.hotLevel === '走弱' ? 'down' : 'mid'">{{ f.hotLevel }}</span></div>
+            <div class="fc-sub">库存 {{ f.currentStock }} · 近 7 日 {{ f.last7Total }} 件 · 趋势 {{ f.trendPct }}%</div>
+          </div>
+          <div class="fc-right">
+            <div class="fc-qty">≈{{ f.forecastQty }} 件</div>
+            <div class="fc-suggest">建议备货 +{{ f.suggestStock }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty">{{ fcLoading ? '预测计算中…' : '暂无预测数据' }}</div>
+
+      <div class="warn-label" style="margin-top:12px;">智能选品建议</div>
+      <div v-if="selection.length" class="sel-list">
+        <div v-for="(s, i) in selection" :key="s.skuId" class="sel-row">
+          <span class="rank" :class="{ top: i < 2 }">{{ i + 1 }}</span>
+          <div class="sel-main">
+            <div class="sel-name">{{ s.productName }} <span class="fc-hot" :class="s.hotLevel === '热销' ? 'up' : s.hotLevel === '走弱' ? 'down' : 'mid'">{{ s.hotLevel }}</span></div>
+            <div class="sel-reason">{{ s.reason }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty">暂无选品建议</div>
+      <div class="brain-note">数据底座 product-service daily_sales · 演示算法，正式版接入时序模型与促销日历</div>
+    </div>
+
     <!-- 热销榜 -->
     <div class="section">
       <div class="sec-title">热销商品 Top{{ hotList.length }}</div>
@@ -180,6 +215,10 @@ import {
   autoReplenish,
   runFulfillmentAction,
   getFulfillmentActions,
+  getMerchantForecast,
+  getMerchantSelection,
+  type ForecastItem,
+  type SelectionItem,
   ACTION_LABELS,
   type PendingOrder,
   type FulfillItem,
@@ -262,6 +301,37 @@ async function loadFulfill() {
     // 保持空态
   }
 }
+const forecast = ref<ForecastItem[]>([])
+const selection = ref<SelectionItem[]>([])
+const fcDays = ref(7)
+const fcLoading = ref(false)
+
+async function switchDays(days: number) {
+  fcDays.value = days
+  fcLoading.value = true
+  try {
+    const d = await getMerchantForecast(days)
+    if (d) forecast.value = d
+  } catch (e) {
+    // 保持空态
+  } finally {
+    fcLoading.value = false
+  }
+}
+
+async function loadBrain() {
+  fcLoading.value = true
+  try {
+    const [f, s] = await Promise.all([getMerchantForecast(7), getMerchantSelection()])
+    if (f) forecast.value = f
+    if (s) selection.value = s
+  } catch (e) {
+    // 保持空态
+  } finally {
+    fcLoading.value = false
+  }
+}
+
 const supplyLow = ref<{ skuId: number; available: number }[]>([])
 const supplyRecords = ref<ReplenishRecord[]>([])
 const supplyLoading = ref(false)
@@ -302,6 +372,7 @@ onMounted(async () => {
   await loadWarnings()
   await loadFulfill()
   await loadSupply()
+  await loadBrain()
 })
 
 async function loadWarnings() {
@@ -397,3 +468,29 @@ async function loadSupply() {
   background: #fff; color: #B7791F; font-size: 12px; font-weight: 600; }
 .fa-btn:disabled { opacity: 0.6; }
 </style>
+
+.brain-sec { border: 1px solid #D6E4FF; }
+.brain-badge { background: #3B82F6; color: #fff; font-size: 10px; border-radius: 4px; padding: 1px 5px; margin-left: 4px; vertical-align: 1px; }
+.brain-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+.brain-tab { flex: 1; text-align: center; padding: 6px 0; border-radius: 8px; background: #F0F1F4; color: #888; font-size: 12px; cursor: pointer; }
+.brain-tab.on { background: #3B82F6; color: #fff; font-weight: 600; }
+.fc-list { border-top: 1px solid #f0f1f4; }
+.fc-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f6f8; }
+.fc-row:last-child { border-bottom: none; }
+.fc-main { flex: 1; min-width: 0; }
+.fc-name { font-size: 13px; color: #333; display: flex; align-items: center; gap: 6px; }
+.fc-hot { font-size: 10px; border-radius: 4px; padding: 1px 5px; }
+.fc-hot.up { background: #E6F7EC; color: #18794E; }
+.fc-hot.down { background: #FFE9E9; color: #C03038; }
+.fc-hot.mid { background: #F0F1F4; color: #555; }
+.fc-sub { font-size: 11px; color: #999; margin-top: 2px; }
+.fc-right { text-align: right; flex-shrink: 0; }
+.fc-qty { font-size: 15px; font-weight: 700; color: #2563EB; }
+.fc-suggest { font-size: 10px; color: #B7791F; margin-top: 2px; }
+.sel-list { border-top: 1px solid #f0f1f4; }
+.sel-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f6f8; }
+.sel-row:last-child { border-bottom: none; }
+.sel-main { flex: 1; min-width: 0; }
+.sel-name { font-size: 13px; color: #333; display: flex; align-items: center; gap: 6px; }
+.sel-reason { font-size: 11px; color: #666; margin-top: 2px; line-height: 1.5; }
+.brain-note { font-size: 10px; color: #aaa; margin-top: 8px; }
