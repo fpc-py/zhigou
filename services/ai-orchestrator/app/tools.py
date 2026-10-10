@@ -1498,6 +1498,62 @@ async def logistics_delay_alert(
         return "物流预警暂时获取失败，请稍后再试。"
 
 
+@tool
+async def after_sale_repair(
+    action: str,
+    order_no: str | None = None,
+    sku_id: str | None = None,
+    product_name: str | None = None,
+    fault_desc: str | None = None,
+    contact_phone: str | None = None,
+    appointment_time: str | None = None,
+) -> str:
+    """
+    售后助手：质保提醒与维修预约。
+    action=warranty 时盘点我的商品质保状态（NORMAL 正常 / EXPIRING_SOON 30 天内到期 / EXPIRED 已过期），给出建议；action=repair 时创建维修预约单（需 order_no 订单号、fault_desc 故障描述、appointment_time 期望维修时间，如 2026-10-12T10:00:00）。
+    用户问"我买的商品还在质保期吗""质保快到期了帮我提醒""东西坏了怎么维修/帮我约维修"时调用。
+    """
+    try:
+        uid = _get_current_user()
+        if action == "warranty":
+            alerts = await _http_get(
+                f"{settings.aftersale_service_url}/aftersale/warranty/alerts?userId={uid}&days=30",
+                timeout=5.0,
+            )
+            items = alerts.get("data") or []
+            if not items:
+                return "当前没有质保记录。"
+            lines = ["商品质保提醒（演示底座 · 正式版以订单/商品质保政策为准）："]
+            risk = [a for a in items if a.get("status") in ("EXPIRING_SOON", "EXPIRED")]
+            for a in items:
+                label = {"NORMAL": "正常", "EXPIRING_SOON": "即将到期", "EXPIRED": "已过期"}.get(a.get("status"), a.get("status"))
+                lines.append(f"· {a.get('productName')}（{label}，质保到期 {str(a.get('expireTime'))[:10]}，剩 {a.get('daysLeft')} 天）：{a.get('hint')}")
+            if risk:
+                lines.append("建议：临近/已过期商品如有问题，可告知我商品信息帮你约维修或生成售后话术。")
+            else:
+                lines.append("均在质保期内，放心使用。")
+            return "\n".join(lines)
+        if action == "repair":
+            if not order_no or not fault_desc or not appointment_time:
+                return "维修预约缺少必要信息：请提供订单号 order_no、故障描述 fault_desc、期望维修时间 appointment_time。"
+            d = await _http_post(
+                f"{settings.aftersale_service_url}/aftersale/repair/appointment?userId={uid}",
+                json_data={"orderNo": order_no, "skuId": sku_id, "productName": product_name,
+                           "faultDesc": fault_desc, "contactPhone": contact_phone,
+                           "appointmentTime": appointment_time},
+                timeout=5.0,
+            )
+            r = d.get("data") or {}
+            if not r.get("appointmentNo"):
+                return "维修预约提交失败：" + (d.get("message") or "未知原因") + "（正式版需商家确认排期与到店/寄修方式）"
+            return (f"维修预约已提交 ✅：预约单号 {r.get('appointmentNo')}，状态 {r.get('status')}（待商家确认），"
+                    f"期望时间 {str(r.get('appointmentTime'))[:16]}。商家确认后会有排期反馈；正式版支持在线改期与取消。")
+        return "未知操作：action 仅支持 warranty（质保提醒）/ repair（维修预约）。"
+    except Exception as e:
+        logger.warning("after_sale_repair 调用失败: %s", e)
+        return "售后助手暂时不可用，请稍后再试。"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1514,6 +1570,7 @@ TOOLS = [
     aftersale_assistant,
     logistics_tracker,
     logistics_delay_alert,
+    after_sale_repair,
     usage_cycle_assistant,
     groupbuy_finder,
     optimize_cart,

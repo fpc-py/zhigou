@@ -8,7 +8,11 @@ import com.zhigou.aftersale.client.PaymentClient;
 import com.zhigou.aftersale.dto.ApplyRequest;
 import com.zhigou.aftersale.dto.OrderInfo;
 import com.zhigou.aftersale.entity.AftersaleOrder;
+import com.zhigou.aftersale.entity.RepairAppointment;
+import com.zhigou.aftersale.entity.WarrantyInfo;
 import com.zhigou.aftersale.mapper.AftersaleOrderMapper;
+import com.zhigou.aftersale.mapper.RepairAppointmentMapper;
+import com.zhigou.aftersale.mapper.WarrantyInfoMapper;
 import com.zhigou.aftersale.state.AftersaleState;
 import com.zhigou.common.BizException;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,8 @@ public class AftersaleServiceImpl {
     private final OrderClient orderClient;
     private final PaymentClient paymentClient;
     private final InventoryClient inventoryClient;
+    private final WarrantyInfoMapper warrantyMapper;
+    private final RepairAppointmentMapper repairMapper;
 
     private static final Set<String> ALLOWED_ORDER_STATUS = Set.of("PAID", "SHIPPED", "COMPLETED");
     private static final Set<String> REFUNDABLE_STATUS = Set.of("SELLER_APPROVED", "REFUNDING");
@@ -60,6 +66,66 @@ public class AftersaleServiceImpl {
         mapper.insert(ao);
         log.info("售后申请: aftersaleNo={}, orderNo={}", no, req.getOrderNo());
         return ao;
+    }
+
+
+    /** 质保提醒：扫描用户质保信息，30 天内到期 EXPIRING_SOON / 已过期 EXPIRED / 正常 NORMAL */
+    public List<Map<String, Object>> warrantyAlerts(Long userId, int days) {
+        if (days <= 0) days = 30;
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        List<WarrantyInfo> list = warrantyMapper.selectList(new LambdaQueryWrapper<WarrantyInfo>().eq(WarrantyInfo::getUserId, userId));
+        List<Map<String, Object>> alerts = new java.util.ArrayList<>();
+        for (WarrantyInfo w : list) {
+            long daysLeft = java.time.Duration.between(now, w.getExpireTime()).toDays();
+            String status = w.getExpireTime().isBefore(now) ? "EXPIRED" : (daysLeft <= days ? "EXPIRING_SOON" : "NORMAL");
+            String hint;
+            if (status.equals("EXPIRED")) hint = "质保已过期，建议关注维修/以旧换新方案";
+            else if (status.equals("EXPIRING_SOON")) hint = "质保即将到期（剩 " + daysLeft + " 天），有问题请尽快申请售后";
+            else hint = "质保期内，正常保障";
+            Map<String, Object> m = new java.util.HashMap<>();
+            m.put("orderNo", w.getOrderNo()); m.put("skuId", w.getSkuId());
+            m.put("productName", w.getProductName());
+            m.put("purchaseTime", w.getPurchaseTime().toString());
+            m.put("expireTime", w.getExpireTime().toString());
+            m.put("daysLeft", daysLeft);
+            m.put("status", status); m.put("hint", hint);
+            alerts.add(m);
+        }
+        alerts.sort((a, b) -> Boolean.compare(!a.get("status").equals("EXPIRED") && !a.get("status").equals("EXPIRING_SOON"),
+                !b.get("status").equals("EXPIRED") && !b.get("status").equals("EXPIRING_SOON")));
+        log.info("质保提醒扫描: userId={}, {} 条, 风险 {} 条", userId, alerts.size(),
+                alerts.stream().filter(a -> !a.get("status").equals("NORMAL")).count());
+        return alerts;
+    }
+
+    /** 维修预约：创建预约单（演示口径直接 PENDING，正式版需商家确认排期 + 到店/寄修） */
+    @Transactional
+    public RepairAppointment createRepairAppointment(Long userId, Map<String, Object> req) {
+        String orderNo = req.get("orderNo") == null ? null : String.valueOf(req.get("orderNo"));
+        String faultDesc = req.get("faultDesc") == null ? null : String.valueOf(req.get("faultDesc"));
+        String appointmentTimeStr = req.get("appointmentTime") == null ? null : String.valueOf(req.get("appointmentTime"));
+        if (orderNo == null || orderNo.isBlank()) throw new BizException(40050, "未指定订单号");
+        if (faultDesc == null || faultDesc.isBlank()) throw new BizException(40051, "请描述故障问题");
+        if (appointmentTimeStr == null || appointmentTimeStr.isBlank()) throw new BizException(40052, "请选择期望维修时间");
+        RepairAppointment r = new RepairAppointment();
+        r.setAppointmentNo("RP" + cn.hutool.core.util.IdUtil.fastSimpleUUID().toUpperCase().substring(0, 14));
+        r.setOrderNo(orderNo);
+        r.setSkuId(req.get("skuId") == null ? null : String.valueOf(req.get("skuId")));
+        r.setUserId(userId);
+        r.setProductName(req.get("productName") == null ? null : String.valueOf(req.get("productName")));
+        r.setFaultDesc(faultDesc);
+        r.setContactPhone(req.get("contactPhone") == null ? null : String.valueOf(req.get("contactPhone")));
+        r.setAppointmentTime(java.time.LocalDateTime.parse(appointmentTimeStr.substring(0, 19)));
+        r.setStatus("PENDING");
+        repairMapper.insert(r);
+        log.info("维修预约: appointmentNo={}, orderNo={}, user={}", r.getAppointmentNo(), orderNo, userId);
+        return r;
+    }
+
+    /** 我的维修预约（倒序） */
+    public List<RepairAppointment> repairAppointments(Long userId) {
+        return repairMapper.selectList(new LambdaQueryWrapper<RepairAppointment>()
+                .eq(RepairAppointment::getUserId, userId).orderByDesc(RepairAppointment::getId));
     }
 
     public List<AftersaleOrder> mine(Long userId) {

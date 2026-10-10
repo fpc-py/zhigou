@@ -2,6 +2,7 @@ package com.zhigou.aftersale.controller;
 
 import com.zhigou.aftersale.dto.ApplyRequest;
 import com.zhigou.aftersale.entity.AftersaleOrder;
+import com.zhigou.aftersale.entity.RepairAppointment;
 import com.zhigou.aftersale.service.impl.AftersaleServiceImpl;
 import com.zhigou.common.Result;
 import jakarta.validation.Valid;
@@ -46,5 +47,22 @@ public class AftersaleController {
     @PostMapping("/{no}/reject")
     public Result<Void> reject(@PathVariable String no, @RequestBody Map<String, String> body) {
         service.reject(no, body.get("reason")); return Result.ok();
+    }
+
+    @GetMapping("/warranty/alerts")
+    public Result<List<Map<String, Object>>> warrantyAlerts(@RequestParam Long userId,
+                                                             @RequestParam(defaultValue = "30") int days) {
+        return Result.ok(service.warrantyAlerts(userId, days));
+    }
+
+    @PostMapping("/repair/appointment")
+    public Result<RepairAppointment> createRepairAppointment(@RequestParam Long userId,
+                                                             @RequestBody Map<String, Object> body) {
+        return Result.ok(service.createRepairAppointment(userId, body));
+    }
+
+    @GetMapping("/repair/appointments")
+    public Result<List<RepairAppointment>> repairAppointments(@RequestParam Long userId) {
+        return Result.ok(service.repairAppointments(userId));
     }
 }

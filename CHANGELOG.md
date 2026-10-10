@@ -3,6 +3,19 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.24] - 2026-10-10
+
+### P2 · AI 售后助手：质保提醒 + 维修预约
+
+- feat(P2) `aftersale-service` 售后助手模块：Flyway `V20261094__aftersale_repair.sql` 新增 `warranty_info`（商品质保演示底座，seed 3 条：正常/30 天内到期/已过期）+ `repair_appointment`（维修预约单，状态机 PENDING/CONFIRMED/DONE/CANCELED）；`WarrantyInfo`/`RepairAppointment` 实体 + Mapper（**新 Mapper 必须带 `@Mapper` 注解**，无 @MapperScan 场景下否则不注册）
+- feat(P2) 接口：`GET /aftersale/warranty/alerts?userId&days`（质保状态 NORMAL/EXPIRING_SOON/EXPIRED + daysLeft/hint）、`POST /aftersale/repair/appointment`（缺订单号 40050/缺故障描述 40051/缺期望时间 40052；演示口径直接 PENDING，正式版需商家确认排期）、`GET /aftersale/repair/appointments`
+- fix(P2) `LocalDateTime.parse` 仅接受 ISO `T` 分隔（前端传 `2026-10-12T10:00:00`，勿 replace 成空格）
+- fix(P2) aftersale SecurityConfig 全量 JWT 拦截致 AI 内网直连 403 → 放行 `/aftersale/warranty/**`、`/aftersale/repair/**`（用户侧 BFF 仍走 Bearer 鉴权）
+- feat(P2) AI `after_sale_repair` 工具（TOOLS 25 个）：action=warranty 质保盘点 / action=repair 维修预约；缺 order_no/fault_desc/appointment_time 时如实提示补齐，不编造
+- feat(P2) BFF `GET /aftersale/warranty/alerts`、`POST /aftersale/repair/appointment`、`GET /aftersale/repair/appointments`（JwtAuthGuard + x-user-id 内网头）
+- feat(P2) H5 对话页「售后助手」快捷入口升级为质保提醒/维修预约语义 + api/aftersale.ts 三接口
+- 验证：后端 Bearer 直连 PASS（质保 3 条：手环 EXPIRING_SOON 14 天/榨汁杯 EXPIRED/耳机 NORMAL；预约 RP291B4D49734544 PENDING；mine 1）；AI SSE PASS（质保盘点两分支 + 缺参如实提示）；BFF 三层 PASS（warranty 3/risk 2、RPA0B684EA2C1D49 PENDING、mine 2）；BFF/H5 构建 PASS
+
 ## [0.2.23] - 2026-10-10
 
 ### P2 · 智能物流管家升级：延误预判 + 主动预警 + 一键调度

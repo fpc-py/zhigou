@@ -47,3 +47,22 @@ export async function getAftersaleDetail(no: string): Promise<AftersaleOrder | n
 export async function cancelAftersale(no: string): Promise<void> {
   await http.post(`/aftersale/${no}/cancel`, {});
 }
+
+
+/** 质保提醒：30 天内到期 / 已过期 / 正常（售后助手） */
+export async function getWarrantyAlerts(days = 30) {
+  const res = await http.get<{ code: number; data: any[] | null }>('/aftersale/warranty/alerts?days=' + days);
+  return res.data.data;
+}
+
+/** 创建维修预约（演示口径 PENDING，正式版需商家确认排期） */
+export async function createRepairAppointment(body: Record<string, any>) {
+  const res = await http.post<{ code: number; data: any | null }>('/aftersale/repair/appointment', body);
+  return res.data.data;
+}
+
+/** 我的维修预约 */
+export async function getRepairAppointments() {
+  const res = await http.get<{ code: number; data: any[] | null }>('/aftersale/repair/appointments');
+  return res.data.data;
+}

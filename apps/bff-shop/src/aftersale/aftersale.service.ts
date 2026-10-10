@@ -76,4 +76,52 @@ export class AftersaleService {
       ),
     );
   }
+
+  /** 质保提醒：30 天内到期 / 已过期 / 正常 */
+  async warrantyAlerts(userId: string, days = 30): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${this.base}/aftersale/warranty/alerts?userId=${encodeURIComponent(userId)}&days=${days}`, {
+        headers: this.authHeader(userId),
+      }).pipe(
+        timeout(this.t),
+        catchError((err) => {
+          this.logger.warn(`aftersale-service /aftersale/warranty/alerts 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return resp.data?.data ?? null;
+  }
+
+  /** 创建维修预约（演示口径 PENDING，正式版需商家确认排期） */
+  async createRepairAppointment(userId: string, body: Record<string, any>): Promise<any | null> {
+    const resp = await firstValueFrom(
+      this.http.post(`${this.base}/aftersale/repair/appointment?userId=${encodeURIComponent(userId)}`, body, {
+        headers: this.authHeader(userId),
+      }).pipe(
+        timeout(this.t),
+        catchError((err) => {
+          this.logger.warn(`aftersale-service /aftersale/repair/appointment 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return resp.data?.data ?? null;
+  }
+
+  /** 我的维修预约 */
+  async repairAppointments(userId: string): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${this.base}/aftersale/repair/appointments?userId=${encodeURIComponent(userId)}`, {
+        headers: this.authHeader(userId),
+      }).pipe(
+        timeout(this.t),
+        catchError((err) => {
+          this.logger.warn(`aftersale-service /aftersale/repair/appointments 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return resp.data?.data ?? null;
+  }
 }

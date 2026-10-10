@@ -307,6 +307,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化                                                            |
 
 ## 变更记录
+* 2026-10-10：**P2 AI 售后助手（[0.2.24]）**：aftersale-service 质保提醒 `GET /aftersale/warranty/alerts`（NORMAL/EXPIRING_SOON 30 天内/EXPIRED + daysLeft/hint）+ 维修预约 `POST /aftersale/repair/appointment` + `GET /aftersale/repair/appointments`（状态机 PENDING/CONFIRMED/DONE/CANCELED）→ Flyway `V20261094__aftersale_repair.sql`（warranty_info seed 3 条 + repair_appointment）；AI `after_sale_repair` 工具（TOOLS 25：质保盘点/预约创建，缺参如实提示）；BFF 3 端点；H5 对话页售后助手入口升级。修复 3 坑（新 Mapper 缺 @Mapper 注解不注册 / LocalDateTime.parse 需 ISO T / aftersale 全量 JWT 拦截 AI 直连 403→放行 warranty/repair）。验证：Bearer 直连 3+1+1、AI SSE 质保盘点 PASS、BFF 三层 3/2+RP 单 PENDING、双端构建 PASS。
+
 * 2026-10-10：**P2 智能物流管家升级（[0.2.23]）**：logistics-service 延误预警 `GET /logistics/delay-alerts`（在途未签收未取消运单按最近轨迹节点判疑似停滞，默认 48h）+ 一键调度 `POST /logistics/dispatch`（URGE/REDELIVER/SELF_PICKUP/CHANGE_ADDRESS/RETURN，演示口径写 DONE 记录）→ Flyway `V20261091__dispatch_action.sql` + DispatchAction 实体/Mapper；AI `logistics_delay_alert` 工具（TOOLS 24：预警盘点 + 一键调度）；BFF `GET /freight/delay-alerts`、`POST /freight/dispatch`；H5 对话页「物流管家」快捷入口升级预警语义。修复 3 个坑（无 swagger 依赖 @Operation 移除 / 轨迹排序 null NPE / 端点无类级前缀致静态资源 404）。验证：后端直连 10 在途 1 停滞→URGE DONE、AI SSE 盘点+催件 PASS、BFF 三层 10/1 + SELF_PICKUP DONE、双端构建 PASS。
 
 * 2026-10-10：**P2 商家端 AI 经营体系一期（[0.2.17]）**：order-service 经营统计接口 /order/stats/overview（订单数/销售额/今日/状态分布/热销Top5/售后）+ AI merchant_overview 经营助手工具 + BFF /merchant/overview + H5 商家中心页（指标卡/状态分布/热销榜/AI 助手入口）。修复 chat_service._dispatch_tool `__name__` bug（影响全部 19 工具 SSE 调用）。验证：直连/BFF/H5 渲染/SSE 全链路 PASS。

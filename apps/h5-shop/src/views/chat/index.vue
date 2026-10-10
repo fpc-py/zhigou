@@ -124,7 +124,7 @@ const chips = ['海边度假装备', '帮我送礼', '200 元以内的吹风机'
 const quickActs = [
   { icon: 'gift', label: 'AI 送礼', desc: '生日/纪念日方案', prompt: '送女朋友生日礼物，预算 500 左右，帮我出个送礼方案' },
   { icon: 'tag', label: '跨平台比价', desc: '全网最低价', prompt: '帮我跨平台比价 SKU 9000000000000000022 这款黑色蓝牙耳机，哪个平台最划算' },
-  { icon: 'shield', label: '售后助手', desc: '话术/进度', prompt: '我的商品有问题，帮我生成售后申请话术' },
+  { icon: 'shield', label: '售后助手', desc: '质保提醒/维修预约', prompt: '帮我看下我买的东西还在质保期吗？有一个耳机好像坏了，帮我预约维修' },
   { icon: 'truck', label: '物流管家', desc: '轨迹/延误预警', prompt: '帮我看下我的快递有没有延误卡单，如果有帮我催件或安排重新派送' },
   { icon: 'refresh', label: '补货提醒', desc: '消耗品周期', prompt: '帮我看看我该补点什么了' },
 ];

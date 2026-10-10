@@ -14,6 +14,13 @@
 - **修复**：① 移除 @Operation 注解；② 改为 for 循环取最大 `nodeTime`（null 跳过）；③ 新端点显式 `@GetMapping("/logistics/delay-alerts")`、`@PostMapping("/logistics/dispatch")`（对齐已放行的 `/logistics/**`）
 - **教训**：无 swagger 依赖的服务新增端点禁用 @Operation；业务排序前先判空；controller 无类级路径前缀时，方法级路径必须写完整并核对 SecurityConfig 放行范围
 
+## #28 · [0.2.24] 售后助手 3 坑：新 Mapper 未注册 / LocalDateTime.parse 分隔符 / aftersale 全量 JWT 拦截 AI 直连（已修复）
+
+- **现象**：① aftersale-service 启动失败 `No qualifying bean of type WarrantyInfoMapper`；② `POST /aftersale/repair/appointment` 500；③ AI `after_sale_repair` action=warranty 返回「暂时不可用」
+- **根因**：① AftersaleServiceApplication 无 @MapperScan，现有 Mapper 靠 `@Mapper` 注解注册，新建 Mapper 未加；② `LocalDateTime.parse("2026-10-12 10:00:00")`（replace('T',' ') 后）非 ISO 格式 → DateTimeParseException；③ aftersale SecurityConfig `anyRequest().authenticated()` 全量拦截，AI 内网直连无 Bearer → 403
+- **修复**：① 两个新 Mapper 补 `@Mapper`；② 直接 `parse(substring(0,19))` 保留 ISO T；③ SecurityConfig permitAll 增 `/aftersale/warranty/**`、`/aftersale/repair/**`（BFF 用户侧仍走 Bearer）
+- **教训**：无 @MapperScan 的服务新增 Mapper 必须带 @Mapper；LocalDateTime.parse 只认 ISO `T` 分隔；AI 直连的端点须在 SecurityConfig 显式放行（内网口径），否则工具异常分支静默兜底
+
 # 智购 · 测试问题与 Bug 记录
 
 > 记录测试过程中发现的问题、临时排查命令与修复状态。已修复的条目保留留痕，不删除。
