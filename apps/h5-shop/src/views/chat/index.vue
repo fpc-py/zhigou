@@ -12,6 +12,17 @@
       <button class="head-clear" title="清空会话" @click="onClear"><Icon name="trash" size="xs" /></button>
     </header>
 
+    <!-- AI 功能快捷入口 -->
+    <div v-if="messages.length === 0" class="quick">
+      <button v-for="q in quickActs" :key="q.label" class="quick-card" @click="sendWith(q.prompt)">
+        <span class="quick-icon"><Icon :name="q.icon" size="sm" /></span>
+        <span class="quick-txt">
+          <span class="quick-label">{{ q.label }}</span>
+          <span class="quick-desc">{{ q.desc }}</span>
+        </span>
+      </button>
+    </div>
+
     <!-- 快捷 chips -->
     <div v-if="messages.length === 0" class="chips">
       <button v-for="c in chips" :key="c" class="chip" @click="sendWith(c)">{{ c }}</button>
@@ -108,6 +119,15 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const pendingImg = ref('');
 
 const chips = ['海边度假装备', '帮我送礼', '200 元以内的吹风机'];
+
+/** AI 功能快捷入口（对齐 P1/P2 AI 工具：送礼/比价/售后/物流/补货） */
+const quickActs = [
+  { icon: 'gift', label: 'AI 送礼', desc: '生日/纪念日方案', prompt: '送女朋友生日礼物，预算 500 左右，帮我出个送礼方案' },
+  { icon: 'tag', label: '跨平台比价', desc: '全网最低价', prompt: '帮我跨平台比价 SKU 9000000000000000022 这款黑色蓝牙耳机，哪个平台最划算' },
+  { icon: 'shield', label: '售后助手', desc: '话术/进度', prompt: '我的商品有问题，帮我生成售后申请话术' },
+  { icon: 'truck', label: '物流管家', desc: '轨迹/预警', prompt: '帮我查一下我的快递物流到哪里了' },
+  { icon: 'refresh', label: '补货提醒', desc: '消耗品周期', prompt: '帮我看看我该补点什么了' },
+];
 
 /** 打开图片选择（图片搜款入口） */
 function pickImage() {
@@ -312,6 +332,37 @@ onMounted(() => {
   border-radius: 999px;
   padding: 7px 13px;
 }
+.quick {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 12px 14px 2px;
+}
+.quick-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 11px;
+  text-align: left;
+}
+.quick-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.quick-txt { display: flex; flex-direction: column; min-width: 0; }
+.quick-label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.quick-desc { font-size: 10px; color: var(--ink-3); margin-top: 1px; }
 .msg-list {
   flex: 1;
   overflow-y: auto;

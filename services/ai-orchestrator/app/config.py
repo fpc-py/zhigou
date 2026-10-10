@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     marketing_service_url: str = "http://localhost:8088"
     cart_service_url: str = "http://localhost:8084"
     order_service_url: str = "http://localhost:8085"
+    logistics_service_url: str = "http://localhost:8089"
+    aftersale_service_url: str = "http://localhost:8090"
 
     # ── JWT（用于转发认证） ──
     jwt_secret: str = "change-me-to-a-random-256-bit-string"

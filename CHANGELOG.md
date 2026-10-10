@@ -3,6 +3,26 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.11] - 2026-10-10
+
+### P2 · 拼团社交购物（marketing-service 拼团 + AI groupbuy_finder + BFF + H5） + AI 链路迁移修复 + 上线就绪资产
+
+- feat(P2) marketing-service 拼团模块：`group_buy_activity`（活动 + 拼团价/单人价/成团人数/限时）、`group_buy_order`（团单：开团/参团/状态机 OPEN→SUCCESS/CLOSED，leader 幂等防重复开团、防自参团）、`group_buy_member`（成员）；迁移 `V20261099__group_buy.sql`（3 活动 seed：耳机 3 人 199/169、运动鞋 2 人 99/89、T恤 3 人 49/39）
+  - 接口：`GET /group-buy/activities`（活动 + 招募中 openGroups + 成团进度）、`POST /group-buy/open`、`POST /group-buy/join`、`GET /group-buy/mine`、`GET /group-buy/group/{id}`
+  - 规则：开团=创建团单并入团；参团达 targetSize → 全团 SUCCESS；团主不可参自己的团；同商品重复开团拒绝（业务码 40041/40043）
+- feat(P2) AI 新工具 `groupbuy_finder(sku_id?, keywords?)`：调 marketing `/group-buy/activities`（带 x-user-id 内网透传）输出拼团情报（拼团价 vs 单人价、还差几人）
+- feat(P2) BFF 拼团透传：`service.config.ts` +5 路径；`marketing.service.ts` 统一注入 `x-user-id` 头 + `unwrapOrThrow`（后端业务失败 code≠200 → 抛 HttpException 400，前端展示真实 message，不再吞错返回空）；controller 5 路由透传 userId
+- feat(P2) H5 拼团页：`views/groupbuy/index.vue`（活动卡片/拼团价+立省/倒计时/可加入团列表/开团参团弹窗+错误提示/我的拼团/邀请复制）+ 路由 `/groupbuy` + 首页第 5 宫格「一起拼团」
+- fix(ai) **Windows tiktoken DLL 阻断**：langchain-openai+langgraph 顶层 import tiktoken Rust 扩展被「应用程序控制策略」阻止（进程级必崩）→ `chat_service.py` 整体迁移为原生 `AsyncOpenAI` 流式 + 手动工具循环（schema 用 `convert_to_openai_tool` 不触发 tiktoken），SSE 契约不变（token/tool_call/tool_result/done）
+- fix(ai) **LLM 工具触发不稳定**：① system.md 第 8 条「不是客服，不处理退款/物流」与工具触发规则自相矛盾 → 改为「命中场景必须调工具」；② 新增确定性工具路由 `_route_tool`（送礼/售后/物流/使用周期/拼团关键词命中 → 首轮 `tool_choice` 强制该工具），攒批场景 100% 触发
+- fix(ai) **asyncio.timeout 取消后 ContextVar reset 崩溃**（`Token was created in a different Context`）→ finally reset 包 try/except
+- fix(ai) **SSE 测试脚本分隔符不兼容**：sse_starlette wire 用 `\r\n\r\n`，旧脚本按 `\n\n` 分块全解析失败（服务端正常）→ 断言脚本兼容两种分隔
+- fix(ai) fallback.yml `llm.timeout_ms` 1500→20000（原值过短，LLM 必然超时走兜底）
+- docs 上线就绪：`release-checklist.md` 改写（去 Nacos/K8s，compose 蓝绿三编排）、新建 `gray-release.md`（分批放量+回滚）、`monitoring-alerting.md`（RED/USE+SLO+告警定级）、`docs/README.md` 索引登记
+- chore 部署资产整改：`infra/compose/services.yml` 11 镜像改 `${ZHIGOU_REPO:-zhigou}/<svc>:${TAG:-0.1.0}` 占位；`deploy.yml` 注入 `ZHIGOU_REPO=ghcr.io/fpc-py/zhigou`；compose config 双模式渲染验证通过（默认/生产）
+- **验证**：拼团 API 全链路 v2（干净数据）——登录→activities=3→开团→重复开团拒绝「你已开过该商品的团」→自参团拒绝「你已是该团团主」→user2 参团成团 SUCCESS→mine 两人各 2 条→detail members=2 remain=0（8/8 业务断言通过；脚本 1 处「成团团单应出现在招募列表」与业务设计不符——openGroups 仅展示招募中 OPEN 团，已按 detail 口径验证）；AI 攒批 5 工具 SSE 实测 **5/5 PASS**（gift/aftersale/logistics/usage_cycle/groupbuy_finder 均触发并返回真实数据）；`tests/test_chat.py` 重写适配新实现
+- **限制说明**：AI 工具路由基于关键词规则（覆盖攒批场景），其余场景仍模型 auto 决策；H5 拼团页/AI 快捷入口待浏览器端到端复验（接口层已全绿）
+
 ## [0.2.10] - 2026-10-08
 
 ### P1 · AI 决策辅助第六批（跨平台比价 + 图片搜款）

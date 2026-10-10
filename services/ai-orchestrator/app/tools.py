@@ -760,7 +760,428 @@ async def _vision_extract(image_url: str) -> dict | None:
     return None
 
 
+
+
+
+
+# ── 购物后 AI 服务 ──
+
+AFTERSALE_STATUS_HINT = {
+    "PENDING": "待审核（商家将在 24 小时内处理）",
+    "APPROVED": "已通过（等待退款/换货执行）",
+    "REFUNDING": "退款处理中",
+    "REFUNDED": "已退款（款项将按原路退回）",
+    "REJECTED": "已驳回",
+    "CANCELLED": "已取消",
+}
+
+AFTERSALE_TYPE_HINT = {
+    "refund": "仅退款（未收到货或未使用）",
+    "return_refund": "退货退款（已收到货，退货后退款）",
+    "exchange": "换货（同款换新）",
+    "repair": "维修（质保期内免费维修）",
+}
+
+
+@tool
+async def aftersale_assistant(issue: str = "", aftersale_no: str = "") -> str:
+    """
+    AI 售后助手。处理两类场景：
+    1) 用户描述商品问题（issue）→ 生成专业售后话术（问题描述、建议诉求、证据清单、适用售后类型）并提示发起售后；
+    2) 用户提供售后单号（aftersale_no）→ 查询售后进度、解读当前状态并给出下一步行动建议。
+
+    用户说"商品有问题""怎么申请售后""售后到哪一步了""我要退货/换货/退款"时调用。
+
+    Args:
+        issue: 商品问题描述（可选，如"耳机左耳没声音，用了三天"）
+        aftersale_no: 售后单号（可选，查询进度用）
+    """
+    try:
+        headers = {"x-user-id": _get_current_user()}
+        if aftersale_no:
+            url = f"{settings.aftersale_service_url}/aftersale/{aftersale_no}"
+            data = await _http_get(url, timeout=5.0, headers=headers)
+            o = data.get("data") or {}
+            if not o:
+                return f"未查到售后单 {aftersale_no}，请核对单号。"
+            status = (o.get("status") or "UNKNOWN").upper()
+            hint = AFTERSALE_STATUS_HINT.get(status, "状态未知")
+            lines = [
+                f"售后进度｜单号 {aftersale_no}",
+                f"类型：{AFTERSALE_TYPE_HINT.get(o.get('type') or '', o.get('type') or '未知')}",
+                f"状态：{status}（{hint}）",
+                f"申请原因：{o.get('reason') or '未填写'}",
+                f"申请金额：¥{(o.get('amount') or 0) / 100:.2f}",
+                f"申请时间：{o.get('applyAt') or '—'}",
+            ]
+            if o.get("rejectReason"):
+                lines.append(f"驳回原因：{o['rejectReason']}")
+            if status in ("PENDING", "APPROVED"):
+                lines.append("下一步：请耐心等待商家处理，通常 24 小时内会有结果；如需加急可联系在线客服。")
+            elif status == "REJECTED":
+                lines.append("下一步：若对驳回有异议，可重新发起售后并补充证据（照片/视频/物流凭证）。")
+            elif status in ("REFUNDING", "REFUNDED"):
+                lines.append(f"下一步：退款{'正在处理' if status == 'REFUNDING' else '已完成'}，款项退回原支付渠道，一般 1-7 个工作日到账。")
+            return "\n".join(lines)
+
+        # 生成售后话术
+        issue = (issue or "").strip()
+        if not issue:
+            try:
+                url = f"{settings.aftersale_service_url}/aftersale/mine?userId={_get_current_user()}"
+                data = await _http_get(url, timeout=5.0, headers=headers)
+                items = data.get("data") or []
+                if items:
+                    lines = ["你的售后单列表："]
+                    for it in items[:5]:
+                        lines.append(f"· {it.get('aftersaleNo')} | {AFTERSALE_TYPE_HINT.get(it.get('type') or '', it.get('type') or '')} | {it.get('status')} | 金额 ¥{(it.get('amount') or 0) / 100:.2f}")
+                    lines.append("回复售后单号可查详情；或直接描述商品问题，我帮你生成售后话术。")
+                    return "\n".join(lines)
+                return "暂无售后记录。可描述你遇到的商品问题，我帮你生成专业的售后申请话术。"
+            except Exception:
+                return "暂无售后记录。可描述你遇到的商品问题，我帮你生成专业的售后申请话术。"
+
+        # 诉求与类型推断（简单规则）
+        req = ""
+        if any(k in issue for k in ("没收到", "一直不发货", "未发货")):
+            req = "要求尽快发货或退款"
+            atype = "refund"
+        elif any(k in issue for k in ("坏的", "坏了", "不响", "不能用", "故障", "质量问题")):
+            req = "申请退款或换货，并附检测说明"
+            atype = "exchange"
+        elif any(k in issue for k in ("不喜欢", "不合适", "尺码", "色差", "想退")):
+            req = "申请退货退款（不影响二次销售）"
+            atype = "return_refund"
+        else:
+            req = "申请按平台售后政策处理（退款/换货/维修）"
+            atype = "repair"
+        lines = [
+            f"专业售后话术（类型建议：{AFTERSALE_TYPE_HINT.get(atype, atype)}）",
+            f"【问题描述】我在 {issue}。已核对商品与订单信息，问题属实。",
+            f"【诉求】{req}。",
+            "【证据建议】附上商品照片/短视频（问题部位特写）+ 订单截图 + 物流外包装照片（如涉及）；",
+            "【时效】根据《消费者权益保护法》与平台七天无理由政策，售后申请应在受理后 24 小时内处理，退款 1-7 个工作日到账。",
+            "【下一步】在订单详情页发起售后（选择对应类型），或回复确认后我帮你跳转/整理成申请草稿。",
+        ]
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("aftersale_assistant 调用失败: %s", e)
+        return "售后信息暂时获取失败，请稍后再试或联系人工客服。"
+
+
+LOGISTICS_NODE_ORDER = {"已下单": 1, "已付款": 2, "已发货": 3, "运输中": 4, "派送中": 5, "已签收": 6}
+
+
+@tool
+async def logistics_tracker(shipment_no: str) -> str:
+    """
+    智能物流管家。查询物流轨迹并做时效评估：
+    汇总最新节点与时间、判断是否停滞（长时间无更新）、给出延误预警与替代建议。
+
+    用户问"物流到哪了""快递什么时候到""包裹卡住了/一直不动"时调用。
+
+    Args:
+        shipment_no: 运单号（shipmentNo）
+    """
+    try:
+        url = f"{settings.logistics_service_url}/shipment/{shipment_no}/track"
+        headers = {"x-user-id": _get_current_user()}
+        data = await _http_get(url, timeout=5.0, headers=headers)
+        events = data.get("data") or []
+        if not events:
+            return f"未查到运单 {shipment_no} 的物流轨迹，请核对运单号。"
+        latest = events[-1]
+        node = latest.get("nodeName") or ""
+        desc = latest.get("description") or ""
+        node_time = latest.get("nodeTime") or "—"
+        lines = [
+            f"物流轨迹｜运单 {shipment_no}",
+            f"最新节点：{node}（{node_time}）{('：' + desc) if desc else ''}",
+            "最近轨迹：",
+        ]
+        for ev in reversed(events[-4:]):
+            lines.append(f"· {ev.get('nodeTime') or '—'} {ev.get('nodeName') or ''} {ev.get('description') or ''}")
+        # 停滞预判：最新节点非签收且是"运输中/派送中"，提示留意
+        if node and node not in ("已签收",):
+            lines.append("时效提示：当前仍在运输/派送中，正常情况下 1-2 天内会有新进展。")
+            lines.append("若超过 48 小时无新节点，建议：① 联系在线客服催件；② 申请物流客服介入；③ 必要时发起售后（未按时送达可依据承诺时效申请补偿）。")
+        else:
+            lines.append("已签收：请及时验货，如有破损/少件可在 48 小时内联系售后。")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("logistics_tracker 调用失败: %s", e)
+        return "物流信息暂时获取失败，请稍后再试。"
+
+
+
+# ── 使用周期管理 ──
+
+CYCLE_RULES = [
+    # (关键词元组, 品类, 建议补货/换新周期文案, 提示)
+    (("纸巾", "抽纸", "湿巾", "卷纸"), "纸品消耗品", "建议每 1-2 个月补货一次", "按家庭用量提前囤货更划算"),
+    (("洗衣液", "洗洁精", "洗洁", "清洁", "垃圾袋"), "家清消耗品", "建议每 2-3 个月补货一次", "大容量装单价更低"),
+    (("牙膏", "洗发水", "沐浴露", "洗发", "沐浴", "香皂"), "个护消耗品", "建议每 2-3 个月补货一次", "套装/多支装更省"),
+    (("面膜", "护肤品", "精华", "面霜", "水乳"), "美妆护肤", "建议每 3-6 个月按需补货", "开封后注意保质期（通常 6-12 个月）"),
+    (("咖啡", "茶叶", "零食", "饼干", "坚果", "矿泉水", "饮料"), "食品饮品", "建议按消耗频率 1 个月左右补货", "注意保质期，避免囤货过期"),
+    (("耳机", "蓝牙", "键盘", "鼠标", "手表", "充电", "数据线"), "数码配件", "建议使用 2-3 年后考虑换新/升级", "出现续航下降/卡顿可提前以旧换新"),
+    (("鞋", "运动鞋", "跑鞋", "T恤", "衬衫", "外套", "卫衣", "裤"), "服饰", "建议按季节/磨损每 1-2 年补充", "换季时关注折扣"),
+    (("保温杯", "水杯", "电饭煲", "锅", "小家电"), "家居耐用品", "建议使用 2-3 年后检查是否需要更换", "功能正常无需过早更换"),
+]
+
+
+@tool
+async def usage_cycle_assistant() -> str:
+    """
+    使用周期管理。基于用户已购订单（品类聚合）生成消耗品补货提醒、
+    食品保质期提示、耐用品换新时机建议。
+
+    用户问"我该补点什么了""上次买的什么时候用完""有没有快到期的""哪些该换新了"时调用。
+
+    Args: 无（用户身份由服务端注入）
+    """
+    try:
+        url = f"{settings.order_service_url}/order/mine?userId={_get_current_user()}"
+        headers = {"x-user-id": _get_current_user()}
+        data = await _http_get(url, timeout=5.0, headers=headers)
+        orders = data.get("data") or []
+        seen_items: dict[str, int] = {}
+        for o in orders:
+            if o.get("orderStatus") in ("CANCELLED", "CLOSED"):
+                continue
+            for it in o.get("items") or []:
+                name = it.get("skuName") or ""
+                if not name:
+                    continue
+                seen_items[name] = seen_items.get(name, 0) + (it.get("count") or 1)
+        if not seen_items:
+            return "你还没有已购订单。买过东西之后，我可以帮你做消耗品补货与换新提醒。"
+
+        hits: dict[str, tuple] = {}
+        for name, qty in seen_items.items():
+            for keywords, cat, cycle, tip in CYCLE_RULES:
+                if any(k in name for k in keywords):
+                    hits.setdefault(name, (cat, cycle, tip, qty))
+                    break
+        if not hits:
+            return "已购商品暂未匹配到周期管理品类（消耗品/食品/耐用品）。可以告诉我具体品类，我帮你估算。"
+        lines = [
+            "你的使用周期管理清单（基于已购订单）：",
+        ]
+        for name, (cat, cycle, tip, qty) in sorted(hits.items()):
+            lines.append(f"· {name} ×{qty}｜{cat}")
+            lines.append(f"   → {cycle}；{tip}")
+        lines.append("提示：以上为通用估算，具体请结合实际消耗速度；食品/护肤品注意开封后保质期。")
+        lines.append("需要我帮你把某类加入购物车补货，或对比同品类更划算的规格吗？")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("usage_cycle_assistant 调用失败: %s", e)
+        return "周期管理信息暂时获取失败，请稍后再试。"
+
+# ── AI 送礼助手 ──
+
+GIFT_PROFILE_RULES: dict[str, dict] = {
+    "女朋友": {
+        "keywords": ["香水", "口红", "首饰", "花束", "项链"],
+        "reason": "浪漫与心意优先，选择高颜值、可表达爱意的品类",
+        "note": "可搭配贺卡 + 鲜花，仪式感拉满",
+    },
+    "男朋友": {
+        "keywords": ["蓝牙耳机", "运动鞋", "机械键盘", "游戏手柄", "手表"],
+        "reason": "实用 + 兴趣向，选他日常用得上又显用心的品类",
+        "note": "数码配件记得确认型号兼容",
+    },
+    "父母": {
+        "keywords": ["按摩", "养生", "滋补", "保暖", "茶叶"],
+        "reason": "健康与体贴优先，功能性强的实用品类最稳妥",
+        "note": "偏实体店试用型商品建议先看评价",
+    },
+    "孩子": {
+        "keywords": ["玩具", "绘本", "文具", "积木"],
+        "reason": "寓教于乐，安全适龄是第一位",
+        "note": "注意适用年龄与安全标准",
+    },
+    "朋友": {
+        "keywords": ["香薰", "咖啡", "手账", "保温杯", "零食"],
+        "reason": "轻松有趣不踩雷，价位适中表达情谊",
+        "note": "预算内选最有趣或最有话题性的",
+    },
+    "师长": {
+        "keywords": ["书", "钢笔", "保温杯", "茶叶"],
+        "reason": "得体与实用，表达敬意不刻意",
+        "note": "避免过于个人化的礼物",
+    },
+    "长辈": {
+        "keywords": ["足浴盆", "按摩枕", "保温杯", "养生"],
+        "reason": "健康关怀，适老实用是核心",
+        "note": "操作要简单，优先大字/语音款",
+    },
+}
+
+GIFT_OCCASION_CARDS = {
+    "生日": "愿你的每一个愿望都能如期而至，生日快乐！",
+    "纪念日": "纪念日快乐！愿岁岁年年，心意如初。",
+    "情人节": "把心意藏在礼物里，愿你每一天都甜。",
+    "七夕": "七夕快乐！星月可寄，心意可托。",
+    "新年": "新年快乐！愿你岁岁常欢愉，万事皆胜意。",
+    "圣诞": "圣诞快乐！愿你被温柔以待，平安喜乐。",
+    "乔迁": "乔迁之喜！新居新气象，万事皆顺意。",
+    "感谢": "谢谢你一直以来的照顾，一点心意请收下。",
+    "道歉": "对不起，希望这份小小心意能让你心情好一点。",
+    "通用": "一点心意，不成敬意，希望你喜欢！",
+}
+
+
+@tool
+async def gift_assistant(recipient: str, occasion: str, budget: float = 0) -> str:
+    """
+    送礼方案助手。根据收礼人关系、场景与预算生成可落地的送礼方案：
+    推断收礼人画像 → 搜索预算内真实在售商品 → 每件给出推荐理由 → 附贺卡文案与心意小贴士。
+
+    用户表达送礼意图（"送XX什么礼物""生日礼物""纪念日送什么""过节送XX")时调用。
+
+    Args:
+        recipient: 收礼人关系，如"女朋友""男朋友""父母""孩子""闺蜜""老师""长辈"
+        occasion: 场景，如"生日""纪念日""情人节""七夕""新年""圣诞""乔迁""感谢""道歉"
+        budget: 预算（元），可选；不填由对话推断，0 表示不限制
+    """
+    rec = (recipient or "").strip()
+    rel = "朋友"
+    if any(k in rec for k in ("女朋友", "女友", "对象", "老婆", "妻子", "女生")):
+        rel = "女朋友"
+    elif any(k in rec for k in ("男朋友", "男友", "老公", "丈夫", "男生")):
+        rel = "男朋友"
+    elif any(k in rec for k in ("父母", "妈妈", "母亲", "爸爸", "父亲", "爸妈")):
+        rel = "父母"
+    elif any(k in rec for k in ("孩子", "女儿", "儿子", "宝宝", "小朋友")):
+        rel = "孩子"
+    elif any(k in rec for k in ("老师", "导师", "师长", "教授")):
+        rel = "师长"
+    elif any(k in rec for k in ("老人", "长辈", "爷爷", "奶奶", "外公", "外婆", "姥姥", "姥爷")):
+        rel = "长辈"
+
+    rule = GIFT_PROFILE_RULES[rel]
+    budget_fen = int(budget * 100) if budget and budget > 0 else 0
+    occ = (occasion or "通用").strip()
+
+    cands: list[dict] = []
+    try:
+        headers = {"x-user-id": _get_current_user()}
+        for kw in rule["keywords"]:
+            try:
+                url = f"{settings.product_service_url}/product/page?keyword={kw}&pageNum=1&pageSize=5"
+                data = await _http_get(url, timeout=5.0, headers=headers)
+                items = data.get("data", {}).get("records", []) or []
+                for it in items:
+                    skus = it.get("skus") or []
+                    sku_id = skus[0].get("skuId") if skus else None
+                    if not sku_id:
+                        continue
+                    cands.append({
+                        "name": it.get("name") or "未知商品",
+                        "spuId": it.get("spuId"),
+                        "skuId": sku_id,
+                        "priceFen": it.get("priceMin") or 0,
+                        "kw": kw,
+                    })
+            except Exception:
+                continue
+    except Exception as e:
+        logger.warning("gift_assistant 搜索失败: %s", e)
+        return "送礼方案生成失败：暂时无法获取商品信息，请稍后再试。"
+
+    if not cands:
+        return "暂时没有搜到适合该收礼人的礼物商品，可以换个关系/场景再试。"
+
+    seen: set[str] = set()
+    picked: list[dict] = []
+    over_budget = False
+    for c in sorted(cands, key=lambda x: x["priceFen"]):
+        if c["skuId"] in seen:
+            continue
+        seen.add(c["skuId"])
+        if budget_fen and c["priceFen"] > budget_fen:
+            continue
+        picked.append(c)
+        if len(picked) >= 3:
+            break
+    if budget_fen and not picked:
+        over_budget = True
+        for c in sorted(cands, key=lambda x: x["priceFen"]):
+            if c["skuId"] in seen:
+                continue
+            seen.add(c["skuId"])
+            picked.append(c)
+            if len(picked) >= 3:
+                break
+
+    card = GIFT_OCCASION_CARDS.get(occ, GIFT_OCCASION_CARDS["通用"])
+    lines = [
+        f"送礼方案｜收礼人：{recipient}（画像推断：{rel}）｜场景：{occasion}",
+        "候选礼物（均为本平台真实在售商品）：",
+    ]
+    for i, c in enumerate(picked, 1):
+        price_txt = f"¥{c['priceFen'] / 100:.2f}"
+        lines.append(f"{i}. {c['name']} | {price_txt}")
+        lines.append(f"   推荐理由：{rule['reason']}；围绕「{c['kw']}」品类挑选，契合「{rel}」画像")
+        lines.append(f"   可直接购买：skuId={c['skuId']}（加购或代下单均可）")
+    lines.append(f"贺卡文案（{occ}）：「{card}」")
+    lines.append(f"小贴士：{rule['note']}。预算：{'%d 元' % budget if budget else '未指定'}；")
+    if over_budget:
+        lines.append("当前候选均超出预算，已按最低价排序供参考，建议调低预算或选择更小规格。")
+    return "\n".join(lines)
+
 # ── 工具注册表 ──
+
+@tool
+async def groupbuy_finder(sku_id: str | None = None, keywords: str | None = None) -> str:
+    """
+    拼团搜索 / 开团推荐。查询当前进行中的拼团活动（拼团价 vs 单人价、成团人数、正在拼的团还差几人）。
+    用户问"有没有拼团""拼团价多少""想找人一起拼""这个能拼团吗""开团/参团"时调用。
+
+    Args:
+        sku_id: 商品 SKU ID（可选，精确匹配某个商品）
+        keywords: 品类/标题关键词（可选，模糊匹配活动标题）
+    """
+    try:
+        headers = {"x-user-id": _get_current_user()}
+        data = await _http_get(
+            f"{settings.marketing_service_url}/group-buy/activities",
+            timeout=5.0,
+            headers=headers,
+        )
+        acts = data.get("data") or []
+        if not acts:
+            return "当前暂无进行中的拼团活动。"
+        if sku_id:
+            acts = [a for a in acts if str(a.get("skuId")) == str(sku_id)]
+        if keywords:
+            kw = keywords.strip()
+            acts = [a for a in acts if kw.lower() in (a.get("title") or "").lower()]
+        if not acts:
+            return "没有找到匹配的拼团活动，可以看看其他商品或等平台上新。"
+        lines = []
+        for a in acts:
+            save = a["soloPrice"] - a["groupPrice"]
+            lines.append(
+                f"· {a['title']}（skuId={a['skuId']}）\n"
+                f"  单人价 ¥{a['soloPrice'] / 100:.2f} → 拼团价 ¥{a['groupPrice'] / 100:.2f}"
+                f"（省 ¥{save / 100:.2f}），{a['groupSize']} 人成团"
+            )
+            opens = a.get("openGroups") or []
+            if opens:
+                for g in opens[:3]:
+                    lines.append(
+                        f"  - 可加入团#{g['groupId']}：已 {g['memberCount']}/{g['targetSize']} 人，"
+                        f"还差 {g['remain']} 人成团"
+                    )
+            else:
+                lines.append("  - 暂无在拼的团，可以直接开团拉好友")
+        lines.append("提示：开团/参团后按拼团价支付；成团失败自动退回原价差额。")
+        return "拼团情报（当前进行中）：\n" + "\n".join(lines)
+    except Exception as e:
+        logger.warning("groupbuy_finder 调用失败: %s", e)
+        return "拼团信息暂时没查到，稍后再试试？"
+
 
 TOOLS = [
     search_products,
@@ -774,6 +1195,11 @@ TOOLS = [
     analyze_user_context,
     recommend_products,
     search_by_image,
+    gift_assistant,
+    aftersale_assistant,
+    logistics_tracker,
+    usage_cycle_assistant,
+    groupbuy_finder,
     optimize_cart,
     create_order,
 ]

@@ -7,7 +7,12 @@
 
 | # | 问题描述 | 涉及端 | 状态 | 备注 |
 |---|---|---|---|---|
-| 1 | 管理端登录进去后，浏览目录会跳出登录 | admin-merchant | 🆕 | 疑似 token 校验/路由守卫问题，待复现定位 |
+| 15 | **P2 拼团联调 4 坑**：① Flyway 版本冲突——新迁移 `V20261010` 版本低于已有 mock 迁移 20261090，被跳过不执行；② BFF 拼团透传未带 `x-user-id` 头，marketing Security 全量 JWT → 出站 403 空数组；③ BFF `catchError` 吞业务错误（后端 HTTP 200+code≠200 如 40041/40043）→ 前端看不到真实失败原因；④ 脚本误判「成团团单应出现在招募列表」（openGroups 仅展示 OPEN 招募中团，SUCCESS 团不进招募） | marketing + BFF + H5 | ✅ | ① 迁移改名 `V20261099__group_buy.sql`（> 20261090）重打包重启；② marketing.service 统一注入 `authHeader(userId)`；③ `unwrapOrThrow`：code≠200 抛 HttpException(400, message)，H5 try/catch 展示；④ 按 detail 接口口径验证 members=2 remain=0，非产品缺陷 |
+| 16 | **AI 链路 Windows tiktoken 阻断**：langchain-openai 顶层 import tiktoken Rust 扩展被「应用程序控制策略」阻止（`DLL load failed while importing _tiktoken`），进程级必崩，SSE 5 工具全 FAIL | ai-orchestrator | ✅ | `chat_service.py` 迁移为原生 openai `AsyncOpenAI` 流式 + 手动工具循环；`convert_to_openai_tool` 生成 schema（不触发 tiktoken）；SSE 契约不变 |
+| 17 | **AI 工具触发不稳定（同 query 时好时坏）**：① system.md 第 8 条「不是客服，不处理退款/物流」与触发规则自相矛盾，模型随机拒绝；② 模型对强场景 query 偶发不调工具 | ai-orchestrator + prompts | ✅ | ① system.md 改为「命中场景必须调对应工具」；② 新增确定性工具路由 `_route_tool`（关键词命中 → 首轮 `tool_choice` 强制），SSE 5/5 PASS |
+| 18 | **LLM 超时全走兜底**：fallback.yml `llm.timeout_ms=1500` 过短（首字延迟 1~3s，整体 5~15s），LLM 必然超时 → 无真实工具调用 | ai-orchestrator | ✅ | fallback.yml 改 20000（小于 BFF aiOrchestrator 30s 超时）；服务重启加载 |
+| 19 | **asyncio.timeout 取消后 ContextVar reset 崩溃**：LLM 超时取消工具链时 generator 被 athrow 到不同 context，`finally _current_user_id.reset(token)` 抛 `ValueError: Token was created in a different Context`，吞掉正常 done | ai-orchestrator | ✅ | finally reset 包 try/except ValueError，忽略上下文不匹配 |
+| 20 | **SSE 测试脚本分隔符不兼容**：sse_starlette wire 分隔为 `\r\n\r\n`，断言脚本按 `\n\n` 分块 → 整段解析失败 calls=[] done=False（服务端实际正常） | 测试脚本 | ✅ | 断言脚本兼容 `\r\n\r\n` 与 `\n\n` 两种分隔，重跑 5/5 PASS || 1 | 管理端登录进去后，浏览目录会跳出登录 | admin-merchant | 🆕 | 疑似 token 校验/路由守卫问题，待复现定位 |
 | 2 | 需以完整用户视角在浏览器跑一遍全流程 | 全链路 | ⏳ 待验证 | 首页→AI 对话→详情→加购→下单→支付→订单，前端已就绪，待全服务启动联调 |
 | 3 | 验证码获取（临时排查命令） | auth-center | ✅ | `docker exec zhigou-redis redis-cli GET "auth:sms:15120598756"` |
 | 4 | **CI 集成测试全失败（AuthIntegrationTest HTTP 500）**：① `TEST_JDBC_URL` 键名错误（Spring 不认该键）；② MySQL/Redis 容器无显式等待策略与超时；③ payment/marketing/aftersale 测试类无 Redis 容器；④ 9 服务 `SecurityConfig @Profile("!test")` → test 下默认安全链全拒 401；⑤ cart mock URL/响应脱节、order OutboxDeliveryTask 强依赖 MQ、payment 残留旧迁移、order 断言过时 | 全服务集成测试 | ✅ | ①~③：@DynamicPropertySource 注册标准键 + waitingFor + 120s 超时 + 补 Redis 容器；④：10 服务新建 `TestSecurityConfig`（permitAll，inventory 非 Web 不导入）；⑤：cart mock 对齐、OutboxDeliveryTask `@Profile("!test")`、清理残留迁移、order 改验状态机。**`mvn verify` 全模块 78 项测试 0 失败 0 错误** |

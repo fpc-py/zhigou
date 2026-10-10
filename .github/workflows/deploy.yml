@@ -56,7 +56,8 @@ jobs:
       - name: Deploy compose services
         run: |
           ssh zhigou-prod "cd ${{ secrets.DEPLOY_PATH }} && \
-            TAG=$TAG docker compose -f infra/compose/services.yml up -d --pull always && \
+            TAG=$TAG ZHIGOU_REPO=ghcr.io/fpc-py/zhigou \
+            docker compose -f infra/compose/services.yml up -d --pull always && \
             echo '--- waiting for health ---' && \
             sleep 20 && \
             docker compose -f infra/compose/services.yml ps"

@@ -22,6 +22,31 @@
 >
 > 。
 
+## 待验证清单（已开发未测试）
+
+> 以下功能已完成代码开发与静态编译检查，**尚未进行运行态测试与 git 提交**，下次统一验证后补测补交。
+
+| 批次 | 功能 | 代码状态 | 验证状态 | 备注 |
+|---|---|---|---|---|
+| P1 第七批 | AI 送礼助手 `gift_assistant` | ✅ 已写入 tools.py + system.md | ✅ 2026-10-10 SSE 实测 PASS（工具触发+真实数据） | 随 [0.2.11] 统一提交 |
+| P2 第一批 | 购物后 AI 服务：`aftersale_assistant` + `logistics_tracker` | ✅ 已写入 tools.py + system.md | ✅ 2026-10-10 SSE 实测 PASS（售后/物流均触发） | 随 [0.2.11] 统一提交 |
+| P2 第一批 | `usage_cycle_assistant` 使用周期管理 | ✅ 已写入 tools.py + system.md | ✅ 2026-10-10 SSE 实测 PASS | 随 [0.2.11] 统一提交 |
+| P2 第一批 | H5 对话页 AI 功能快捷入口（5 卡片） | ✅ 已写入 chat/index.vue，vite build 通过 | ⏸ 未浏览器实测（接口层已全绿） | 待浏览器端到端复验 |
+| P2 拼团 | marketing 拼团后端 + AI groupbuy_finder + BFF 透传 + H5 拼团页 | ✅ 全套代码完成 | ✅ 2026-10-10 API 全链路 8/8 业务断言通过 | 随 [0.2.11] 统一提交 |
+| AI 链路 | chat_service 迁移原生 OpenAI（tiktoken 阻断修复）+ 工具路由 + 超时配置 | ✅ 重写完成 | ✅ 2026-10-10 SSE 实测 5/5 PASS | 随 [0.2.11] 统一提交 |
+| 上线就绪 | release-checklist 改写 + gray-release + monitoring-alerting + 部署资产整改 | ✅ 已完成 | ✅ 静态核验通过 | 随 [0.2.11] 统一提交 |
+
+## 2026-10-10 · 上线就绪文档（M4 对齐）
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| release-checklist.md | ✅ 改写 | 对齐真实部署资产：去掉 Nacos/K8s 残留，改为 compose 蓝绿 + middleware/services/monitoring 三编排；保留启动顺序/回滚条件/性能基准/签署结构 |
+| gray-release.md | ✅ 新建 | 灰度发布（服务分 A/B/C 三批放量 + 决策门）+ 回滚方案（镜像回退首选 / DB 回滚高风险流程 / Hotfix） |
+| monitoring-alerting.md | ✅ 新建 | RED/USE 指标体系、SLO、P1-P3 告警定级 + PromQL 规则示例、值班 SOP、日志检索 |
+| docs/README.md 索引 | ✅ 更新 | 运维域登记 gray-release / monitoring-alerting（🆕） |
+| 运行态验证 | ⏸ 未测试 | 纯文档交付（引用路径/端口已静态核验），未 git 提交，随攒批统一提交 |
+| ✅ 部署资产整改 | ✅ 已完成 | services.yml 镜像改为 ${ZHIGOU_REPO:-zhigou}/<svc>:${TAG:-0.1.0} 占位（11 服务）；deploy.yml 注入 ZHIGOU_REPO=ghcr.io/fpc-py/zhigou；compose config 双模式渲染验证通过（默认 zhigou/0.1.0、生产 ghcr.io/fpc-py/zhigou/main-<sha>）；release-checklist/gray-release 前置条件同步更新。未测试未提交 |
+
 ## 2026-10-08 · P1 第六批：跨平台比价 + 图片搜款（多模态）
 
 | 项 | 状态 | 说明 |

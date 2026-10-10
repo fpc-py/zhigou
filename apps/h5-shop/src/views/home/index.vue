@@ -119,6 +119,7 @@ const entries = [
   { icon: 'gift', label: '帮我送礼', sub: 'AI 挑礼', bg: '#FFEDE7', color: '#FF5C39', action: () => goChat('帮我挑一份礼物，预算 300 元') },
   { icon: 'closet', label: '智能衣橱', sub: '每日穿搭', bg: '#E3F7F0', color: '#00A87E', action: () => router.push('/closet') },
   { icon: 'scan', label: 'AR试穿', sub: '虚拟上身', bg: '#FFF3DF', color: '#FFA62B', action: () => router.push('/tryon') },
+  { icon: 'comm', label: '一起拼团', sub: '2 人成团', bg: '#E3EFFF', color: '#2E7DFF', action: () => router.push('/groupbuy') },
 ];
 
 const todayText = computed(() => {

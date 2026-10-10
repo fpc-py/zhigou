@@ -25,7 +25,9 @@
 | **开发** | [测试问题bug记录.md](./测试问题bug记录.md) | 已知 bug 与修复记录 | 开发者 | 每次修复 | ✅ 现行 |
 | **开发** | [mock-data-cleanup-guide.md](./mock-data-cleanup-guide.md) | Mock 数据机制与上线清除 | 开发、运维 | 数据机制变更时 | ✅ 现行 |
 | **测试** | [../scripts/smoke/zhigou-e2e.ps1](../scripts/smoke/zhigou-e2e.ps1) | 全链路联调冒烟脚本（17 步黄金路径，最新 PASS 17/17） | QA、全栈 | 每次联调 | ✅ 现行 |
-| **运维** | [release-checklist.md](./release-checklist.md) | 发布前/中/后逐项检查 | 发布负责人、QA | 每次发布 | ✅ 现行 |
+| **运维** | [release-checklist.md](./release-checklist.md) | 发布前/中/后逐项检查（对齐 compose 蓝绿部署） | 发布负责人、QA | 每次发布 | ✅ 现行 |
+| **运维** | [gray-release.md](./gray-release.md) | 灰度发布（服务分批放量）与回滚方案（镜像/DB/Hotfix） | 发布负责人、SRE | 发布流程变更时 | 🆕 新建 |
+| **运维** | [monitoring-alerting.md](./monitoring-alerting.md) | 监控指标体系、SLO、告警定级规则与值班 SOP | 发布负责人、值班开发、SRE | 指标/告警变更时 | 🆕 新建 |
 | **运维** | [load-test/](./load-test/) | 压测报告与结果数据 | 架构、SRE | 每次压测 | ✅ 现行 |
 | **战略** | [智购开发任务差距分析报告.md](./智购开发任务差距分析报告.md) | 目标态 vs 现状的差距清单与执行顺序（P0→P4）+ 生产就绪度基线（附录 A） | 项目负责人、架构 | 每次差距评估 | ✅ 现行 |
 
@@ -41,7 +43,7 @@
 | **前端开发者** | `README.md` → `apps/h5-shop/README.md` → `docs/前端改造说明-原型对齐与后端对接.md` → `docs/智购AI超级商城-企业级可交互原型.html` |
 | **后端开发者** | `CLAUDE.md` → `services/README.md` → 所属服务目录 → `docs/智购-企业级工程化技术方案.md`（第 3/4 章） |
 | **架构/评审** | `docs/智购-企业级工程化技术方案.md` → `docs/adr/` → `docs/智购开发任务差距分析报告.md` |
-| **发布负责人** | `docs/release-checklist.md` → `docs/智购开发任务差距分析报告.md`（附录 A）→ `docs/load-test/` |
+| **发布负责人** | `docs/release-checklist.md` → `docs/gray-release.md` → `docs/monitoring-alerting.md` → `docs/智购开发任务差距分析报告.md`（附录 A）→ `docs/load-test/` |
 | **产品/决策** | `docs/智购功能文档.md` → `docs/智购开发任务差距分析报告.md` → `docs/progress.md` |
 
 ---

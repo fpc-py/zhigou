@@ -29,6 +29,7 @@ const router = createRouter({
     { path: '/order/:orderId', name: 'order-detail', component: () => import('@/views/order-detail/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/address', name: 'address', component: () => import('@/views/address/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/coupons', name: 'coupons', component: () => import('@/views/coupons/index.vue'), meta: { requiresAuth: true, tabbar: false } },
+    { path: '/groupbuy', name: 'groupbuy', component: () => import('@/views/groupbuy/index.vue'), meta: { requiresAuth: true, tabbar: false } },
 
     // ── 售后 ──
     { path: '/aftersale/apply', name: 'aftersale-apply', component: () => import('@/views/aftersale/apply.vue'), meta: { requiresAuth: true, tabbar: false } },

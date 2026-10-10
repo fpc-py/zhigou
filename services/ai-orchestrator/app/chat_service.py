@@ -3,19 +3,23 @@
 
 会话记忆：当前实现为「本地 JSON 文件持久化」（零依赖，单实例部署重启不丢）。
 生产环境替换为 RedisSaver / Redis 会话存储（key: ai:session:{session_id}，TTL 7 天）。
+
+实现说明（2026-10-10 迁移）：
+- 原实现基于 langchain-openai + langgraph，其顶层 import tiktoken 的 Rust 扩展，
+  在 Windows「应用程序控制策略」下 DLL 加载被阻止（ImportError: _tiktoken），
+  导致新进程无法构建对话图。本版本改为原生 openai AsyncOpenAI 流式 + 手动工具循环，
+  工具 schema 用 langchain_core.convert_to_openai_tool（不触发 tiktoken），对外 SSE 契约不变。
 """
 
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langgraph.graph import START, MessagesState, StateGraph
-from langgraph.prebuilt import ToolNode, tools_condition
-from openai import APIError, APIConnectionError, AuthenticationError, RateLimitError
+from openai import APIError, APIConnectionError, AuthenticationError, RateLimitError, AsyncOpenAI
 
 from .config import settings
 from .fallback_config import llm_timeout_ms
@@ -25,8 +29,6 @@ from .tools import TOOLS, _current_user_id
 logger = logging.getLogger(__name__)
 
 # ── 会话持久化（生产环境应换 RedisSaver / Redis） ──
-# 存储目录：services/ai-orchestrator/data/sessions/{session_id}.json
-# 结构：[{"role": "human"|"ai", "content": "..."}]
 _SESSION_DIR = Path(__file__).resolve().parent.parent / "data" / "sessions"
 _MAX_HISTORY_ROUNDS = 12  # 注入最近 N 轮，避免 context 膨胀
 
@@ -61,7 +63,7 @@ def _load_history(session_id: str) -> list[dict]:
         data = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(data, list):
             return []
-        return data[-_MAX_HISTORY_ROUNDS * 2 :]  # 每轮 2 条（human+ai）
+        return data[-_MAX_HISTORY_ROUNDS * 2 :]
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("会话历史读取失败 session=%s: %s", session_id, e)
         return []
@@ -73,10 +75,7 @@ def _save_history(session_id: str, history: list[dict]) -> None:
         _SESSION_DIR.mkdir(parents=True, exist_ok=True)
         path = _session_file(session_id)
         data = history[-_MAX_HISTORY_ROUNDS * 2 :]
-        path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     except OSError as e:
         logger.warning("会话历史写入失败 session=%s: %s", session_id, e)
 
@@ -95,79 +94,181 @@ def clear_session(session_id: str) -> bool:
     return False
 
 
-# ── 构建 LangGraph 图 ──
+def is_empty_session(session_id: str) -> bool:
+    """会话是否为空（无历史消息）。"""
+    return not _load_history(session_id)
 
 
-def _build_graph() -> StateGraph:
-    # 延迟导入，避免 tiktoken DLL 在 Windows 下模块加载时报错
-    from langchain_openai import ChatOpenAI  # fmt: skip
+# ── 确定性工具路由（攒批/服务类场景强制触发，避免模型随机不调工具） ──
 
-    llm = ChatOpenAI(
-        base_url=settings.llm_base_url,
-        api_key=settings.llm_api_key,
-        model=settings.llm_model,
-        temperature=settings.llm_temperature,
-        streaming=True,
-    )
-
-    tool_node = ToolNode(TOOLS)
-    llm_with_tools = llm.bind_tools(TOOLS)
-
-    def call_model(state: MessagesState) -> dict[str, Any]:
-        messages = state["messages"]
-        return {"messages": [llm_with_tools.invoke(messages)]}
-
-    graph = StateGraph(MessagesState)
-    graph.add_node("agent", call_model)
-    graph.add_node("tools", tool_node)
-    graph.add_conditional_edges("agent", tools_condition)
-    graph.add_edge("tools", "agent")
-    graph.add_edge(START, "agent")
-
-    return graph
+_ROUTE_RULES: list[tuple[str, "re.Pattern"]] = [
+    ("gift_assistant", re.compile(r"送[^，。]*礼物|礼物|生日|纪念日|情人节|七夕|过节|贺卡|送[\u4e00-\u9fa5]{0,6}(妈妈|爸爸|朋友|闺蜜|同事|女票|女朋友|男朋友|家人|长辈)")),
+    ("aftersale_assistant", re.compile(r"售后|退货|换货|退款|坏了|破损|质量问题|申请售后|维修|补发|质量有问题")),
+    ("logistics_tracker", re.compile(r"物流|快递|运单|发货|配送|包裹|签收|到货|到哪了|送到")),
+    ("usage_cycle_assistant", re.compile(r"补货|囤货|保质期|快用完|用完|换新|复购|该买|提醒我|还剩多少")),
+    ("groupbuy_finder", re.compile(r"拼团|拼单|开团|参团|成团|团购")),
+]
 
 
-_graph_app = None
+def _route_tool(query: str) -> Optional[str]:
+    """对 query 做确定性场景路由；命中返回强制工具名，未命中返回 None（模型 auto 决策）。"""
+    for name, pat in _ROUTE_RULES:
+        if pat.search(query):
+            return name
+    return None
 
 
-def _get_graph():
-    global _graph_app
-    if _graph_app is None:
-        graph = _build_graph()
-        # 无 checkpointer：跨轮记忆由本地会话存储（_load_history/_save_history）自管理，
-        # 避免 MemorySaver 进程内存 + 持久化双重续接导致历史重复
-        _graph_app = graph.compile()
-    return _graph_app
+# ── 工具 schema 与分发（原生 OpenAI 工具循环，不依赖 tiktoken） ──
+
+_tool_schemas_cache: Optional[list[dict]] = None
 
 
-# ── 构建消息列表（系统提示 + 会话历史 + 当前 query） ──
+def _tool_schemas() -> list[dict]:
+    """从 TOOLS 函数签名/docstring 生成 OpenAI tools 参数。
+
+    复用 langchain_core.utils.function_calling.convert_to_openai_tool
+    （纯 Python 解析，不触发 tiktoken Rust 扩展）。
+    """
+    global _tool_schemas_cache
+    if _tool_schemas_cache is None:
+        from langchain_core.utils.function_calling import convert_to_openai_tool
+
+        _tool_schemas_cache = [convert_to_openai_tool(t) for t in TOOLS]
+    return _tool_schemas_cache
 
 
-def _build_messages(query: str, history: Optional[list[dict]] = None, image_url: str = "") -> list:
+async def _dispatch_tool(name: str, args: dict) -> Any:
+    """按工具名分发执行（TOOLS 均为 async 函数）。"""
+    for tool in TOOLS:
+        if tool.__name__ == name:
+            return await tool(**args)
+    raise ValueError(f"未知工具: {name}")
+
+
+async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Optional[str] = None) -> AsyncGenerator[dict, None]:
+    """原生 OpenAI 流式工具循环（替代 LangGraph）。
+
+    流式产出事件（与 LangGraph astream_events 契约一致）：
+      {"event": "token", "data": {"content": ...}}
+      {"event": "tool_call", "data": {"tool": ..., "args": {...}}}
+      {"event": "tool_result", "data": {"tool": ..., "result": ...}}
+    无工具调用时结束（由 chat_stream 收尾发 done）。
+    """
+    client = AsyncOpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key)
+
+    first_round = True
+    while True:
+        # 仅第一轮支持确定性路由（tool_choice 强制）；后续轮走 auto 把工具结果转自然语言
+        tool_choice: Any = (
+            {"type": "function", "function": {"name": forced_tool}}
+            if first_round and forced_tool
+            else "auto"
+        )
+        first_round = False
+        stream = await client.chat.completions.create(
+            model=settings.llm_model,
+            messages=messages,
+            tools=_tool_schemas(),
+            temperature=settings.llm_temperature,
+            stream=True,
+            tool_choice=tool_choice,
+        )
+
+        content_buf = ""
+        tool_calls: dict[int, dict] = {}
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta.content:
+                content_buf += delta.content
+                yield {"event": "token", "data": json.dumps({"content": delta.content}, ensure_ascii=False)}
+            for tc in delta.tool_calls or []:
+                slot = tool_calls.setdefault(tc.index, {"id": "", "name": "", "args": ""})
+                if tc.id:
+                    slot["id"] = tc.id
+                if tc.function and tc.function.name:
+                    slot["name"] += tc.function.name
+                if tc.function and tc.function.arguments:
+                    slot["args"] += tc.function.arguments
+
+        # 无工具调用 → 直接结束（本轮为最终答复）
+        if not tool_calls:
+            return
+
+        # 追加 assistant 消息（含 tool_calls）→ 执行工具 → 追加 tool 结果 → 下一轮
+        assistant_msg: dict[str, Any] = {"role": "assistant", "content": content_buf or None}
+        calls_payload = []
+        for idx in sorted(tool_calls):
+            tc = tool_calls[idx]
+            calls_payload.append(
+                {
+                    "id": tc["id"] or f"call_{idx}",
+                    "type": "function",
+                    "function": {"name": tc["name"], "arguments": tc["args"] or "{}"},
+                }
+            )
+        assistant_msg["tool_calls"] = calls_payload
+        messages.append(assistant_msg)
+
+        for idx in sorted(tool_calls):
+            tc = tool_calls[idx]
+            name = tc["name"]
+            try:
+                args = json.loads(tc["args"] or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            safe_args = dict(args)
+            if "userId" in safe_args:
+                safe_args["userId"] = str(safe_args["userId"])[:3] + "***"
+            yield {"event": "tool_call", "data": json.dumps({"tool": name, "args": safe_args}, ensure_ascii=False)}
+            try:
+                result = await _dispatch_tool(name, args)
+                result_str = str(result) if result is not None else ""
+            except Exception as e:  # 工具自身异常 → 反馈给 LLM 继续
+                logger.warning("工具 %s 执行失败: %s", name, e)
+                result_str = f"工具执行失败: {e}"
+            yield {"event": "tool_result", "data": json.dumps({"tool": name, "result": result_str}, ensure_ascii=False)}
+            messages.append(
+                {"role": "tool", "tool_call_id": tc["id"] or f"call_{idx}", "content": result_str}
+            )
+
+
+# ── 构建消息列表（系统提示 + 会话历史 + 当前 query，OpenAI 原生格式） ──
+
+
+def _build_messages(query: str, history: Optional[list[dict]] = None, image_url: str = "") -> list[dict]:
     global _system_prompt
     if not _system_prompt:
         _system_prompt = _load_system_prompt()
 
-    messages: list = [SystemMessage(content=_system_prompt)]
+    messages: list[dict] = [{"role": "system", "content": _system_prompt}]
     for item in history or []:
         role = item.get("role")
         content = item.get("content", "")
         if not content:
             continue
-        if role == "human":
-            messages.append(HumanMessage(content=content))
-        elif role == "ai":
-            messages.append(AIMessage(content=content))
+        messages.append({"role": "user" if role == "human" else "assistant", "content": content})
 
     # 图片搜款：强制系统指令 + 多模态首条消息（文本 + 图片），必须调 search_by_image
     if image_url:
-        messages.append(SystemMessage(content="用户上传了商品图片。你必须先调用 search_by_image 工具（入参 image_url 为图片地址）识别图片特征并搜索同款/类似商品，禁止直接文字回答跳过工具。"))
-        messages.append(HumanMessage(content=[
-            {"type": "text", "text": query or "帮我看下这张图里的商品，找同款"},
-            {"type": "image_url", "image_url": {"url": image_url}},
-        ]))
+        messages.append(
+            {
+                "role": "system",
+                "content": "用户上传了商品图片。你必须先调用 search_by_image 工具（入参 image_url 为图片地址）识别图片特征并搜索同款/类似商品，禁止直接文字回答跳过工具。",
+            }
+        )
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": query or "帮我看下这张图里的商品，找同款"},
+                    {"type": "image_url", "image_url": {"url": image_url}},
+                ],
+            }
+        )
     else:
-        messages.append(HumanMessage(content=query))
+        messages.append({"role": "user", "content": query})
     return messages
 
 
@@ -198,13 +299,11 @@ async def chat_stream(
         if not _system_prompt:
             _system_prompt = _load_system_prompt()
 
-        graph = _get_graph()
         sid = session_id or "default"
 
         # 注入会话历史（本地持久化），保证多轮长对话跨进程/重启延续
         history = _load_history(sid)
         input_messages = _build_messages(query, history, image_url)
-        inputs = {"messages": input_messages}
 
         # 收集完整回复，对话结束后写回会话存储
         response_text = ""
@@ -214,37 +313,10 @@ async def chat_stream(
 
         try:
             async with asyncio.timeout(timeout_s):
-                async for event in graph.astream_events(inputs, version="v2"):
-                    kind = event.get("event", "")
-
-                    # ── LLM token 输出 ──
-                    if kind == "on_chat_model_stream":
-                        chunk = event.get("data", {}).get("chunk", None)
-                        if chunk is not None and hasattr(chunk, "content") and chunk.content:
-                            content = chunk.content
-                            response_text += content
-                            yield {"event": "token", "data": json.dumps({"content": content}, ensure_ascii=False)}
-
-                    # ── 工具调用 ──
-                    elif kind == "on_chat_model_start":
-                        pass
-
-                    elif kind == "on_tool_start":
-                        tool_data = event.get("data", {})
-                        # LangChain astream_events v2: 工具名在事件顶层 name 字段（原取自 data.name 会得到 unknown）
-                        tool_name = event.get("name", "unknown")
-                        tool_input = tool_data.get("input", {})
-                        safe_args = dict(tool_input)
-                        if "userId" in safe_args:
-                            safe_args["userId"] = safe_args["userId"][:3] + "***"
-                        yield {"event": "tool_call", "data": json.dumps({"tool": tool_name, "args": safe_args}, ensure_ascii=False)}
-
-                    elif kind == "on_tool_end":
-                        tool_data = event.get("data", {})
-                        tool_name = event.get("name", "unknown")
-                        output = tool_data.get("output", "")
-                        output_str = str(output) if output else ""
-                        yield {"event": "tool_result", "data": json.dumps({"tool": tool_name, "result": output_str}, ensure_ascii=False)}
+                async for event in _run_agent(input_messages, timeout_s, forced_tool=_route_tool(query)):
+                    if event["event"] == "token":
+                        response_text += json.loads(event["data"])["content"]
+                    yield event
 
         except TimeoutError:
             logger.warning("LLM 超时 (timeout=%dms)，切换为兜底推荐", llm_timeout_ms())
@@ -280,4 +352,9 @@ async def chat_stream(
         yield {"event": "error", "data": json.dumps({"message": "对话处理异常，请稍后重试"}, ensure_ascii=False)}
         yield {"event": "done", "data": "null"}
     finally:
-        _current_user_id.reset(token)
+        try:
+            _current_user_id.reset(token)
+        except ValueError:
+            # asyncio.timeout 取消工具调用链时，generator 被 athrow 到不同 context，
+            # 此处 reset 可能报「Token was created in a different Context」，忽略即可
+            logger.warning("current_user_id reset 上下文不匹配（可能由 LLM 超时取消导致）")

@@ -3,9 +3,9 @@
 # 依赖：先启动 infra/compose/middleware.yml（网络 compose_default）
 # 启动：docker compose -f infra/compose/services.yml up -d
 # 说明：
-#   - 镜像：zhigou/<service>:0.1.0
-#     · 生产构建：services/<svc>/Dockerfile（多阶段，容器内 mvn 打包，需网络）
-#     · 本地构建：services/<svc>/Dockerfile.runtime（宿主 mvn 打包后 COPY jar）
+#   - 镜像：${ZHIGOU_REPO:-zhigou}/<service>:${TAG:-0.1.0}
+#     · 默认本地构建 zhigou/<svc>:0.1.0（Dockerfile.runtime）
+#     · 生产部署注入 ZHIGOU_REPO=ghcr.io/fpc-py/zhigou + TAG=<tag>（deploy.yml 蓝绿发布）
 #   - 环境变量覆盖 application.yml 占位符（DB/REDIS/ROCKETMQ/服务间 URL）
 #   - 中间件在 external 网络（compose_default，middleware.yml），
 #     depends_on 不可跨 project，故靠 restart: unless-stopped 自愈重试
@@ -34,7 +34,7 @@ x-service-common: &service-common
 services:
   auth-center:
     <<: *service-common
-    image: zhigou/auth-center:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/auth-center:${TAG:-0.1.0}
     container_name: zhigou-auth-center
     # auth-center application.yml 的 datasource 无占位符，用 Spring 宽松绑定覆盖
     environment:
@@ -43,7 +43,7 @@ services:
 
   user-service:
     <<: *service-common
-    image: zhigou/user-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/user-service:${TAG:-0.1.0}
     container_name: zhigou-user-service
     environment:
       <<: *svc-env-base
@@ -51,7 +51,7 @@ services:
 
   file-service:
     <<: *service-common
-    image: zhigou/file-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/file-service:${TAG:-0.1.0}
     container_name: zhigou-file-service
     environment:
       <<: *svc-env-base
@@ -63,7 +63,7 @@ services:
 
   product-service:
     <<: *service-common
-    image: zhigou/product-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/product-service:${TAG:-0.1.0}
     container_name: zhigou-product-service
     environment:
       <<: *svc-env-base
@@ -71,7 +71,7 @@ services:
 
   cart-service:
     <<: *service-common
-    image: zhigou/cart-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/cart-service:${TAG:-0.1.0}
     container_name: zhigou-cart-service
     environment:
       <<: *svc-env-base
@@ -82,7 +82,7 @@ services:
 
   order-service:
     <<: *service-common
-    image: zhigou/order-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/order-service:${TAG:-0.1.0}
     container_name: zhigou-order-service
     environment:
       <<: *svc-env-base
@@ -98,7 +98,7 @@ services:
 
   inventory-service:
     <<: *service-common
-    image: zhigou/inventory-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/inventory-service:${TAG:-0.1.0}
     container_name: zhigou-inventory-service
     environment:
       <<: *svc-env-base
@@ -106,7 +106,7 @@ services:
 
   payment-service:
     <<: *service-common
-    image: zhigou/payment-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/payment-service:${TAG:-0.1.0}
     container_name: zhigou-payment-service
     environment:
       <<: *svc-env-base
@@ -118,7 +118,7 @@ services:
 
   marketing-service:
     <<: *service-common
-    image: zhigou/marketing-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/marketing-service:${TAG:-0.1.0}
     container_name: zhigou-marketing-service
     environment:
       <<: *svc-env-base
@@ -126,7 +126,7 @@ services:
 
   logistics-service:
     <<: *service-common
-    image: zhigou/logistics-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/logistics-service:${TAG:-0.1.0}
     container_name: zhigou-logistics-service
     environment:
       <<: *svc-env-base
@@ -134,7 +134,7 @@ services:
 
   aftersale-service:
     <<: *service-common
-    image: zhigou/aftersale-service:0.1.0
+    image: ${ZHIGOU_REPO:-zhigou}/aftersale-service:${TAG:-0.1.0}
     container_name: zhigou-aftersale-service
     environment:
       <<: *svc-env-base
