@@ -3,6 +3,19 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.28] - 2026-10-10
+
+### docs · 文档体系全量对齐（以《智购功能文档.md》《智购-企业级工程化技术方案.md》为基准）
+
+- docs 服务清单对齐：README / CLAUDE / docs-README / services-README / 技术方案 / release-checklist / gray-release / monitoring-alerting / mock-cleanup 的 服务数 12→16（补 community-service 8091 / life-service 8092 / closet-service 8093 / wallet-service 8094）、AI 端口 8000→8095、AI 工具 5→29、目录树/端口表/架构图/AI 数据流/启动命令全量同步
+- docs progress.md 对齐：待办池按真实进度勾销（P0 收尾完成项 + P1 全项 + P2 全项，保留 4 个未闭环项：画像/收藏/浏览底座、评价增量向量、文件服务增强、BFF 熔断埋点）；「当前阶段」「风险与阻塞」更新（生产就绪度 40% 过时快照改标注）；[0.2.12] push 留痕注更新
+- docs 技术方案 v2.0：当前实现对比行（16 服务/29 工具）+ M1/M2/M3/M4 里程碑状态更新
+- docs 前端改造说明：衣橱/社区由「视觉占位」改「已实现」；AI 启动 8095
+- docs 差距报告 v2.0：正文头部加「执行状态说明（2026-10-10）」——评估时点快照与最新现状分离（P0/P1/P2 已闭环），附录 A 保留快照口径
+- docs ADR 新增 `docs/adr/ADR-0001-服务治理与AI端口迁移.md`：服务清单唯一真相 = `services/` 目录、AI 固定 8095、AI 工具清单唯一真相 = `tools.py` TOOLS 列表、文档对齐纪律（填补空 adr 死引用）
+- chore 根 README 架构图 ASCII 补 community/life/closet/wallet + AI 数据流 6-29 工具行；release-checklist 健康检查 11→16 服务
+- 校验：grep 残留失实（8000/12 个/11 服务）仅存于历史变更记录、快照附录与 ADR 背景叙述（均已标注保留口径）
+
 ## [0.2.27] - 2026-10-10
 
 ### P2 · 3.3 商家端 AI 客服与营销（一期）：评论自动回复 + 负面预警

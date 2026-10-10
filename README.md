@@ -3,7 +3,7 @@
   <img src="docs/logo.png" width="120" alt="智购" />
   <h1 align="center">智购 · AI 原生超级商城</h1>
   <p align="center">
-    AI 驱动的全渠道电商平台 · 12 微服务 · 对话式购物体验
+    AI 驱动的全渠道电商平台 · 16 微服务 · 对话式购物体验
   </p>
   <p align="center">
     <img src="https://img.shields.io/badge/Java-21-%23ED8B00?logo=openjdk" alt="Java 21" />
@@ -27,12 +27,12 @@
 
 ### 核心特性
 
-- 🤖 **AI 导购** —— 基于 LangChain + LangGraph 的对话式购物助手「小智」，SSE 流式回复，支持工具调用（搜索、查价、查库存、推荐优惠券），对话结果按关键词拉取真实商品卡
+- 🤖 **AI 导购** —— 对话式购物助手「小智」，SSE 流式回复，29 个 AI 工具（搜索/比价/差评避坑/凑单/代下单/送礼/拼团/售后/物流/补货/商家经营等），工具结果按关键词拉取真实商品卡
 - 🛍️ **完整电商闭环** —— 商品 → 购物车（服务端）→ 下单（requestId 幂等 + 真实价格）→ 沙箱支付 → 库存扣减（Redis Lua）→ 物流 → 售后逆向流程
 - 🔍 **语义搜索** —— PostgreSQL pgvector 实现商品语义检索，告别 MySQL `LIKE %keyword%`
 - 📊 **可观测** —— Prometheus + Grafana + Loki 全栈监控，RED 指标 + JVM + 业务大盘
 - 📱 **多端覆盖** —— 移动端 H5（Vue 3，8 屏对齐原型）+ 商家后台（Element Plus）+ BFF 聚合层（NestJS）
-- 🏗️ **企业级工程化** —— Monorepo + 12 微服务 + JWT 鉴权 + Flyway 迁移 + Testcontainers 测试
+- 🏗️ **企业级工程化** —— Monorepo + 16 微服务 + JWT 鉴权 + Flyway 迁移 + Testcontainers 测试 + GitHub Actions CI/CD
 
 ### 项目状态
 
@@ -41,8 +41,8 @@
 | M0 脚手架 — Monorepo + 中间件 + auth-center 登录 | ✅ |
 | M1 交易闭环 — 下单→支付→库存→物流 | ✅ 全链路联调 17/17 |
 | M2 AI 导购 — SSE + RAG + 降级 + 对话商品卡 | ✅ |
-| M3 大促压测 — 5000 QPS | ⬜ |
-| M4 上线 — 灰度 + 监控 + 回滚 | ⬜ |
+| M3 大促压测 — 5000 QPS | 🚧 BFF 层已压（718 RPS），全链路压测待做 |
+| M4 上线 — 灰度 + 监控 + 回滚 | 🚧 文档已就绪（release-checklist/gray-release/monitoring-alerting），未真执行 |
 
 > 详细进度见 [docs/progress.md](docs/progress.md)；与目标态的差距与执行顺序见 [docs/智购开发任务差距分析报告.md](docs/智购开发任务差距分析报告.md)。
 
@@ -117,7 +117,11 @@ foreach ($svc in $services) {
 | marketing-service | 8088 | 优惠券/折扣引擎 |
 | logistics-service | 8089 | 运费计算 + 物流轨迹 |
 | aftersale-service | 8090 | 售后/逆向流程（状态机） |
-| ai-orchestrator | 8000 | AI 导购（Python FastAPI） |
+| community-service | 8091 | 内容社区（笔记/短视频/直播） |
+| life-service | 8092 | 本地生活（POI/到店预约） |
+| closet-service | 8093 | 智能衣橱/家居盘点 |
+| wallet-service | 8094 | 会员钱包（余额/等级/AI 订阅） |
+| ai-orchestrator | 8095 | AI 编排（Python FastAPI，SSE 对话） |
 
 ### 3. 启动 AI 服务
 
@@ -159,7 +163,7 @@ curl -X POST http://localhost:3000/auth/login \
 curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/home/feed
 
 # AI 对话（SSE）
-curl -N -X POST http://localhost:8000/api/v1/chat/sse \
+curl -N -X POST http://localhost:8095/api/v1/chat/sse \
   -H "Content-Type: application/json" \
   -d '{"query":"推荐跑步鞋","userId":"u1001","sessionId":"s001"}'
 ```
@@ -184,8 +188,13 @@ curl -N -X POST http://localhost:8000/api/v1/chat/sse \
    └──────────┘   └────────┘ └──────┘ └────┘ └──────────┘ └─────────┘
 
    ┌──────────┐   ┌────────┐ ┌──────┐ ┌────┐ ┌──────────┐ ┌─────────┐
-   │marketing │   │logistics│ │after │ │user│ │   file   │ │   AI    │
-   │  8088    │   │  8089   │ │8090  │ │8081│ │   8082   │ │  8000   │
+   │marketing │   │logistics│ │after │ │user│ │   file   │ │community│
+   │  8088    │   │  8089   │ │8090  │ │8081│ │   8082   │ │  8091   │
+   └──────────┘   └────────┘ └──────┘ └────┘ └──────────┘ └─────────┘
+
+   ┌──────────┐   ┌────────┐ ┌──────┐ ┌────┐ ┌──────────┐ ┌─────────┐
+   │   life    │   │ closet  │ │wallet│ │ AI │ │          │ │         │
+   │  8092    │   │  8093   │ │8094  │ │8095│ │          │ │         │
    └──────────┘   └────────┘ └──────┘ └────┘ └──────────┘ └─────────┘
 
    ┌──────────────────────────────────────────────────────────────┐
@@ -215,6 +224,7 @@ curl -N -X POST http://localhost:8000/api/v1/chat/sse \
                │  3. check_inventory  │──▶ inventory-service
                │  4. get_user_profile │──▶ user-service
                │  5. apply_coupon     │──▶ marketing-service
+               │  6-29. 比价/避坑/凑单/送礼/拼团/售后/物流/商家经营 │──▶ 各业务服务
                └─────────────────────┘
                           │
                           ▼
@@ -255,14 +265,14 @@ curl -N -X POST http://localhost:8000/api/v1/chat/sse \
 |------|------|
 | 编排 | Docker Compose |
 | 部署 | K8s (Helm chart 开发中) |
-| CI | (待接入，见差距报告附录 A P1-6) |
+| CI | GitHub Actions 已接入（build-test→镜像→部署，13 checks 绿） |
 | 迁移 | Flyway |
 
 ## 项目结构
 
 ```
 zhigou/
-├── services/                    # 微服务 (11 Java + 1 Python)
+├── services/                    # 微服务 (15 Java + 1 Python)
 │   ├── auth-center/             #   认证中心 :8080
 │   ├── user-service/            #   用户服务 :8081
 │   ├── file-service/            #   文件服务 :8082
@@ -274,7 +284,11 @@ zhigou/
 │   ├── marketing-service/       #   营销 :8088
 │   ├── logistics-service/       #   物流 :8089
 │   ├── aftersale-service/       #   售后 :8090
-│   └── ai-orchestrator/         #   AI 导购 (Python FastAPI) :8000
+│   ├── community-service/         #   内容社区 :8091
+│   ├── life-service/              #   本地生活 :8092
+│   ├── closet-service/            #   智能衣橱/家居 :8093
+│   ├── wallet-service/            #   会员钱包 :8094
+│   └── ai-orchestrator/           #   AI 编排 (Python FastAPI) :8095
 ├── apps/                        # 前端应用
 │   ├── bff-shop/                #   BFF 聚合层 (NestJS) :3000
 │   ├── h5-shop/                 #   移动端 H5 (Vue 3) :5173

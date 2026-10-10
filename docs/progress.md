@@ -132,7 +132,7 @@
 
 ## 当前阶段
 
-**M1 交易闭环收尾**（目标态 P0）+ M2 AI 导购已交付。下一步按差距报告 P0 → P1 推进。
+**P0 交易闭环 / P1 决策辅助 / P2 生态矩阵 + 商家端 AI 全部闭环**（[0.1.1]~[0.2.27]）。剩余：P0 技术收尾项（用户画像/收藏/浏览底座、评价增量向量、文件服务增强、BFF 熔断埋点）→ M3 全链路压测 → M4 上线执行。文档体系已按《智购功能文档.md》《智购-企业级工程化技术方案.md》对齐（[0.2.28]）。
 
 ## 里程碑
 
@@ -227,23 +227,23 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 
 
 
-* [ ] 交易最终一致性（RocketMQ 事务消息 + outbox 投递任务）
+* [x] ~~交易最终一致性（RocketMQ 事务消息 + outbox 投递任务）~~（outbox 表 + 投递任务 + RocketMQ 事务消息已落地，见 CHANGELOG [0.2.x]）
 
-* [ ] 超时关单 / 支付对账 / 退款资金流
+* [x] ~~超时关单 / 支付对账 / 退款资金流~~（RocketMQ 延迟关单 + reconcile 对账 + 售后退款资金流已闭环）
 
-* [ ] 售后全流程 + 凭证上传 MinIO
+* [x] ~~售后全流程 + 凭证上传 MinIO~~（申请→审核→退货入库→退款→拒绝全流程 + 凭证 MinIO 已闭环）
 
-* [ ] 营销活动 + 凑单最优组合 + 防超卖
+* [x] ~~营销活动 + 凑单最优组合 + 防超卖~~（券/满减/拼团 + optimize_cart 凑单 + 库存 Lua 防超卖已交付）
 
 * [ ] 评价增量向量更新（pgvector）
 
-* [ ] 用户画像 / 收藏 / 浏览历史 / 会员基础
+* [ ] 用户画像 / 收藏 / 浏览历史 / 会员基础——**未闭环**（会员基础随 wallet 已部分落地，画像/收藏/浏览底座待开发）
 
-* [ ] 文件服务增强（压缩 / 转格式 / 鉴权）
+* [ ] 文件服务增强（压缩 / 转格式 / 鉴权）——**未闭环**（MinIO 上传已有，增强待开发）
 
-* [ ] BFF 补全 + 埋点 + 熔断降级 + SSE 重连
+* [ ] BFF 补全 + 埋点 + 熔断降级 + SSE 重连——**部分完成**（接口聚合已补全，埋点/熔断降级/SSE 重连待开发）
 
-* [ ] 前端售后页 + 商家后台业务页
+* [x] ~~前端售后页 + 商家后台业务页~~（H5 售后 tab/详情已交付；商家后台以商家中心 H5 承载，admin-merchant 未扩展）
 
 * [x] ~~Java 服务 JWT 过滤器（11 个）~~（联调确认已存在并生效）
 
@@ -265,37 +265,33 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 - [x] ~~AI 凑单优化器（券+满减最优组合）~~（[0.2.4] optimize_cart 工具交付：购物车+SKU 现价+满减引擎+逐券试算）
 - [x] ~~一键代下单（Agent 对接下单 + 用户确认流）~~（[0.2.4] create_order 工具交付：真实下单 + 用户确认流实测）
 - [x] ~~会话记忆持久化（当前 MemorySaver 进程内存）~~（[0.2.4] 本地文件持久化 + DELETE 清空接口 + H5 清空按钮；生产注释换 Redis）
+- [x] ~~需求拆解 / 跨平台比价 / 差评避坑~~（analyze_requirement / compare_prices / review_analysis，已上 SSE 链路）
+- [x] ~~推荐引擎（行为 + 画像）~~（[0.2.5] recommend_products + /recommend 可解释推荐，含刷评/已购标记）
+- [x] ~~图片搜款 / 多模态~~（[0.2.6] search_by_image 视觉搜款 + H5 相机入口）
+- [x] ~~推荐理由标准化（可解释性）~~（recommend 返回理由 + RAG 溯源）
 
 
 
 
-* [ ] 需求拆解模块（模糊需求 → 预算 / 场景 / 品类 / 偏好结构化）
-
-* [ ] 跨平台比价（外部价格源 + 最优购买方案）
-
-* [ ] 差评分析 / 避坑指南
-
-* [ ] 推荐引擎（行为 + 画像）
-
-* [ ] AI 凑单优化器 / 一键代下单（用户确认流）
-
-* [ ] 会话记忆（多轮持久化 + 会话清空）
-
-* [ ] 推荐理由标准化（可解释性）
+* [x] ~~需求拆解（analyze_requirement）~~ ✅
+* [x] ~~跨平台比价（compare_prices，6 渠道演示口径）~~ ✅
+* [x] ~~差评分析 / 避坑指南（review_analysis）~~ ✅
+* [x] ~~推荐引擎（recommend_products，画像+评分+可解释）~~ ✅
+* [x] ~~AI 凑单优化器 / 一键代下单（用户确认流）~~ ✅
+* [x] ~~会话记忆（持久化 + 清空）~~ ✅
+* [x] ~~推荐理由标准化（可解释性）~~ ✅
 
 ### P2+・生态矩阵 / 远期（立项评估后）
 
 
 
-* [ ] 社交购物（AI 送礼 / 拼团）/ 内容社区 / 本地生活（新业务域）
-
-* [ ] 商家端 AI 经营体系
-
-* [ ] 智能衣橱 / 家居管理
-
-* [ ] AI 会员订阅体系（¥29 / ¥99 权益）
-
-* [ ] P3-P4：多模态搜款、AR/VR、数字人（无技术底座，先用图像搜款验证）
+* [x] ~~社交购物（AI 送礼 / 拼团）~~（[0.2.9-0.2.11] gift_assistant + groupbuy_finder + marketing 拼团）
+* [x] ~~内容社区~~（[0.2.12-0.2.13] community-service：笔记/短视频/直播 + 虚假内容识别）
+* [x] ~~本地生活~~（[0.2.14] life-service：POI/到店预约，成都商圈演示数据）
+* [x] ~~智能衣橱 / 家居管理~~（[0.2.15] closet-service：衣物/穿搭/家居盘点）
+* [x] ~~AI 会员订阅体系（¥29 / ¥99 权益）~~（[0.2.19] wallet-service 订阅 + 权益）
+* [x] ~~商家端 AI 经营体系~~（[0.2.17]-[0.2.27]：经营大脑/客服营销/供应链/物流/售后）
+* [ ] P3-P4：多模态搜款（✅ 已验证）、AR/VR、数字人、个人购物大模型（无技术底座，待立项评估）
 
 ## 风险与阻塞
 
@@ -303,10 +299,12 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 
 | 风险          | 等级 | 说明                                                                                                    |
 | ----------- | -- | ----------------------------------------------------------------------------------------------------- |
-| 生产就绪度约 40%  | P0 | 全链路已联调跑通（17/17），但 9 个服务无 Dockerfile、无 CI/CD、RocketMQ 事务消息与支付对账仍为骨架 —— 详见 `docs/智购开发任务差距分析报告.md`（附录 A） |
-| 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化                                                            |
+| 生产就绪度（附录 A 快照 30%） | P0 | 快照过时：JWT 过滤器/日志脱敏/Dockerfile/CI-CD/k6 压测已补齐，RocketMQ 事务消息与支付对账已闭环 —— 详见 `docs/智购开发任务差距分析报告.md`（附录 A，落地以本文件为准） |
+| 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项） |
 
 ## 变更记录
+* 2026-10-10：**文档体系对齐（[0.2.28]）**：以《智购功能文档.md》《智购-企业级工程化技术方案.md》为基准对齐 10+1 份文档 —— ① README/CLAUDE/docs-README：服务 12→16（补 community/life/closet/wallet）、AI 8000→8095、AI 工具 5→29、CI 已接入（13 checks 绿）、目录树/端口表/架构图/数据流/启动命令同步；② progress：待办池按真实进度勾销（P0 收尾完成项 + P1 全项 + P2 全项，保留 4 个未闭环项）、当前阶段/风险与阻塞更新、[0.2.12] push 留痕注更新；③ 技术方案 v2.0：「当前实现」对比行（16 服务/29 工具）+ 里程碑 M2-M4 状态；④ 前端改造说明：衣橱/社区改「已实现」、AI 启动 8095；⑤ release-checklist / gray-release / monitoring-alerting / mock-data-cleanup-guide：服务清单/分批表/监控 targets/mock 表补 4 个新服务；⑥ 新建 `docs/adr/ADR-0001-服务治理与AI端口迁移.md`（填补空 adr 引用，对齐技术方案 ADR 纪律）。
+
 * 2026-10-10：**P2 3.3 商家端 AI 客服与营销一期（[0.2.27]）**：评论自动回复 + 负面预警 —— product-service Flyway `V20261093__merchant_review_reply.sql`（review_reply 表）+ `GET /product/review/merchant/pending`（情感 + AI 建议话术）+ `POST /product/review/merchant/reply`；AI `review_assistant`（TOOLS 29，pending/reply 双动作）+ system.md/路由；BFF 2 端点；H5 商家中心「评论管理」区块。修复：AI f-string 引号/转义坑、BizException 包路径、ReviewReply import。验证：直连 pending 8 含 3 负面、reply 移出；SSE PASS（负面盘点+一键回复模板）；BFF pending=9/3 负面；双端构建 PASS。
 
 * 2026-10-10：**P2 3.3 商家端 AI 经营大脑二期（[0.2.26]）**：动态定价 `GET /product/merchant/pricing`（趋势/库存/竞品 → UP/DOWN/HOLD + 建议价，演示口径）+ 营销方案 `GET /marketing/plan`（会员价/拼团/满减策略 + 渠道，演示口径）；AI `dynamic_pricing` + `marketing_plan`（TOOLS 28）+ system.md/路由；BFF 2 端点；H5 经营大脑区块追加定价+营销子区。修复：BFF 服务名拼写（marketingService→marketingSvc，含 timeout 引用）。验证：直连 pricing 3/plan 3、SSE 双 PASS、BFF 三层 PASS、双端构建 PASS。
@@ -327,7 +325,7 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 
 * 2026-10-10：**P2 内容社区二期（[0.2.13]）**：短视频（图文 MVP，video_url 兼容真实视频 URL 即插即用）+ 直播（状态机预告/直播中/已结束，直播流演示占位标注）。community-service V2 迁移 2 表 + seed；BFF +7 路由；H5 短视频竖屏 feed 页 + 直播列表/详情页 + 首页宫格 2 入口 + 社区 tab。验证：直连 8/8、BFF 接口全通、H5 构建通过、浏览器渲染验证（短视频 5 条/直播 2 场）。
 
-* 2026-10-10（注）：**git push 待重试**——[0.2.12] 与 [0.2.11 防编造补充] 两个 commit 已在本地（origin/main 落后 2），push 多次因 GitHub 443/Connection reset 失败，网络恢复后重试 `git push origin main`。
+* 2026-10-10（注）：**[0.2.12]/[0.2.11] push 曾因 GitHub 443 失败**——已于后续批次全部推送成功（origin/main 与本地一致），此注仅为留痕。
 
 * 2026-10-10：**P2 内容社区 MVP（[0.2.12]）**：新增 community-service（8091，笔记/评论/点赞收藏/虚假内容识别 SPAM_WORDS+重复检测）；AI 种草文案 writer（真实数据锚点）；BFF 透传 8 路由 + 雪花 ID 字符串化修复 + ai-writer 超时豁免；H5 社区页换真（信息流/发布/AI 写文案/详情评论/营销标记）。验证：直连 11/11、BFF 全链路 7/7、双端构建通过；浏览器 UI 点按实测受 bu 会话 viewport 异常未完成（页面渲染文本验证通过，交互以 API 验收为准）。
 

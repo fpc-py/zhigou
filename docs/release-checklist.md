@@ -53,14 +53,14 @@
 
 - [ ] Java 服务编译打包
   ```bash
-  cd services && mvn -pl auth-center,user-service,file-service,product-service,cart-service,order-service,inventory-service,payment-service,marketing-service,logistics-service,aftersale-service -am clean package -DskipTests
+  cd services && mvn -pl auth-center,user-service,file-service,product-service,cart-service,order-service,inventory-service,payment-service,marketing-service,logistics-service,aftersale-service,community-service,life-service,closet-service,wallet-service -am clean package -DskipTests
   ```
 - [ ] Docker 镜像构建并推送（tag 用 git SHA / 版本，**禁止 `latest`**）
   ```bash
   # CI 已自动完成（.github/workflows/ci.yml build-images：GHCR 推送 ghcr.io/fpc-py/zhigou/<svc>）
   # 本地构建（与 services.yml 默认一致）：
   SHA=$(git rev-parse --short HEAD)
-  for svc in auth-center user-service file-service product-service cart-service order-service inventory-service payment-service marketing-service logistics-service aftersale-service; do
+  for svc in auth-center user-service file-service product-service cart-service order-service inventory-service payment-service marketing-service logistics-service aftersale-service community-service life-service closet-service wallet-service; do
     docker build -t zhigou/$svc:0.1.0 -f services/$svc/Dockerfile.runtime services/$svc
   done
   ```
@@ -118,9 +118,13 @@
 9. payment-service       MySQL + RocketMQ         GET /actuator/health
 10. logistics-service    MySQL + auth             GET /actuator/health
 11. aftersale-service    MySQL + RocketMQ         GET /actuator/health
-12. ai-orchestrator      PG + RocketMQ + LLM      GET /health
-13. BFF                  auth + product + …       GET /health
-14. H5 / Admin CDN       BFF                      HTTP 200
+12. community-service     MySQL + auth             GET /actuator/health
+13. life-service          MySQL + auth             GET /actuator/health
+14. closet-service         MySQL + auth             GET /actuator/health
+15. wallet-service         MySQL + auth             GET /actuator/health
+16. ai-orchestrator        PG + RocketMQ + LLM      GET /health（venv，端口 8095）
+17. BFF                  auth + product + …       GET /health
+18. H5 / Admin CDN       BFF                      HTTP 200
 ```
 - [ ] 前序服务健康通过后再启后续（本机经验：product 启动约 60-70s，等待而非跳过）
 - [ ] Windows 本地注意：RocketMQ broker IP 修复脚本 `scripts/mq-fix-broker-ip.ps1`（如生产者超时）
@@ -135,7 +139,7 @@
 
 ### 3.1 蓝绿切换与健康确认
 
-- [ ] 新服务容器 `docker inspect --format '{{.State.Health.Status}}'` 全部 `healthy`（deploy.yml 已内置 11 服务健康检查）
+- [ ] 新服务容器 `docker inspect --format '{{.State.Health.Status}}'` 全部 `healthy`（deploy.yml 已内置 16 服务健康检查）
 - [ ] 旧容器未清理前，流量不切换（蓝绿交替：新服务健康后移除旧容器）
 - [ ] Prometheus target 全部 UP
   ```bash

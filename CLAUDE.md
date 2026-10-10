@@ -31,7 +31,7 @@ zhigou/
 ├── CONTRIBUTING.md            # 贡献规范
 ├── CHANGELOG.md               # 变更记录
 ├── pom.xml                    # Maven 父 POM
-├── services/                  # 每个微服务一个目录（12 个）
+├── services/                  # 每个微服务一个目录（16 个）
 │   ├── auth-center/           #   :8080 认证中心
 │   ├── user-service/          #   :8081 用户
 │   ├── file-service/          #   :8082 文件
@@ -43,7 +43,11 @@ zhigou/
 │   ├── marketing-service/     #   :8088 营销
 │   ├── logistics-service/     #   :8089 物流
 │   ├── aftersale-service/     #   :8090 售后
-│   └── ai-orchestrator/       #   :8000 AI 导购 (Python FastAPI)
+│   ├── community-service/       #   :8091 内容社区
+│   ├── life-service/            #   :8092 本地生活
+│   ├── closet-service/          #   :8093 智能衣橱/家居
+│   ├── wallet-service/          #   :8094 会员钱包
+│   └── ai-orchestrator/         #   :8095 AI 编排 (Python FastAPI)
 ├── apps/
 │   ├── bff-shop/              # BFF 聚合层 (NestJS, :3000)
 │   ├── h5-shop/               # 移动端 H5 (Vue 3, :5173)
@@ -125,8 +129,9 @@ mvn -pl services/order-service test
 # 构建全部 Java 服务
 mvn -DskipTests package
 
-# AI 服务
-cd services/ai-orchestrator && pip install -r requirements.txt && python main.py
+# AI 服务（venv + 8095，勿用系统 Python）
+cd services/ai-orchestrator && .venv\Scripts\activate && uvicorn app.main:app --port 8095
+# 或 python main.py（内部固定 8095）；改代码后需杀端口进程重启才生效
 
 # BFF / 前端（注意：本仓库用 npm，不用 pnpm）
 cd apps/bff-shop && npm install && npm run start:dev

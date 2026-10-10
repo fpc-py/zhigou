@@ -1,7 +1,7 @@
 # 智购 · 监控告警与值班
 
 > 回答"生产怎么知道出事了、怎么定级、谁处理"。
-> 可观测性栈：Prometheus（抓取 11 服务 `/actuator/prometheus`）+ Grafana（RED 面板 `zhigou-red.json`）+ Loki（日志检索），编排见 `infra/compose/monitoring.yml`。
+> 可观测性栈：Prometheus（抓取 16 服务 `/actuator/prometheus`）+ Grafana（RED 面板 `zhigou-red.json`）+ Loki（日志检索），编排见 `infra/compose/monitoring.yml`。
 
 ---
 
@@ -101,7 +101,7 @@ groups:
 
 ## 五、上线前可观测性自检
 
-- [ ] Prometheus target 全部 UP（11 服务）
+- [ ] Prometheus target 全部 UP（16 服务）
 - [ ] Grafana RED 面板各图有数据（非空）
 - [ ] 日志接入 Loki 且可按 traceId 检索
 - [ ] 告警规则已加载（`rules.yml`）且 P1/P2 关键规则做过触发演练

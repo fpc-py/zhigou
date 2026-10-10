@@ -19,7 +19,7 @@
 
 | 批次 | 服务 | 放量观察要点 |
 |---|---|---|
-| A 批（边缘） | file-service / marketing-service / logistics-service | 无核心链路回归；日志无 ERROR 激增 |
+| A 批（边缘） | file-service / marketing-service / logistics-service / community-service / life-service / closet-service / wallet-service | 无核心链路回归；日志无 ERROR 激增 |
 | B 批（核心） | product-service / inventory-service / cart-service / order-service / payment-service / aftersale-service | 交易链路冒烟（e2e-order）；库存/订单一致性 |
 | C 批（入口） | auth-center / user-service / BFF / H5 / AI Orchestrator | 登录、SSE 对话、AI 工具抽测 |
 

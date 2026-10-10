@@ -77,7 +77,7 @@
 zhigou/
 ├── README.md / CLAUDE.md / CONTRIBUTING.md / CHANGELOG.md   ← 项目入口
 ├── docs/                ← 本文档索引的全部文档
-├── services/            ← 12 个服务（见 services/README.md）
+├── services/            ← 16 个服务（见 services/README.md）
 ├── apps/
 │   ├── bff-shop/        ← BFF 聚合层（README 见 apps/bff-shop/README.md）
 │   ├── h5-shop/         ← 移动端 H5（README 见 apps/h5-shop/README.md）

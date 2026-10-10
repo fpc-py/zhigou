@@ -44,7 +44,7 @@ java -jar services/product-service/target/zhigou-product-service-0.1.0-SNAPSHOT.
 
 ### 2.2 启动全部服务
 
-对 11 个服务分别带上 `--spring.profiles.active=dev` 启动即可（端口见下表）。
+对 16 个服务分别带上 `--spring.profiles.active=dev` 启动即可（端口见下表）。
 
 ### 2.3 验证 Mock 已导入
 
@@ -108,6 +108,10 @@ powershell -ExecutionPolicy Bypass -File scripts/mock-data/clean-mock.ps1 -SkipC
 | zhigou_marketing | user_coupon, discount_snapshot, coupon_template, promotion_rule |
 | zhigou_logistics | track_event, shipment, freight_template |
 | zhigou_aftersale | aftersale_order |
+| zhigou_community | community_note, community_comment, community_like, community_video, community_live |
+| zhigou_life | life_poi, life_sku, life_appointment |
+| zhigou_closet | closet_item, closet_outfit, home_inventory |
+| zhigou_wallet | wallet_account, wallet_transaction, subscription |
 
 > 说明：清除范围包含 DDL 迁移里自带的种子数据（category / brand / coupon_template / freight_template），
 > 上线时应一并清除，由运营重新录入正式基础数据。
@@ -176,6 +180,10 @@ Get-Content backup_20261003_120000.sql | docker exec -i zhigou-mysql mysql -uroo
 | marketing-service | 8088 | zhigou_marketing | V20261090__mock_marketing.sql |
 | logistics-service | 8089 | zhigou_logistics | V20261090__mock_logistics.sql |
 | aftersale-service | 8090 | zhigou_aftersale | V20261090__mock_aftersale.sql |
+| community-service | 8091 | zhigou_community | V20261090__mock_community.sql |
+| life-service | 8092 | zhigou_life | V20261090__mock_life.sql |
+| closet-service | 8093 | zhigou_closet | V20261090__mock_closet.sql |
+| wallet-service | 8094 | zhigou_wallet | V20261090__mock_wallet.sql |
 
 ---
 
