@@ -3,6 +3,16 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.29] - 2026-10-10
+
+### P0 · 用户画像 / 收藏 / 浏览历史底座（favoriteIds 精度修复）
+
+- feat(P0) `user-service` 画像底座：Flyway `V20261091__user_favorite_browse.sql`（`user_favorite` + `user_browse_history`，UNIQUE(user_id,spu_id,deleted)、商品快照、browse_count 累加、idx_user_time）；实体/2 Mapper；DTO `ProductTrackRequest/ProductTrackItem/UserInsightResponse`；`UserProfileService+Impl`（收藏幂等刷新快照、取消、分页、favoriteIds、浏览同 SPU 聚合 + DuplicateKeyException 兜底、recentBrowse limit 钳 1-100、insight 实时聚合：品类词表 + 价位带众数 + 最近 Top5）；Controller 8 端点（favorite 增删查/ids/check、browse 记/查、insight）；SecurityConfig 放行 `/user/insight`
+- feat(P0) BFF 透传 +9 路径（user.types.ts / user.service.ts / user.controller.ts，catchError 降级）；AI `analyze_user_context` 三源融合（user-service `/user/insight` + 历史订单 + 画像并入，TOOLS 仍 29）；H5 详情页收藏/浏览真接口 + `/favorites` `/history` 页 + 我的页入口
+- fix(P0) **JS Number 精度丢失（#32）**：`GET /user/favorite/ids` 曾返回 `[1000000000000000300, …]`（应为 `…201`）——19 位 Snowflake Long 超出 2^53，`JSON.parse` 后 201→300、101→100；根因为 BFF 透传未字符串化。修复：后端 `favoriteIds` 改返回 `List<String>`（`String.valueOf(spuId)`），checkFavorite 改字符串比较；BFF/H5 已按 `string[]` 透传比较
+- fix(P0) 编码事故修复：PowerShell ANSI 写回 Java 致 `UserProfileServiceImpl/UserProfileController` 中文乱码 + 注释吞行，重写两文件（UTF-8 无 BOM）+ 词表对齐 tools.py `_CATEGORY_WORDS`
+- 验证：8081 直连 + BFF `favorite/ids` 均返回 `["1000000000000000201","1000000000000000101"]`；BFF 8 端点全 200（增/查/ids/check/浏览/最近/insight/删）；H5 浏览器端到端 PASS（详情页收藏写入 + 刷新「已收藏」态初始化 + /favorites 1 件 + /history 看过 2 次同 SPU 聚合 + 我的页入口）
+
 ## [0.2.28] - 2026-10-10
 
 ### docs · 文档体系全量对齐（以《智购功能文档.md》《智购-企业级工程化技术方案.md》为基准）

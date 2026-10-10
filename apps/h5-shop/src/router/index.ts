@@ -42,6 +42,10 @@ const router = createRouter({
     // ── 售后 ──
     { path: '/aftersale/apply', name: 'aftersale-apply', component: () => import('@/views/aftersale/apply.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/aftersale/:no', name: 'aftersale-detail', component: () => import('@/views/aftersale/detail.vue'), meta: { requiresAuth: true, tabbar: false } },
+
+    // ── 用户画像底座：我的收藏 / 浏览历史 ──
+    { path: '/favorites', name: 'favorites', component: () => import('@/views/user/favorites.vue'), meta: { requiresAuth: true, tabbar: false } },
+    { path: '/history', name: 'history', component: () => import('@/views/user/history.vue'), meta: { requiresAuth: true, tabbar: false } },
   ],
 });
 

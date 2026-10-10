@@ -95,6 +95,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getProductDetail } from '@/api/product';
 import { addCart } from '@/api/cart';
+import { addFavorite, removeFavorite, favoriteIds, recordBrowse } from '@/api/user';
 import { useUserStore } from '@/stores/user';
 import type { ProductDetailData } from '@/api/product';
 import { showToast, formatPrice } from '@/utils';
@@ -136,6 +137,24 @@ async function loadDetail() {
   error.value = false;
   try {
     detail.value = await getProductDetail(spuId);
+    if (!userStore.isLoggedIn) return;
+    // 记录浏览（画像底座：同 SPU 聚合次数）
+    const sku = defaultSku();
+    const pd = p.value;
+    if (pd?.name) {
+      recordBrowse({
+        spuId,
+        skuId: sku?.skuId,
+        spuName: pd.name,
+        price: pd.priceMin ?? undefined,
+        imageUrl: mainImage.value || undefined,
+      }).catch(() => {});
+    }
+    // 收藏状态
+    try {
+      const ids = await favoriteIds();
+      faved.value = ids.includes(spuId);
+    } catch { /* 保持默认 */ }
   } catch {
     error.value = true;
   } finally {
@@ -184,10 +203,29 @@ function buyNow() {
   router.push(`/checkout?skuId=${sku.skuId}&count=1&from=buy`);
 }
 
-function toggleFav() {
+async function toggleFav() {
   if (!ensureLogin()) return;
-  faved.value = !faved.value;
-  showToast(faved.value ? '已收藏' : '已取消收藏');
+  try {
+    const sku = defaultSku();
+    const pd = p.value;
+    if (faved.value) {
+      await removeFavorite(spuId);
+      faved.value = false;
+      showToast('已取消收藏');
+    } else {
+      await addFavorite({
+        spuId,
+        skuId: sku?.skuId,
+        spuName: pd?.name,
+        price: pd?.priceMin ?? undefined,
+        imageUrl: mainImage.value || undefined,
+      });
+      faved.value = true;
+      showToast('已收藏');
+    }
+  } catch {
+    showToast('操作失败，请稍后再试');
+  }
 }
 
 function goCompare() {

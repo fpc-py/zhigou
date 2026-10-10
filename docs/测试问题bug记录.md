@@ -1,5 +1,13 @@
 # 测试问题 & Bug 记录
 
+## #32 · [0.2.29] JS Number 精度丢失：BFF favorite/ids 返回 300 而非 201（已修复）
+
+- **现象**：`GET /user/favorite/ids`（BFF 3000 透传）返回 `[1000000000000000300, 1000000000000000100]`，而 8081 直连与 Node 原生 http 均返回 `[1000000000000000201, 1000000000000000101]`；前端详情页收藏态判断受影响
+- **根因**：**JS Number 精度丢失**——19 位 Snowflake Long（1000000000000000201）超出 2^53 安全整数，`JSON.parse` 后 201→300、101→100。已排除：axios keepAlive/连接池、dist mock、路由冲突、多进程、重启竞态、localhost/127.0.0.1 差异、代理环境变量、拦截器（均验证为死路）；`node -e` 验证 `JSON.stringify(1000000000000000201)` = `"1000000000000000300"` 实锤
+- **修复**：后端 `UserProfileService.favoriteIds` 改返回 `List<String>`（`String.valueOf(spuId)`，与 ProductTrackItem.spuId ToStringSerializer 口径一致）；`checkFavorite` 改 `contains(String.valueOf(spuId))` 字符串比较；BFF/H5 已按 `string[]` 透传（前端无需改）
+- **教训**：19 位 ID 跨层必须字符串透传（CLAUDE.md 红线再次验证——收藏/浏览/画像底座同款）；BFF 层禁止 Number() 化；`\uFEFF` BOM 与 ANSI 写回均会破坏 Java 文件（Java 源码必须 UTF-8 无 BOM）
+- **验证**：8081 直连 + BFF 均返回 `["1000000000000000201","1000000000000000101"]`；H5 详情页刷新「已收藏」态正确（favoriteIds 字符串比较）
+
 ## #26 · [0.2.22] order Flyway mock 版本陷阱 + orderIds 字符串反序列化 500 + BFF Number() 丢精度（已修复）
 
 - **现象**：① 新增 V20261002__fulfillment_action 被 order 库已应用的 mock V20261090 覆盖（版本更小被跳过），fulfillment_action 表未建，/order/stats/pending-fulfillment 报 500；② 后端 `List<Number>` 拒收 JSON 字符串 orderId，POST /order/fulfillment/action 返回 500；③ BFF 将 19 位 Snowflake orderId 经 `Number()` 化后回传，精度丢失致后端「订单不存在」

@@ -120,4 +120,11 @@ export const SERVICE_PATHS = {
   walletLevel:        '/wallet/level',
   walletSubscribe:    '/wallet/subscribe',
   walletSubscription: '/wallet/subscription',
+  userFavorite:       '/user/favorite',
+  userFavoriteIds:    '/user/favorite/ids',
+  userFavoriteCheck:  (spuId: string) => `/user/favorite/check?spuId=${spuId}`,
+  userFavoriteDelete: (spuId: string) => `/user/favorite/${spuId}`,
+  userBrowse:         '/user/browse',
+  userBrowseRecent:   (limit: number) => `/user/browse/recent?limit=${limit}`,
+  userInsight:        '/user/insight',
 };

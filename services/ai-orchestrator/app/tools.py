@@ -412,20 +412,32 @@ async def review_analysis(spu_id: str) -> str:
 @tool
 async def analyze_user_context() -> str:
     """
-    隐性需求挖掘。分析当前用户的历史订单，提炼购买偏好：常购品类、常用价位带、复购倾向。
+    隐性需求挖掘。分析当前用户的画像底座（收藏 + 浏览历史）与历史订单，
+    提炼购买偏好：常购品类、常用价位带、复购倾向。
     用户在表达需求时没说清偏好，或说"参考我买过的""我之前买过""跟上次差不多"时调用，
     用于补全隐性约束，让推荐更贴合用户历史习惯。用户身份由服务端注入，无需传参。
     """
     try:
         user_id = _get_current_user()
-        url = f"{settings.order_service_url}/order/mine?userId={user_id}"
         headers = {"x-user-id": user_id}
+
+        # ① 用户画像底座（收藏 + 浏览历史 + 偏好聚合；user-service 内网直连已放行）
+        insight: dict | None = None
+        try:
+            url = f"{settings.user_service_url}/user/insight"
+            data = await _http_get(url, timeout=3.0, headers=headers)
+            insight = data.get("data") or None
+        except Exception as e:
+            logger.warning("analyze_user_context 画像底座不可用 userId=%s: %s", user_id, e)
+
+        # ② 历史订单统计
+        url = f"{settings.order_service_url}/order/mine?userId={user_id}"
         data = await _http_get(url, timeout=5.0, headers=headers)
         orders = data.get("data") or []
-        if not orders:
-            return "用户暂无历史订单，无法提炼购买偏好（推荐将按通用流程进行）。"
 
-        # 品类统计（按 skuName 关键词归类）
+        if not orders and not insight:
+            return "用户暂无历史行为（无订单 / 收藏 / 浏览），无法提炼购买偏好（推荐将按通用流程进行）。"
+
         category_count: dict[str, int] = {}
         price_points: list[int] = []
         total_items = 0
@@ -439,6 +451,20 @@ async def analyze_user_context() -> str:
                 cat = _match_word(name, _CATEGORY_WORDS)
                 if cat:
                     category_count[cat] = category_count.get(cat, 0) + cnt
+
+        # ③ 画像偏好并入（收藏/浏览品类 + 价位带 + 最近浏览）
+        profile_categories: list[str] = (insight or {}).get("topCategories") or []
+        profile_band = (insight or {}).get("priceBand")
+        for cat in profile_categories:
+            category_count[cat] = category_count.get(cat, 0) + 1
+        recent_browse = [
+            {
+                "spuName": (it or {}).get("spuName"),
+                "price": (it or {}).get("price"),
+                "browseCount": (it or {}).get("browseCount"),
+            }
+            for it in ((insight or {}).get("recentBrowse") or [])[:3]
+        ]
 
         # 价位带分桶
         def _bucket(fen: int) -> str:
@@ -457,15 +483,18 @@ async def analyze_user_context() -> str:
         for p in price_points:
             b = _bucket(p)
             buckets[b] = buckets.get(b, 0) + 1
-        top_band = max(buckets, key=buckets.get) if buckets else None
+        top_band = max(buckets, key=buckets.get) if buckets else profile_band
 
         top_cats = sorted(category_count.items(), key=lambda kv: -kv[1])[:3]
         result = {
             "orderCount": len(orders),
             "totalItems": total_items,
+            "favoriteCount": (insight or {}).get("favoriteCount") or 0,
+            "browseTotal": (insight or {}).get("browseTotal") or 0,
             "topCategories": [{"category": cat, "count": n} for cat, n in top_cats],
             "priceBand": top_band,
-            "hint": "以上来自用户历史订单统计，可作为隐性需求补全依据（默认品类/价位带/复购倾向）；无历史时不编造",
+            "recentBrowse": recent_browse,
+            "hint": "以上来自用户画像底座（收藏/浏览）与历史订单统计，可作为隐性需求补全依据（默认品类/价位带/复购倾向）；无历史时不编造",
         }
         return json.dumps(result, ensure_ascii=False)
     except PermissionError:
