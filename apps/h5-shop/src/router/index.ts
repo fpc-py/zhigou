@@ -33,6 +33,9 @@ const router = createRouter({
     { path: '/short-video', name: 'short-video', component: () => import('@/views/short-video/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/live', name: 'live', component: () => import('@/views/live/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/live/:id', name: 'live-detail', component: () => import('@/views/live/detail.vue'), meta: { requiresAuth: true, tabbar: false } },
+    { path: '/life', name: 'life', component: () => import('@/views/life/index.vue'), meta: { requiresAuth: true, tabbar: false } },
+    { path: '/life/store/:id', name: 'life-store', component: () => import('@/views/life/store.vue'), meta: { requiresAuth: true, tabbar: false } },
+    { path: '/life/appointments', name: 'life-appointments', component: () => import('@/views/life/appointments.vue'), meta: { requiresAuth: true, tabbar: false } },
 
     // ── 售后 ──
     { path: '/aftersale/apply', name: 'aftersale-apply', component: () => import('@/views/aftersale/apply.vue'), meta: { requiresAuth: true, tabbar: false } },

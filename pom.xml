@@ -24,6 +24,7 @@
         <module>services/payment-service</module>
         <module>services/marketing-service</module>
         <module>services/community-service</module>
+    <module>services/life-service</module>
         <module>services/logistics-service</module>
         <module>services/aftersale-service</module>
 

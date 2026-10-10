@@ -43,6 +43,12 @@
 | 2026-10-07 | 订单详情页对 CLOSED/REFUNDED 仍显示"申请售后"（不合状态机） | 操作按钮按状态收敛：INIT=取消+支付，PAID/SHIPPED/COMPLETED=申请售后，终态无操作 | `npm run build` 通过 |
 
 > 新增 bug 时在此追加一行；涉及代码修复的同步更新 `CHANGELOG.md`。
+| 2026-10-10 | **BizException 构造签名**：life 首版 `BizException("CODE","msg")` 编译失败（common 定义为 `BizException(int,String)`/`(String)`） | 全部改用业务码 `BizException(40001/40011/...)` | mvn 编译通过 |
+| 2026-10-10 | **mapper 未扫描**：life 的 3 个 Mapper 缺 `@Mapper` 注解 → 启动报 No qualifying bean | 补 `@Mapper` | 启动成功 |
+| 2026-10-10 | **BFF 控制器缺 JwtAuthGuard**：life.controller 用 `@Headers('x-user-id')` 拿不到 userId（BFF 不转发该头）→ 出站空头致下游 401，接口全空 | 改用 `@UseGuards(JwtAuthGuard)` + `req.userId`（与 community 一致） | BFF 8/8 PASS |
+| 2026-10-10 | **BFF 新模块 import 缺 `.js` 后缀**（ESM 严格模式）→ TS2307 | life controller/module import 补 `.js` | nest build 通过 |
+
+
 | 2026-10-10 | **BFF videoPublish 字段名不匹配**：BFF 传 `userId`，后端 CommunityVideo 实体为 `authorId` → 后端判「请先登录」400 | BFF videoPublish 出站 body 改 `authorId: userId` | BFF video-publish PASS |
 | 2026-10-10 | **生成脚本漏字段**：二期实体 CommunityVideo/CommunityLive 生成时遗漏 createdAt/updatedAt（ServiceImpl setCreatedAt 编译报错） | 补实体两字段 | mvn 编译通过 |
 | 2026-10-10 | **H5 type-check 报 CommunityVideo 缺 liked/favorited**（短视频页操作按钮绑定该字段） | api 接口补可选字段 liked/favorited | H5 构建通过 |

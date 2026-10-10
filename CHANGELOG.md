@@ -3,6 +3,19 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.14] - 2026-10-10
+
+### P2 · 本地生活 MVP（新业务域：life-service + BFF + H5）
+
+- feat(P2) 新建 `life-service`（端口 8092、库 zhigou_life、Flyway `flyway_life_history`）：
+  - `poi_store`（POI 门店/商圈：商圈/餐饮/生鲜/家政/到店，含距离/人均/评分/营业时间/标签）、`life_sku`（服务 SKU：外卖/生鲜/家政/到店券，价格/单位/库存）、`life_appointment`（预约单：0 待确认/1 已确认/2 已完成/3 已取消）
+  - Seed：成都真实商圈演示数据（春熙路/宽窄巷子/锦里/交子公园商圈 + 火锅/串串/盒马/永辉/家政门店 + 8 个服务 SKU + 示例预约），营业信息为演示口径并明确标注
+  - 接口：`GET /life/poi/page`（分类过滤）、`GET /life/poi/{id}`（含 SKU）、`GET /life/sku/page`、`POST /life/appointment`、`GET /life/appointment/mine`、`POST /life/appointment/{id}/cancel`；全量 JWT 鉴权（X-User-Id）+ 雪花 ID 字符串化；业务失败 HTTP200+code≠200
+- feat(P2) BFF：`lifeSvc` 配置 + 6 路由透传（JwtAuthGuard + req.userId + ApiResponse）
+- feat(P2) H5：`views/life/index.vue`（周边推荐/商圈/到店/外卖/生鲜/家政 tab + 门店列表 + 服务 SKU）、`views/life/store.vue`（门店详情 + 预约表单弹层 + 演示标注）、`views/life/appointments.vue`（我的预约：状态徽标/取消）；路由 /life、/life/store/:id、/life/appointments；首页宫格第 8 格「本地生活」
+- 说明：POI 为演示数据（真实商圈名称，价格/营业信息演示口径）；预约写入预约单不触发真实履约；后续接真实地图/外卖运力仅替换数据与履约链路
+- 验证：life 直连 10/10、BFF 8/8（poi 分页/分类/详情/sku/创建/我的/取消/未登录 401）、H5 type-check+build 通过、浏览器渲染验证（10 门店 + 详情 + 预约表单）
+
 ## [0.2.13] - 2026-10-10
 
 ### P2 · 内容社区二期：短视频（图文 MVP）+ 直播（community-service 扩展 + BFF + H5）

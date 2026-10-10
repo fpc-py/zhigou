@@ -122,6 +122,7 @@ const entries = [
   { icon: 'comm', label: '一起拼团', sub: '2 人成团', bg: '#E3EFFF', color: '#2E7DFF', action: () => router.push('/groupbuy') },
   { icon: 'video', label: '短视频', sub: '图文种草', bg: '#F3E8FF', color: '#8B5CF6', action: () => router.push('/short-video') },
   { icon: 'live', label: '看直播', sub: '主播推荐', bg: '#FFE9E9', color: '#F43F5E', action: () => router.push('/live') },
+  { icon: 'local', label: '本地生活', sub: '周边到店', bg: '#E8F8F2', color: '#0D9488', action: () => router.push('/life') },
 ];
 
 const todayText = computed(() => {
