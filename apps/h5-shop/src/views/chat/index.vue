@@ -150,7 +150,8 @@ async function onPickImage(e: Event) {
     return;
   }
   try {
-    const resp = await uploadImage(file);
+    // 图片搜款只需视觉特征：压缩至 1280 内再上传，省存储/带宽
+    const resp = await uploadImage(file, { compress: true, bizType: 'chat' });
     pendingImg.value = resp.url;
     showToast('图片已就绪，点击发送即可搜款');
   } catch {

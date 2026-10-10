@@ -20,11 +20,17 @@ public class FileController {
 
     private final FileService fileService;
 
-    @Operation(summary = "上传文件")
+    @Operation(summary = "上传文件（支持压缩/格式转换/尺寸限制）")
     @PostMapping("/upload")
-    public Result<UploadResponse> upload(@RequestParam("file") MultipartFile file) {
+    public Result<UploadResponse> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "compress", defaultValue = "false") boolean compress,
+            @RequestParam(value = "convertTo", required = false) String convertTo,
+            @RequestParam(value = "bizType", defaultValue = "other") String bizType,
+            @RequestParam(value = "maxWidth", required = false) Integer maxWidth,
+            @RequestParam(value = "maxHeight", required = false) Integer maxHeight) {
         Long userId = UserContext.requireUserId();
-        UploadResponse resp = fileService.upload(userId, file);
+        UploadResponse resp = fileService.upload(userId, file, compress, convertTo, bizType, maxWidth, maxHeight);
         return Result.ok(resp);
     }
 

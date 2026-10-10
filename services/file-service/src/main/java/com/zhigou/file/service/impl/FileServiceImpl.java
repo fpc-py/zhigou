@@ -18,10 +18,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -39,12 +48,38 @@ public class FileServiceImpl implements FileService {
     @Value("${file.url-expire-seconds:3600}")
     private long urlExpireSeconds;
 
+    @Value("${file.image.max-width:1280}")
+    private int imageMaxWidth;
+
+    @Value("${file.image.max-height:1280}")
+    private int imageMaxHeight;
+
+    @Value("${file.image.quality:0.8}")
+    private float imageQuality;
+
+    /** 像素上限（宽×高），超限拒绝，防超大图内存 DoS */
+    @Value("${file.image.max-pixels:25000000}")
+    private long imageMaxPixels;
+
     private static final Set<String> ALLOWED_MIME = Set.of(
             "image/jpeg", "image/png", "image/webp", "image/gif"
     );
 
+    /** ImageIO 原生可解码+可编码的图片类型（可做压缩/缩放/转换） */
+    private static final Set<String> PROCESSABLE_MIME = Set.of("image/jpeg", "image/png");
+
+    /** 允许的目标转换格式（对应 mime 后缀） */
+    private static final Set<String> CONVERT_TARGETS = Set.of("jpeg", "png");
+
     @Override
     public UploadResponse upload(Long userId, MultipartFile file) {
+        return upload(userId, file, false, null, "other", null, null);
+    }
+
+    @Override
+    public UploadResponse upload(Long userId, MultipartFile file,
+                                 boolean compress, String convertTo, String bizType,
+                                 Integer maxWidth, Integer maxHeight) {
         // 1. MIME 校验
         String mime = file.getContentType();
         if (mime == null || !ALLOWED_MIME.contains(mime)) {
@@ -54,20 +89,29 @@ public class FileServiceImpl implements FileService {
         // 2. Magic bytes 校验
         validateMagicBytes(file, mime);
 
-        // 3. 构建 object key
-        String ext = getExtension(mime);
+        // 3. 图片处理（压缩 / 缩放 / 格式转换）；webp/gif 无解码器时原样直存
+        byte[] raw = readAllBytes(file);
+        ProcessResult processed = PROCESSABLE_MIME.contains(mime)
+                ? processImage(raw, mime, compress, convertTo, maxWidth, maxHeight)
+                : ProcessResult.passthrough(raw, mime, null, null);
+
+        byte[] toStore = processed.bytes;
+        String storeMime = processed.mime;
+        String ext = getExtension(storeMime);
+
+        // 4. 构建 object key
         String fileId = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
                 + "/" + userId + "/" + IdUtil.fastSimpleUUID() + ext;
         String objectKey = fileId;
 
-        // 4. 上传到 MinIO
+        // 5. 上传到 MinIO
         long start = System.currentTimeMillis();
-        try (InputStream is = file.getInputStream()) {
+        try (InputStream is = new ByteArrayInputStream(toStore)) {
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(bucket)
                     .object(objectKey)
-                    .stream(is, file.getSize(), -1)
-                    .contentType(mime)
+                    .stream(is, toStore.length, -1)
+                    .contentType(storeMime)
                     .build());
         } catch (Exception e) {
             log.error("MinIO 上传失败: userId={}", userId, e);
@@ -76,28 +120,37 @@ public class FileServiceImpl implements FileService {
 
         long elapsed = System.currentTimeMillis() - start;
 
-        // 5. 生成签名 URL
+        // 6. 生成签名 URL
         String url = generatePresignedUrl(objectKey);
 
-        // 6. 写 file_meta
+        // 7. 写 file_meta
         FileMeta meta = new FileMeta();
         meta.setFileId(fileId);
         meta.setUserId(userId);
         meta.setObjectKey(objectKey);
         meta.setOriginalName(file.getOriginalFilename());
-        meta.setSize(file.getSize());
-        meta.setMimeType(mime);
+        meta.setSize((long) toStore.length);
+        meta.setMimeType(storeMime);
+        meta.setBizType(bizType == null || bizType.isBlank() ? "other" : bizType);
+        meta.setWidth(processed.width);
+        meta.setHeight(processed.height);
         fileMetaMapper.insert(meta);
 
-        log.info("文件上传成功: fileId={}, size={}, mime={}, elapsed={}ms",
-                fileId, file.getSize(), mime, elapsed);
+        log.info("文件上传成功: fileId={}, size={}->{}, mime={}->{}, processed={}, bizType={}, elapsed={}ms",
+                fileId, raw.length, toStore.length, mime, storeMime, processed.processed, meta.getBizType(), elapsed);
 
         return UploadResponse.builder()
                 .fileId(fileId)
                 .url(url)
-                .size(file.getSize())
-                .mimeType(mime)
+                .size((long) toStore.length)
+                .mimeType(storeMime)
                 .originalName(file.getOriginalFilename())
+                .width(processed.width)
+                .height(processed.height)
+                .processed(processed.processed)
+                .originalSize((long) raw.length)
+                .originalWidth(processed.originalWidth)
+                .originalHeight(processed.originalHeight)
                 .build();
     }
 
@@ -155,6 +208,129 @@ public class FileServiceImpl implements FileService {
         }
     }
 
+    /**
+     * 图片处理管线：尺寸探测 → 像素上限防 DoS → 等比缩放（只缩小不放大）→ 压缩/格式转换。
+     * ImageIO 原生支持 jpeg/png 解码与编码；webp/gif 输入无解码器，交由调用方直存。
+     */
+    private ProcessResult processImage(byte[] bytes, String sourceMime,
+                                       boolean compress, String convertTo,
+                                       Integer maxWidth, Integer maxHeight) {
+        int targetMaxW = maxWidth != null && maxWidth > 0 ? maxWidth : imageMaxWidth;
+        int targetMaxH = maxHeight != null && maxHeight > 0 ? maxHeight : imageMaxHeight;
+        String targetFormat = normalizeTarget(convertTo);
+
+        BufferedImage image;
+        try (InputStream is = new ByteArrayInputStream(bytes)) {
+            image = ImageIO.read(is);
+        } catch (Exception e) {
+            log.warn("图片解码失败，原样直存: mime={}, err={}", sourceMime, e.getMessage());
+            return ProcessResult.passthrough(bytes, sourceMime, null, null);
+        }
+        if (image == null) {
+            log.warn("图片解码返回 null（可能为 webp/gif），原样直存: mime={}", sourceMime);
+            return ProcessResult.passthrough(bytes, sourceMime, null, null);
+        }
+
+        int origW = image.getWidth();
+        int origH = image.getHeight();
+        long pixels = (long) origW * origH;
+        if (pixels > imageMaxPixels) {
+            throw new BizException(40003, "FILE_IMAGE_TOO_LARGE");
+        }
+
+        // 等比缩放（只缩小，不放大）
+        BufferedImage scaled = image;
+        if (origW > targetMaxW || origH > targetMaxH) {
+            double scale = Math.min((double) targetMaxW / origW, (double) targetMaxH / origH);
+            int newW = Math.max(1, (int) Math.round(origW * scale));
+            int newH = Math.max(1, (int) Math.round(origH * scale));
+            scaled = new BufferedImage(newW, newH, BufferedImage.TYPE_INT_RGB);
+            var g = scaled.createGraphics();
+            try {
+                g.drawImage(image, 0, 0, newW, newH, null);
+            } finally {
+                g.dispose();
+            }
+        }
+
+        String targetMime = sourceMime;
+        if (targetFormat != null) {
+            targetMime = switch (targetFormat) {
+                case "jpeg" -> "image/jpeg";
+                case "png" -> "image/png";
+                default -> sourceMime;
+            };
+        }
+
+        boolean needConvert = targetFormat != null && !mimeOf(targetFormat).equals(sourceMime);
+
+        // 无任何处理必要 → 原样直存
+        if (scaled == image && !needConvert && !compress) {
+            return ProcessResult.of(bytes, sourceMime, origW, origH, false, origW, origH);
+        }
+        // 仅压缩语义但已是 PNG（无损），不重编码 PNG，避免体积膨胀
+        if (!needConvert && scaled == image && compress && sourceMime.equals("image/png")) {
+            return ProcessResult.of(bytes, sourceMime, origW, origH, false, origW, origH);
+        }
+
+        byte[] out;
+        try {
+            out = encode(scaled, targetMime);
+        } catch (Exception e) {
+            log.warn("图片编码失败，原样直存: mime={}, err={}", targetMime, e.getMessage());
+            return ProcessResult.of(bytes, sourceMime, origW, origH, false, origW, origH);
+        }
+
+        return ProcessResult.of(out, targetMime, scaled.getWidth(), scaled.getHeight(), true, origW, origH);
+    }
+
+    private byte[] encode(BufferedImage image, String targetMime) throws Exception {
+        String format = targetMime.equals("image/png") ? "png" : "jpeg";
+        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName(format);
+        if (!writers.hasNext()) {
+            throw new IllegalStateException("no ImageWriter for " + format);
+        }
+        ImageWriter writer = writers.next();
+        try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
+             ImageOutputStream ios = ImageIO.createImageOutputStream(bos)) {
+            ImageWriteParam param = writer.getDefaultWriteParam();
+            if (format.equals("jpeg") && param.canWriteCompressed()) {
+                param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                param.setCompressionQuality(imageQuality);
+            }
+            writer.setOutput(ios);
+            writer.write(null, new IIOImage(image, null, null), param);
+            ios.flush();
+            return bos.toByteArray();
+        } finally {
+            writer.dispose();
+        }
+    }
+
+    private String normalizeTarget(String convertTo) {
+        if (convertTo == null || convertTo.isBlank()) {
+            return null;
+        }
+        String t = convertTo.toLowerCase();
+        if ("jpg".equals(t)) {
+            t = "jpeg";
+        }
+        return CONVERT_TARGETS.contains(t) ? t : null;
+    }
+
+    private String mimeOf(String format) {
+        return format.equals("png") ? "image/png" : "image/jpeg";
+    }
+
+    private byte[] readAllBytes(MultipartFile file) {
+        try (InputStream is = file.getInputStream()) {
+            return is.readAllBytes();
+        } catch (Exception e) {
+            log.error("读取上传文件失败", e);
+            throw new BizException(500, "文件上传失败");
+        }
+    }
+
     private String getExtension(String mime) {
         return switch (mime) {
             case "image/jpeg" -> ".jpg";
@@ -189,5 +365,18 @@ public class FileServiceImpl implements FileService {
             throw new BizException(403, "无权操作该文件");
         }
         return meta;
+    }
+
+    /** 图片处理结果（bytes + 目标 mime + 尺寸 + 是否处理 + 原始尺寸） */
+    private record ProcessResult(byte[] bytes, String mime, Integer width, Integer height,
+                                 boolean processed, Integer originalWidth, Integer originalHeight) {
+        static ProcessResult passthrough(byte[] bytes, String mime, Integer w, Integer h) {
+            return new ProcessResult(bytes, mime, w, h, false, w, h);
+        }
+
+        static ProcessResult of(byte[] bytes, String mime, Integer w, Integer h,
+                                boolean processed, Integer ow, Integer oh) {
+            return new ProcessResult(bytes, mime, w, h, processed, ow, oh);
+        }
     }
 }

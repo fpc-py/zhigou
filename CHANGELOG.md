@@ -3,6 +3,25 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.31] - 2026-10-10
+
+### P0 · 文件服务增强：图片压缩 / 格式转换 / 尺寸限制 + 售后凭证统一接入
+
+- feat(P0) `file-service` 图片处理管线重写（`FileServiceImpl.processImage`）：尺寸探测 → 像素上限防 DoS（`file.image.max-pixels` 默认 2500 万，超限抛 40003 `FILE_IMAGE_TOO_LARGE`）→ 等比缩放（只缩小不放大，默认最长边 1280，`maxWidth/maxHeight` 可覆盖）→ JPEG 质量压缩（默认 0.8）/ PNG 无损不重编码 → 格式转换（`convertTo=jpeg|png`）。webp/gif 无 ImageIO 解码器时原样直存不伪造转换；`ProcessResult` 内部 record 承载 bytes/mime/尺寸/processed/原始尺寸
+- feat(P0) 增强上传签名：`compress/convertTo/bizType/maxWidth/maxHeight` 五参数（Controller `/file/upload` 同名 query）；`FileMeta` 加 `bizType/width/height`（Flyway `V20261093__file_meta_biz_type.sql`，bizType 默认 'other'）；`UploadResponse` 加 `width/height/processed/originalSize/originalWidth/originalHeight`；application.yml 加 `file.image.*` 配置（均带环境变量覆盖）
+- feat(P0) H5 接入：`api/file.ts` 重写（UploadOptions + 带参 uploadImage）；对话页图片搜款改 `{compress:true, bizType:'chat'}`；售后申请页 `aftersale/apply.vue` 新增凭证区块（最多 3 张、压缩上传 `bizType:'aftersale'`、缩略图+删除、上传中 spinner、提交时 images 数组）；`ApplyBody.images` 后端本就支持，无需改 aftersale 侧
+- fix(P0) 编译修错：`processImage` 内两处 `ProcessResult.passthrough` 调用未带 sourceMime（签名 4 参）补传；`ImageWriter` 非 AutoCloseable，`try(ImageWriter…)` 编译报错改手动 `writer.dispose()`（try/finally）
+- 验证（file-service 单服务全绿 + 售后凭证闭环）：
+  - 原样上传 2400×1600 大图 → 自动缩放 1280×853、167748→41037B、processed=true、originalSize/originalWidth/originalHeight 回显
+  - `compress=true&bizType=aftersale` → 同尺寸压缩，落库 biz_type=aftersale
+  - `convertTo=png` → 1280×853、**.png**、mimeType=image/png
+  - 6000×6000（36M 像素 > 25M）→ **40003 FILE_IMAGE_TOO_LARGE**；fake.txt → **40002 FILE_TYPE_NOT_ALLOWED**
+  - 小图 800×600 `compress=true` → 尺寸不变、41313→31982B（只压缩不缩放）
+  - `file_meta` 落库核对：biz_type/width/height/size/mime_type 全对（含 mock 旧数据默认 other）
+  - **售后凭证闭环 PASS**：上传凭证 → `POST /aftersale/apply`（orderNo=2106312063613272064 PAID 单）带 images → 售后单 `ASC5C7AE75454C4696` images 落库凭证 URL；500 根因定位为 PowerShell 中文 body GBK 编码破坏 UTF-8 JSON（非业务问题），ASCII/UTF-8 文件 body 即通
+  - H5 `npm run build` PASS；file-service 编译/打包/启动 PASS；测试数据（售后单 + 4 条 file_meta + 4 个 MinIO 对象）已清理
+- chore(P0) AI 服务再次核对运行态：8095 已显式 venv 启动（PID 8408），RAG 检索复验 PASS（运动鞋 0.8127 / 增量商品 999 0.4615），[0.2.30] 1024 维代码持续生效
+- ⚠️ 测试遗留待办：H5 浏览器端到端（售后申请页凭证上传 + 对话页压缩上传）本轮未做，列入下次统一测试
 ## [0.2.30] - 2026-10-10
 
 ### P0 · 商品增量向量更新（pgvector 链路首次真正闭环）

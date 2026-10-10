@@ -56,6 +56,23 @@
                   placeholder="请描述申请售后的原因（选填）"></textarea>
       </section>
 
+      <!-- 凭证图片（file-service 上传，压缩后接入售后单 images） -->
+      <section class="card">
+        <h3 class="sec-title">上传凭证（选填，最多 3 张）</h3>
+        <div class="evi-grid">
+          <div v-for="(img, idx) in evidence" :key="img" class="evi-item">
+            <img :src="img" alt="凭证" />
+            <button class="evi-del" @click="removeEvidence(idx)">×</button>
+          </div>
+          <button v-if="evidence.length < 3" class="evi-add" :disabled="uploading" @click="pickEvidence">
+            <template v-if="uploading"><span class="evi-spin" /></template>
+            <template v-else><Icon name="plus" /></template>
+          </button>
+        </div>
+        <p class="evi-hint">图片经 file-service 压缩存储；提交后随售后单存档</p>
+        <input ref="eviInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onPickEvidence" />
+      </section>
+
       <!-- 提交 -->
       <div class="submit-bar">
         <button class="submit-btn" :disabled="submitting" @click="submit">提交申请</button>
@@ -70,6 +87,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { getOrderDetail } from '@/api/order';
 import type { OrderDetail, OrderItem } from '@/api/order';
 import { applyAftersale } from '@/api/aftersale';
+import { uploadImage } from '@/api/file';
 import { showToast, formatPrice } from '@/utils';
 import Icon from '@/components/Icon.vue';
 import Skeleton from '@/components/Skeleton.vue';
@@ -83,6 +101,9 @@ const submitting = ref(false);
 const order = ref<OrderDetail | null>(null);
 const pickedSku = ref<string | null>(null);
 const pickedCount = ref(0);
+const evidence = ref<string[]>([]);
+const uploading = ref(false);
+const eviInput = ref<HTMLInputElement | null>(null);
 
 const types = [
   { value: 'REFUND', label: '仅退款' },
@@ -96,6 +117,36 @@ const maxAmount = computed(() => order.value?.payAmount ?? 0);
 function pick(it: OrderItem) {
   pickedSku.value = it.skuId;
   pickedCount.value = it.count;
+}
+
+/** 选择凭证图片（压缩上传 file-service，最多 3 张） */
+function pickEvidence() {
+  if (uploading.value || evidence.value.length >= 3) return;
+  eviInput.value?.click();
+}
+
+async function onPickEvidence(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  if (!/^image\//.test(file.type)) {
+    showToast('请选择图片文件');
+    return;
+  }
+  uploading.value = true;
+  try {
+    const resp = await uploadImage(file, { compress: true, bizType: 'aftersale' });
+    evidence.value.push(resp.url);
+  } catch {
+    showToast('凭证上传失败，请重试');
+  } finally {
+    uploading.value = false;
+  }
+}
+
+function removeEvidence(idx: number) {
+  evidence.value.splice(idx, 1);
 }
 
 async function load() {
@@ -128,6 +179,7 @@ async function submit() {
       amount: form.value.amount,
       skuId: pickedSku.value ? Number(pickedSku.value) : null,
       count: pickedSku.value ? pickedCount.value : null,
+      images: evidence.value.length ? evidence.value : undefined,
     });
     showToast('售后申请已提交');
     router.replace({ path: `/aftersale/${ao.aftersaleNo}` });
@@ -167,6 +219,22 @@ onMounted(load);
 .max-btn { height: 32px; padding: 0 14px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); font-size: 12px; font-weight: 600; }
 .amount-hint { font-size: 11px; color: var(--ink-3); margin-top: 8px; }
 .reason-input { width: 100%; border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; font-size: 13px; resize: none; background: transparent; color: var(--ink); box-sizing: border-box; }
+.evi-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.evi-item { position: relative; width: 76px; height: 76px; }
+.evi-item img { width: 76px; height: 76px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line-2); }
+.evi-del {
+  position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 13px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.evi-add {
+  width: 76px; height: 76px; border-radius: 10px; border: 1px dashed var(--line-2);
+  color: var(--ink-3); display: flex; align-items: center; justify-content: center;
+}
+.evi-add:disabled { opacity: 0.5; }
+.evi-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--brand); animation: evi-rotate 0.8s linear infinite; }
+@keyframes evi-rotate { to { transform: rotate(360deg); } }
+.evi-hint { font-size: 11px; color: var(--ink-3); margin-top: 8px; }
 .submit-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 414px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: rgba(255,255,255,.97); border-top: 1px solid var(--line); }
 .submit-btn { width: 100%; height: 44px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 15px; font-weight: 700; }
 .submit-btn:disabled { opacity: 0.5; }

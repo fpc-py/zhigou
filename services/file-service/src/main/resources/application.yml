@@ -59,6 +59,14 @@ minio:
 file:
   url-expire-seconds: ${FILE_URL_EXPIRE_SECONDS:3600}
   max-size-mb: ${FILE_MAX_SIZE_MB:5}
+  image:
+    # 图片处理：等比缩放上限（只缩小不放大）
+    max-width: ${FILE_IMAGE_MAX_WIDTH:1280}
+    max-height: ${FILE_IMAGE_MAX_HEIGHT:1280}
+    # JPEG 压缩质量（0~1）
+    quality: ${FILE_IMAGE_QUALITY:0.8}
+    # 像素上限（宽×高），超限拒绝上传（防超大图内存 DoS）
+    max-pixels: ${FILE_IMAGE_MAX_PIXELS:25000000}
 # ==================== Actuator / Prometheus ====================
 management:
   endpoints:

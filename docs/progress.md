@@ -4,6 +4,14 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-10 · P0 文件服务增强：图片压缩/格式转换/尺寸限制 + 售后凭证接入 [0.2.31]
+
+- **#126 后端（file-service）**：图片处理管线（像素上限防 DoS 40003 / 等比缩放 / JPEG 0.8 压缩 / PNG 无损 / convertTo 转换）；增强 upload 五参数（compress/convertTo/bizType/maxWidth/maxHeight）；FileMeta 加 bizType/width/height（Flyway V20261093）；UploadResponse 扩展元数据回显
+- **#126 H5**：api/file.ts 重写带参上传；对话页搜款 compress+bizType=chat；售后申请页凭证区块（3 张压缩上传/缩略图删除/提交 images）
+- **#126 验证**：直连 5 场景全 PASS（缩放/压缩/png 转换/40003/40002/小图只压缩）+ file_meta 落库核对 + 售后凭证闭环 PASS（ASC5C7AE75454C4696 images 落库）+ H5 build PASS + AI venv 重启 RAG 复验
+- **#126 提交**：CHANGELOG [0.2.31] / bug #34 记录；待办池勾销；测试数据已清理
+- ⚠️ 遗留：H5 浏览器端到端（凭证上传/压缩上传）下次统一测试
+
 ## 2026-10-10 · P2 供应链优化三期：异常订单自动处理 [0.2.22]
 
 - **#99 后端（order-service）**：Flyway V20261091__fulfillment_action 建表；FulfillmentAction 实体/Mapper；POST /order/fulfillment/action（SPLIT/DELAY/OFF_SHELF/REPLENISH，仅 PAID 单写 DONE 记录）、GET /order/fulfillment/actions；pendingFulfillment 附 handled 标记；orderIds 字符串/数字双兼容（修复 List<Number> 500）
@@ -114,7 +122,7 @@
 
 ## 当前阶段
 
-**P0 交易闭环 / P1 决策辅助 / P2 生态矩阵 + 商家端 AI 全部闭环**（[0.1.1]~[0.2.27]）。剩余：P0 技术收尾项（用户画像/收藏/浏览底座、评价增量向量、文件服务增强、BFF 熔断埋点）→ M3 全链路压测 → M4 上线执行。文档体系已按《智购功能文档.md》《智购-企业级工程化技术方案.md》对齐（[0.2.28]）。
+**P0 交易闭环 / P1 决策辅助 / P2 生态矩阵 + 商家端 AI 全部闭环**（[0.1.1]~[0.2.27]）。剩余：P0 技术收尾项（**BFF 埋点/熔断/SSE 重连**）→ M3 全链路压测 → M4 上线执行。文档体系已按《智购功能文档.md》《智购-企业级工程化技术方案.md》对齐（[0.2.28]）。
 
 ## 里程碑
 
@@ -221,7 +229,7 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 
 * [x] ~~用户画像 / 收藏 / 浏览历史 / 会员基础~~ ✅（[0.2.29] 收藏/浏览底座 + 画像洞察已交付：user-service 8 端点 + BFF 透传 + AI analyze_user_context 三源融合 + H5 详情页/收藏页/浏览历史/我的入口；会员基础随 wallet 已部分落地）
 
-* [ ] 文件服务增强（压缩 / 转格式 / 鉴权）——**未闭环**（MinIO 上传已有，增强待开发）
+* [x] ~~文件服务增强（压缩 / 转格式 / 鉴权）~~ ✅（[0.2.31] 图片处理管线：像素上限防 DoS + 等比缩放 + JPEG/PNG 压缩转换 + bizType/尺寸元数据落库 + H5 售后凭证/对话搜款接入；file-service 直连 5 场景 + 售后凭证闭环 PASS）
 
 * [ ] BFF 补全 + 埋点 + 熔断降级 + SSE 重连——**部分完成**（接口聚合已补全，埋点/熔断降级/SSE 重连待开发）
 

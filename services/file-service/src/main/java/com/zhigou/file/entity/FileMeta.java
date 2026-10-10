@@ -24,6 +24,14 @@ public class FileMeta {
 
     private String mimeType;
 
+    /** 业务分类：product / aftersale / chat / other（统一接入口径，便于审计与清理） */
+    private String bizType;
+
+    /** 处理后图片宽高（原样存储时为原始值，非图片为 null） */
+    private Integer width;
+
+    private Integer height;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

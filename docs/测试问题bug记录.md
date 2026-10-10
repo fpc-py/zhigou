@@ -1,6 +1,14 @@
 # 测试问题 & Bug 记录
 
-## #33 · [0.2.30] pgvector 维度不匹配（vector(1536) vs 实际 1024）+ MQ 消费者 Windows 不可用 + AI 跑系统 Python（已修复 / 留痕）
+## #34 · [0.2.31] 售后凭证闭环 500 误判 + PowerShell 中文 body GBK 编码坑 + 端口核对教训（已定位 / 测试技巧）
+
+- **现象**：① 直连 `POST /aftersale/apply`（body 带中文 reason + images 数组）返回 500「系统繁忙」，一度误判为 orderClient 校验链路故障；② 随后对 8088 调 `/order/mine`、对 8085 调 `/aftersale/apply` 均 500，疑环境故障
+- **根因**：① **PowerShell 中文 body GBK 编码坑**——ConvertTo-Json 后 curl.exe --data-binary  按本地代码页（GBK）发送字节，中文 UTF-8 JSON 被破坏 → 请求体解析异常 → 500；② 打错端口：order-service 配 **8085**、aftersale-service 配 **8090**、marketing 8088、logistics 8089，与记忆中的端口表不符
+- **修复（测试技巧，非代码缺陷）**：① JSON body 写 UTF-8 无 BOM 文件后 --data-binary "@file"（ASCII/文件方式即通，售后单创建成功）；② 权威端口以各服务 application.yml server.port 为准：8080 auth / 8081 user / 8082 file / 8083 product / 8084 cart / 8085 order / 8086 inventory / 8087 payment / 8088 marketing / 8089 logistics / 8090 aftersale / 8091 community / 8092 life / 8093 closet / 8094 wallet / 8095 AI
+- **验证**：售后凭证闭环 PASS（orderNo=2106312063613272064 PAID 单 → 售后单 ASC5C7AE75454C4696 images 落库凭证 URL）；file_meta bizType/width/height 落库核对正确
+- **教训**：curl 中文 JSON 一律 UTF-8 文件 + --data-binary "@file"，禁止管道直传；服务端口以 yml 为准不凭记忆；5200 类业务错误先自证请求构造再查服务
+
+## #33 · [0.2.30] pgvector 维度不匹配（vector(1536) vs 实际 1024）+ MQ 消费者 Windows 不可用 + AI 跑系统 Python（已修复 / 留痕）（vector(1536) vs 实际 1024）+ MQ 消费者 Windows 不可用 + AI 跑系统 Python（已修复 / 留痕）
 
 - **现象**：① `products_vec` 表自建起恒 0 行——任何 upsert 失败；② AI 8095 由系统 Python312 占用（venv 新代码不生效）；③ `rocketmq-client-python` 安装成功但启动报「rocketmq-python does not support Windows」
 - **根因**：① `rag/service.py` 建表 `embedding vector(1536)`，实际模型 text-embedding-v4 输出 **1024 维** → pgvector 维度不匹配必报错；② 历史教训 #25③ 再现（重启时未用 venv）；③ rocketmq-client-python 基于 RocketMQ C++ SDK，官方不支持 Windows 平台
