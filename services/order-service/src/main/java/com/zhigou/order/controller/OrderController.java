@@ -49,4 +49,9 @@ public class OrderController {
     public Result<OrderStatsOverview> overview() {
         return Result.ok(orderService.overview());
     }
+
+    @Operation(summary = "履约异常：PAID 待发货订单 + SKU 明细（缺货/卡单预警）") @GetMapping("/stats/pending-fulfillment")
+    public Result<List<OrderResponse>> pendingFulfillment() {
+        return Result.ok(orderService.pendingFulfillment());
+    }
 }

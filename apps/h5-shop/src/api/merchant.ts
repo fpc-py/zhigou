@@ -30,3 +30,17 @@ export async function getMerchantWarnings(): Promise<MerchantWarnings | null> {
   const res = await http.get<{ code: number; data: MerchantWarnings | null }>('/merchant/warnings');
   return res.data.data;
 }
+
+export interface FulfillItem { skuId: number; skuName: string; count: number; price: number }
+export interface PendingOrder {
+  orderId: string;
+  orderStatus: string;
+  payAmount?: number;
+  items: FulfillItem[];
+}
+
+/** 履约异常：PAID 待发货订单 + SKU 明细（缺货/卡单预警） */
+export async function getMerchantFulfillment(): Promise<PendingOrder[] | null> {
+  const res = await http.get<{ code: number; data: PendingOrder[] | null }>('/merchant/fulfillment');
+  return res.data.data;
+}

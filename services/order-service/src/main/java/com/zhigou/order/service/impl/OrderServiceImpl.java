@@ -331,6 +331,14 @@ public class OrderServiceImpl implements OrderService {
         return ov;
     }
 
+    @Override
+    public List<OrderResponse> pendingFulfillment() {
+        List<OrderMain> orders = orderMapper.selectList(new LambdaQueryWrapper<OrderMain>()
+                .eq(OrderMain::getOrderStatus, OrderState.PAID.name())
+                .orderByAsc(OrderMain::getCreateTime));
+        return orders.stream().map(this::buildResponse).collect(Collectors.toList());
+    }
+
     private OrderResponse buildResponse(OrderMain order) {
         List<OrderItem> items = itemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getOrderId()));

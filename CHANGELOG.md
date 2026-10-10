@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.20] - 2026-10-10
+
+### P2 · 供应链优化一期：履约异常预警（待发货订单 × 低库存匹配缺货卡单）
+
+- feat(P2) `order-service` 新增 `GET /order/stats/pending-fulfillment`：PAID 待发货订单 + SKU 明细（order_item 真实 skuId/skuName/count）
+- feat(P2) AI `fulfillment_alert` 工具：聚合「待发货订单 × 低库存 SKU」匹配出缺货卡单清单（缺口明细）+ 处理建议（补货/拆分发货/延期协商/下架停单）；演示口径显式标注
+- feat(P2) BFF `GET /merchant/fulfillment` 透传（JwtAuthGuard + Bearer 登录态）
+- feat(P2) H5 商家中心新增「履约异常」区块：待发货订单列表（订单号/商品×数量/待发货标签）+ AI 处理建议入口
+- 修复：BFF 配置 `aiOrchestrator/aiRag` 指向 8000 → 8095（本机 8000 被其他项目占用导致 AI 链路失效）
+- 验证：order 直连 PASS（13 单 PAID 含 SKU 明细）；AI SSE PASS（tool_call→tool_result，缺货场景 11 单命中缺口清单，恢复库存后无风险）；BFF 登录态 200；H5 type-check+build + 浏览器实测（履约区块渲染 13 单）
+- 说明：库存为演示阈值口径（≤10 件告警）；正式版需接入库存变动实时推送与自动补货任务
+
 ## [0.2.19] - 2026-10-10
 
 ### P2 · 商业模式落地：AI 会员订阅（会员中心 + 沙箱订阅支付闭环，wallet 遗留「开通/支付规划中」闭环）

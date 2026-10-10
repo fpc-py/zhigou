@@ -1269,6 +1269,70 @@ async def merchant_warnings(threshold: int = 10) -> str:
         return "经营预警数据暂时没查到，稍后再试试？"
 
 
+@tool
+async def fulfillment_alert() -> str:
+    """
+    履约异常预警：把「待发货（PAID）订单」与「低库存 SKU」匹配，找出可能缺货卡单的订单。
+    用户问"哪些订单要缺货""履约异常""发货会卡单吗""缺货订单""待发货但没库存"时调用。
+    输出缺货 SKU、受影响的待发货订单清单与处理建议（补货/拆分/延期发货）。
+    """
+    try:
+        pending = await _http_get(
+            f"{settings.order_service_url}/order/stats/pending-fulfillment",
+            timeout=5.0,
+        )
+        low = await _http_get(
+            f"{settings.inventory_service_url}/inventory/low-stock?threshold=10",
+            timeout=5.0,
+        )
+        pending_list = pending.get("data") or []
+        low_list = low.get("data") or []
+        stock = {int(s.get("skuId")): int(s.get("available") or 0) for s in low_list}
+
+        lines = ["履约异常预警（单商家市场 · 演示口径）："]
+        if not pending_list:
+            lines.append("· 待发货订单：无（当前没有 PAID 待发货订单）")
+            lines.append("· 低库存 SKU：{} 个".format(len(low_list)))
+            lines.append("提示：正常履约通道；库存低于阈值可关注补货。")
+            return "\n".join(lines)
+
+        lines.append(f"· 待发货订单：{len(pending_list)} 单（PAID 状态）")
+        at_risk = []
+        for o in pending_list:
+            for it in (o.get("items") or []):
+                sku_id = int(it.get("skuId"))
+                need = int(it.get("count") or 0)
+                av = stock.get(sku_id)
+                if av is not None and av < need:
+                    at_risk.append({
+                        "orderId": o.get("orderId"),
+                        "skuId": sku_id,
+                        "skuName": it.get("skuName") or f"SKU-{sku_id}",
+                        "need": need,
+                        "stock": av,
+                    })
+        if not at_risk:
+            lines.append("· 缺货风险：无（待发货订单所需 SKU 库存均充足）")
+        else:
+            lines.append("· 缺货风险卡单（库存 < 需求）：")
+            for r in at_risk:
+                lines.append(
+                    f"  - 订单 {r['orderId']}：{r['skuName']}（skuId={r['skuId']}）"
+                    f"需 {r['need']} 件，库存仅 {r['stock']} 件，缺口 {r['need'] - r['stock']} 件"
+                )
+            lines.append(
+                "· 处理建议：① 优先补货（低于安全库存下单给供应商）；"
+                "② 拆分发货（有货 SKU 先发，缺货 SKU 补货后追发）；"
+                "③ 联系买家说明延期并协商发货时间；"
+                "④ 若缺口持续，考虑下架该 SKU 暂停新单。"
+            )
+        lines.append("提示：库存为演示阈值口径（≤10 件告警）；正式版需接入库存变动实时推送与自动补货任务。")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("fulfillment_alert 调用失败: %s", e)
+        return "履约预警数据暂时没查到，稍后再试试？"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1290,4 +1354,5 @@ TOOLS = [
     create_order,
     merchant_overview,
     merchant_warnings,
+    fulfillment_alert,
 ]

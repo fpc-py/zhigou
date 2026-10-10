@@ -27,11 +27,11 @@ export const SERVICES: Record<string, ServiceEntry> = {
   closetSvc:         { url: 'http://localhost:8093', timeout: 2_000 },
   walletSvc:         { url: 'http://localhost:8094', timeout: 2_000 },
 
-  // AI 服务（SSE 需要长连接）
-  aiOrchestrator: { url: 'http://localhost:8000', timeout: 30_000 },
+  // AI 服务（SSE 需要长连接；本机 8000 被其他项目占用，智购 AI 固定 8095）
+  aiOrchestrator: { url: 'http://localhost:8095', timeout: 30_000 },
 
   // RAG 摘要（商品详情 AI 理由）：300ms 快速失败，不拖慢详情接口
-  aiRag: { url: 'http://localhost:8000', timeout: 300 },
+  aiRag: { url: 'http://localhost:8095', timeout: 300 },
 };
 
 export const SERVICE_PATHS = {
@@ -63,6 +63,7 @@ export const SERVICE_PATHS = {
   orderDetail:       (id: string) => `/order/${id}`,
   orderMine:         '/order/mine',
   orderStatsOverview: '/order/stats/overview',
+  orderPendingFulfillment: '/order/stats/pending-fulfillment',
   inventoryLowStock:  '/inventory/low-stock?threshold=10',
   productReviewNegative: '/product/review/negative?minRating=3&limit=5',
   paymentCreate:     '/payment/create',

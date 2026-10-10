@@ -35,6 +35,20 @@ export class MerchantService {
     return unwrapOrThrow(resp, this.logger, 'merchant/overview', null);
   }
 
+  /** 履约异常：PAID 待发货订单 + SKU 明细（供缺货/卡单预警，演示口径） */
+  async fulfillment(): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${SERVICES.orderService.url}${SERVICE_PATHS.orderPendingFulfillment}`).pipe(
+        timeout(SERVICES.orderService.timeout),
+        catchError((err) => {
+          this.logger.warn(`order-service /order/stats/pending-fulfillment 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/fulfillment', []);
+  }
+
   /** 经营预警：低库存 SKU + 近期差评（演示：单商家市场 = 平台聚合口径） */
   async warnings(): Promise<{ lowStock: any[]; negative: any[] } | null> {
     const low = (await firstValueFrom(

@@ -72,6 +72,24 @@
       <div v-if="!warnings.lowStock.length && !warnings.negative.length" class="empty">暂无预警，经营健康</div>
     </div>
 
+    <!-- 履约异常（待发货 × 缺货预警） -->
+    <div class="section fulfill-sec">
+      <div class="sec-title">履约异常 <span class="warn-badge">{{ pendingOrders.length }}</span></div>
+      <div class="warn-label">待发货订单（PAID）· 共 {{ pendingOrders.length }} 单 · 演示口径</div>
+      <div v-if="pendingOrders.length" class="warn-group">
+        <div v-for="o in pendingOrders" :key="o.orderId" class="warn-row">
+          <span class="warn-dot fulf" />
+          <div class="warn-main">
+            <div class="warn-name">订单 {{ shortId(o.orderId) }}</div>
+            <div class="warn-sub">{{ skuSummary(o.items) }}</div>
+          </div>
+          <span class="warn-tag fulf">待发货</span>
+        </div>
+      </div>
+      <div v-if="!pendingOrders.length" class="empty">暂无待发货订单</div>
+      <div class="fulfill-note">可问 AI 助手：哪些订单会缺货卡单、如何处理（补货/拆分/延期）</div>
+    </div>
+
     <!-- 热销榜 -->
     <div class="section">
       <div class="sec-title">热销商品 Top{{ hotList.length }}</div>
@@ -104,7 +122,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMerchantOverview, getMerchantWarnings } from '@/api/merchant'
+import { getMerchantOverview, getMerchantWarnings, getMerchantFulfillment, type PendingOrder, type FulfillItem } from '@/api/merchant'
 
 const router = useRouter()
 
@@ -137,6 +155,11 @@ const warnings = ref<Warnings>({ lowStock: [], negative: [] })
 const warnTotal = computed(() => warnings.value.lowStock.length + warnings.value.negative.length)
 const clip = (s: string) => (s || '').length > 26 ? s.slice(0, 26) + '…' : (s || '')
 
+const pendingOrders = ref<PendingOrder[]>([])
+const shortId = (id: string) => String(id).slice(-8)
+const skuSummary = (items: FulfillItem[] | undefined) =>
+  (items || []).map((i) => `${i.skuName} ×${i.count}`).join('、') || '无商品'
+
 function goChat() {
   router.push({ path: '/chat', query: { q: '帮我看看今天的经营情况：订单、销售额和热销商品' } })
 }
@@ -153,6 +176,12 @@ onMounted(async () => {
     if (w) warnings.value = w
   } catch (e) {
     // 预警区块保持空态
+  }
+  try {
+    const f = await getMerchantFulfillment()
+    if (f) pendingOrders.value = f
+  } catch (e) {
+    // 履约异常区块保持空态
   }
 })
 </script>
@@ -211,4 +240,8 @@ onMounted(async () => {
 .warn-tag { font-size: 10px; border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
 .warn-tag.low { background: #FEF3E2; color: #B7791F; }
 .warn-tag.neg { background: #FFE9E9; color: #C03038; }
+.fulfill-sec { border: 1px solid #FFE9C9; }
+.warn-dot.fulf { background: #F5A623; }
+.warn-tag.fulf { background: #FEF3E2; color: #B7791F; }
+.fulfill-note { font-size: 11px; color: #B7791F; margin-top: 6px; background: #FFFBF0; border-radius: 8px; padding: 6px 8px; }
 </style>

@@ -24,4 +24,11 @@ export class MerchantController {
     const data = await this.merchant.warnings();
     return ApiResponse.ok(data);
   }
+
+  /** 履约异常（待发货订单 + SKU 明细，缺货/卡单预警） */
+  @Get('merchant/fulfillment')
+  async fulfillment() {
+    const data = await this.merchant.fulfillment();
+    return ApiResponse.ok(data);
+  }
 }

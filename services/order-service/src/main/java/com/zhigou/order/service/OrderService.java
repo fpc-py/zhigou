@@ -16,4 +16,6 @@ public interface OrderService {
     int closeExpired(int minutes);
     /** 平台经营概览（全平台聚合，商家视角演示口径） */
     OrderStatsOverview overview();
+    /** 履约异常：PAID 待发货订单 + SKU 明细（供缺货/卡单预警） */
+    List<OrderResponse> pendingFulfillment();
 }

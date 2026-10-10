@@ -36,6 +36,16 @@
 | AI 链路 | chat_service 迁移原生 OpenAI（tiktoken 阻断修复）+ 工具路由 + 超时配置 | ✅ 重写完成 | ✅ 2026-10-10 SSE 实测 5/5 PASS | 随 [0.2.11] 统一提交 |
 | 上线就绪 | release-checklist 改写 + gray-release + monitoring-alerting + 部署资产整改 | ✅ 已完成 | ✅ 静态核验通过 | 随 [0.2.11] 统一提交 |
 
+## 2026-10-10 · P2 供应链优化一期：履约异常预警 [0.2.20]
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| order 待发货接口 | ✅ | `GET /order/stats/pending-fulfillment`：PAID 订单 + SKU 明细；直连验证 13 单 |
+| AI 履约预警 | ✅ | `fulfillment_alert` 工具：待发货 × 低库存匹配缺货卡单 + 处理建议；SSE tool_call→tool_result 实测（造数验证 11 单命中，恢复库存后无风险） |
+| BFF 透传 | ✅ | `GET /merchant/fulfillment`；登录态 200；顺手修复 AI URL 8000→8095（8000 被其他项目占用） |
+| H5 履约区块 | ✅ | 商家中心「履约异常」区块（13 单待发货列表 + AI 入口）；type-check+build + 浏览器实测 |
+| 提交 | ⏳ | 随 [0.2.20] 统一 commit & push（含 [0.2.18]/[0.2.19] 补推） |
+
 ## 2026-10-10 · P2 商业模式落地：AI 会员订阅 [0.2.19]
 
 | 项 | 状态 | 说明 |
