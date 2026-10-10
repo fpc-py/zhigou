@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.30] - 2026-10-10
+
+### P0 · 商品增量向量更新（pgvector 链路首次真正闭环）
+
+- fix(P0) **pgvector 维度硬伤（#33）**：`rag/service.py` 建表 `embedding vector(1536)` 与实际模型 text-embedding-v4 输出 **1024 维**不符——任何 upsert 必然报维度不匹配，该链路自建表起从未写入成功（`products_vec` 恒 0 行）。修复：`EMBEDDING_DIM=1024` 常量 + 建表 SQL 参数化；drop 旧表后 AI 重启由 `init_db` 重建
+- fix(P0) `scripts/backfill_vec.py` 三处整改：默认 AI 地址 8000→8095（过时）；`embed_products` 的 `embed_url` 参数实为死配置且调用处误传 product_url（签名清理）；`fetch_products` 补内网透传头 `X-User-Id`（product `/product/page` 被 JWT 过滤器拦截 403）；新增 `_load_llm_env`（优先环境变量、自动加载 ai-orchestrator/.env 共享 LLM/embedding 口径，python-dotenv 可选）
+- feat(P0) 全量回填跑通：`backfill_vec.py --limit 50` 真实拉取 4 条商品 → 百炼 text-embedding-v4 → upsert pgvector（`products_vec` 4 行、1024 维、spuId UNIQUE 幂等）
+- test(P0) **RAG 语义检索 PASS**：`POST /api/v1/rag/retrieve`「跑步运动鞋 轻量透气」→ top1 轻量运动鞋（score 0.8127）、top2 棉质T恤（0.3993），排序正确
+- test(P0) **增量逻辑 PASS**：直调 `mq_consumer._handle_message_async`（模拟 PRODUCT_CHANGED 消息体：智能手表）→ embedding → upsert，`products_vec` 新增 9000000000000000999
+- ⚠️ 平台限制留痕：`rocketmq-client-python` 已装（venv），但 **Windows 不支持**（`rocketmq-python does not support Windows`）→ MQ 消费者在本地 Windows 无法激活；增量链路生产（Linux/容器）可正常消费 PRODUCT_CHANGED 自动更新向量，本地验证以直调逻辑 + 全量回填代替
+- chore(P0) AI 服务已改 **venv python** 启动（曾用系统 Python312 占 8095，教训 #25③ 再次验证）；pgvector 表重建为 1024 维
+
 ## [0.2.29] - 2026-10-10
 
 ### P0 · 用户画像 / 收藏 / 浏览历史底座（favoriteIds 精度修复）

@@ -217,7 +217,7 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 
 * [x] ~~营销活动 + 凑单最优组合 + 防超卖~~（券/满减/拼团 + optimize_cart 凑单 + 库存 Lua 防超卖已交付）
 
-* [ ] 评价增量向量更新（pgvector）
+* [x] ~~评价增量向量更新（pgvector）~~ ✅（[0.2.30] 按差距报告口径「商品增量向量更新」闭环：pgvector 底座 pg16 容器 + products_vec 表 + 全量回填 backfill_vec.py 跑通 + PRODUCT_CHANGED 增量链路（Windows 本地 MQ SDK 不可用，生产 Linux 自动激活）+ RAG 语义检索验证）
 
 * [x] ~~用户画像 / 收藏 / 浏览历史 / 会员基础~~ ✅（[0.2.29] 收藏/浏览底座 + 画像洞察已交付：user-service 8 端点 + BFF 透传 + AI analyze_user_context 三源融合 + H5 详情页/收藏页/浏览历史/我的入口；会员基础随 wallet 已部分落地）
 
@@ -285,6 +285,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项） |
 
 ## 变更记录
+* 2026-10-10：**P0 商品增量向量更新（[0.2.30]）**：pgvector 维度硬伤修复（表 vector(1536)→1024，对齐 text-embedding-v4 输出，此前 upsert 必失败、表恒 0 行）；backfill_vec.py 整改（URL 8095 / X-User-Id 内网头 / 自动加载 .env / embed_url 死参数清理）并**全量回填 4 条真实商品跑通**；RAG 语义检索 PASS（「跑步运动鞋」→ 运动鞋 0.8127）；增量逻辑直调验证 PASS（模拟 PRODUCT_CHANGED 消息 → 新商品 9000000000000000999 入向量库）；AI 改 venv 启动（曾跑系统 Python 教训 #25③）；⚠️ rocketmq-client-python Windows 不支持 → 本地 MQ 消费者无法激活（生产 Linux/容器可用），已如实留痕。
+
 * 2026-10-10（注）：**[0.2.29] commit c5cbcd6 已本地提交；push 曾因 GitHub 443 连接超时失败**——已于后续批次网络恢复时补推（同 [0.2.11]/[0.2.12] 留痕惯例）。
 
 * 2026-10-10：**P0 用户画像 / 收藏 / 浏览历史底座（[0.2.29]）**：user-service 画像底座（Flyway `V20261091__user_favorite_browse.sql` 两表 + 实体/Mapper/DTO + UserProfileService/Impl 收藏幂等/浏览聚合/画像洞察 + Controller 8 端点 + SecurityConfig 放行 `/user/insight`）；BFF +9 透传路径；AI `analyze_user_context` 三源融合（/user/insight + 历史订单 + 画像并入）；H5 详情页收藏/浏览真接口 + /favorites /history 页 + 我的页入口。**修复 #32 JS Number 精度丢失**（favorite/ids 19 位 Snowflake 经 JSON.parse 201→300 —— 后端改 `List<String>` 字符串透传）；修复 PowerShell ANSI 编码事故（Impl/Controller 重写，UTF-8 无 BOM）。验证：8081+BFF favorite/ids 均返回字符串数组；BFF 8 端点全 200；H5 浏览器端到端 PASS（详情页收藏写入 + 刷新「已收藏」态 + /favorites 1 件 + /history 看过 2 次 + 我的页入口）。

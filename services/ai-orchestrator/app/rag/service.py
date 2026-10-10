@@ -41,6 +41,9 @@ async def _fetch(sql: str, *args) -> list[asyncpg.Record]:
 
 # ── DDL ──
 
+# text-embedding-v4 输出维度为 1024（曾误配 1536 致 upsert 维度不匹配，见 docs/测试问题bug记录.md #33）
+EMBEDDING_DIM = 1024
+
 
 async def init_db() -> None:
     """启动时执行一次：创建 extension、表、索引。"""
@@ -49,11 +52,11 @@ async def init_db() -> None:
         CREATE TABLE IF NOT EXISTS products_vec (
             id         BIGSERIAL PRIMARY KEY,
             spu_id     BIGINT NOT NULL UNIQUE,
-            embedding  vector(1536) NOT NULL,
+            embedding  vector({dim}) NOT NULL,
             text       TEXT NOT NULL,
             updated_at TIMESTAMPTZ DEFAULT now()
         )
-    """)
+    """.format(dim=EMBEDDING_DIM))
     await _execute("""
         CREATE INDEX IF NOT EXISTS idx_products_vec_embedding
         ON products_vec USING ivfflat (embedding vector_cosine_ops)

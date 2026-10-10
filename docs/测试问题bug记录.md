@@ -1,5 +1,13 @@
 # 测试问题 & Bug 记录
 
+## #33 · [0.2.30] pgvector 维度不匹配（vector(1536) vs 实际 1024）+ MQ 消费者 Windows 不可用 + AI 跑系统 Python（已修复 / 留痕）
+
+- **现象**：① `products_vec` 表自建起恒 0 行——任何 upsert 失败；② AI 8095 由系统 Python312 占用（venv 新代码不生效）；③ `rocketmq-client-python` 安装成功但启动报「rocketmq-python does not support Windows」
+- **根因**：① `rag/service.py` 建表 `embedding vector(1536)`，实际模型 text-embedding-v4 输出 **1024 维** → pgvector 维度不匹配必报错；② 历史教训 #25③ 再现（重启时未用 venv）；③ rocketmq-client-python 基于 RocketMQ C++ SDK，官方不支持 Windows 平台
+- **修复**：① `EMBEDDING_DIM=1024` 常量 + 建表 SQL 参数化 + drop 旧表重建；② 停系统 Python 进程 → venv `-m uvicorn main:app --port 8095` 重启；③ 留痕——增量链路（PRODUCT_CHANGED → embedding → upsert）在 Windows 本地不可激活，生产 Linux/容器部署 AI 后自动生效；本地验证改用直调 `_handle_message_async` + 全量回填
+- **验证**：全量回填 4 条真实商品入 pgvector（1024 维、spuId 幂等）；RAG 检索「跑步运动鞋 轻量透气」→ top1 轻量运动鞋 0.8127；直调模拟 PRODUCT_CHANGED 消息 → 新商品 9000000000000000999 入向量库
+- **教训**：pgvector `vector(n)` 维度必须与 embedding 模型实际输出一致（换模型先验维度）；Windows 上 MQ 消费者属平台限制，验证链路要分「逻辑直调」与「生产形态」两层口径
+
 ## #32 · [0.2.29] JS Number 精度丢失：BFF favorite/ids 返回 300 而非 201（已修复）
 
 - **现象**：`GET /user/favorite/ids`（BFF 3000 透传）返回 `[1000000000000000300, 1000000000000000100]`，而 8081 直连与 Node 原生 http 均返回 `[1000000000000000201, 1000000000000000101]`；前端详情页收藏态判断受影响
