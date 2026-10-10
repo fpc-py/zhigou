@@ -22,6 +22,12 @@
 >
 > 。
 
+## 2026-10-10 · P2 供应链优化三期：异常订单自动处理 [0.2.22]
+
+- **#99 后端（order-service）**：Flyway V20261091__fulfillment_action 建表；FulfillmentAction 实体/Mapper；POST /order/fulfillment/action（SPLIT/DELAY/OFF_SHELF/REPLENISH，仅 PAID 单写 DONE 记录）、GET /order/fulfillment/actions；pendingFulfillment 附 handled 标记；orderIds 字符串/数字双兼容（修复 List<Number> 500）
+- **#100 AI**：fulfillment_action 工具（TOOLS 23），未传 order_ids 自动全量处理，演示口径标注正式版审批流
+- **#101 BFF+H5**：BFF /merchant/fulfillment/{actions,action}（JwtAuthGuard，修复 Number() 丢精度）；H5 商家中心履约异常区块四动作按钮 + 已处理标记 + 处理记录列表
+- **#102 验证+三件套+提交**：后端直连 13 单/handled/2 单动作 PASS；AI SSE 全量拆分发货 PASS；BFF 三层 1 单 PASS；H5 build PASS；CHANGELOG [0.2.22] / bug #26；git 提交推送
 ## 待验证清单（已开发未测试）
 
 > 以下功能已完成代码开发与静态编译检查，**尚未进行运行态测试与 git 提交**，下次统一验证后补测补交。

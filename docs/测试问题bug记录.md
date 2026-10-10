@@ -1,3 +1,12 @@
+# 测试问题 & Bug 记录
+
+## #26 · [0.2.22] order Flyway mock 版本陷阱 + orderIds 字符串反序列化 500 + BFF Number() 丢精度（已修复）
+
+- **现象**：① 新增 V20261002__fulfillment_action 被 order 库已应用的 mock V20261090 覆盖（版本更小被跳过），fulfillment_action 表未建，/order/stats/pending-fulfillment 报 500；② 后端 `List<Number>` 拒收 JSON 字符串 orderId，POST /order/fulfillment/action 返回 500；③ BFF 将 19 位 Snowflake orderId 经 `Number()` 化后回传，精度丢失致后端「订单不存在」
+- **根因**：① order 库 flyway_order_history 已应用 V20261090__mock_order，新增迁移版本必须更大（同 inventory）；② Jackson 对 `List<Number>` 遇字符串元素抛 MismatchedInputException；③ JS Number 安全整数上限 ~9e15 < 19 位 Snowflake
+- **修复**：① 迁移改名 V20261091__fulfillment_action.sql + clean package（清 target 残留）；② Controller 改 `List<Object>` + `String.valueOf` 中转解析；③ BFF 直接透传字符串 orderIds（不 Number() 化），后端双兼容
+- **教训**：Flyway 新迁移版本 > 已应用最大版本是铁律（inventory/order 已各踩一次）；19 位 ID 跨层必须字符串透传（CLAUDE.md 红线），BFF 服务层禁止 Number() 化后再回传
+
 # 智购 · 测试问题与 Bug 记录
 
 > 记录测试过程中发现的问题、临时排查命令与修复状态。已修复的条目保留留痕，不删除。

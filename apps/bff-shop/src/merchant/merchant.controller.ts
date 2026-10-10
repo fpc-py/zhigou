@@ -39,6 +39,20 @@ export class MerchantController {
     return ApiResponse.ok(data);
   }
 
+  /** 供应链补货中心：最近异常订单处理记录 */
+  @Get('merchant/fulfillment/actions')
+  async fulfillmentActions(@Query('limit') limit?: string) {
+    const data = await this.merchant.fulfillmentActions(limit ? Number(limit) : 10);
+    return ApiResponse.ok(data);
+  }
+
+  /** 供应链补货中心：异常订单自动处理（SPLIT/DELAY/OFF_SHELF/REPLENISH，演示口径） */
+  @Post('merchant/fulfillment/action')
+  async fulfillmentAction(@Body() body: { action: string; orderIds?: string[]; reason?: string }) {
+    const data = await this.merchant.fulfillmentAction(body.action, body.orderIds ?? [], body.reason);
+    return ApiResponse.ok(data);
+  }
+
   /** 供应链补货中心：自动补货（低库存补到目标库存，演示口径） */
   @Post('merchant/supply/auto-replenish')
   async autoReplenish(@Body() body: { threshold?: number; targetQty?: number }) {

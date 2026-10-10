@@ -22,6 +22,7 @@ public class OrderResponse {
     private String orderStatus;
     private Long totalAmount;
     private Long payAmount;
+    private Boolean handled;
     private List<Item> items;
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

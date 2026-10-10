@@ -1404,6 +1404,53 @@ async def supply_replenish(
         return "补货数据暂时没查到，稍后再试试？"
 
 
+@tool
+async def fulfillment_action(
+    action: str,
+    order_ids: list[int] | None = None,
+    reason: str | None = None,
+) -> str:
+    """
+    履约异常订单自动处理：对待发货（PAID）订单执行处理动作并写处理记录。
+    action 支持：SPLIT 拆分发货（有货先发，缺货追发）/ DELAY 延期发货 / OFF_SHELF 下架停单 / REPLENISH 补货后发货。
+    order_ids 指定订单 ID 列表；不传则自动处理全部待发货订单（演示口径）。
+    用户说"处理缺货订单""自动处理异常订单""拆分发货""延期发货""下架停单""补货后发货"时调用。
+    """
+    try:
+        if action not in ("SPLIT", "DELAY", "OFF_SHELF", "REPLENISH"):
+            return "支持的处理动作：SPLIT（拆分发货）/ DELAY（延期发货）/ OFF_SHELF（下架停单）/ REPLENISH（补货后发货）。请重新指定。"
+        if not order_ids:
+            pending = await _http_get(
+                f"{settings.order_service_url}/order/stats/pending-fulfillment",
+                timeout=5.0,
+            )
+            pending_list = pending.get("data") or []
+            if not pending_list:
+                return "当前没有待发货（PAID）订单，无需处理。"
+            order_ids = [int(o.get("orderId")) for o in pending_list]
+        body = {"action": action, "orderIds": order_ids, "reason": reason}
+        resp = await _http_post(
+            f"{settings.order_service_url}/order/fulfillment/action",
+            json_data=body,
+            timeout=5.0,
+        )
+        done = resp.get("data") or 0
+        label = {"SPLIT": "拆分发货（有货先发、缺货追发）",
+                 "DELAY": "延期发货（已与买家协商延期）",
+                 "OFF_SHELF": "下架停单（暂停该 SKU 新单）",
+                 "REPLENISH": "补货后发货（补到安全库存后履约）"}.get(action, action)
+        lines = ["履约异常订单自动处理（单商家市场 · 演示口径）："]
+        lines.append(f"· 处理动作：{label}")
+        lines.append(f"· 处理订单：{len(order_ids)} 单（{done} 单成功写入处理记录）")
+        if done > 0:
+            lines.append("· 处理记录：已标记 DONE，商家中心可查；后续可继续补货/发货/通知买家。")
+        lines.append("说明：演示直接写处理标记；正式版需接入审批流、物流调度与买家通知，并联动补货单。")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("fulfillment_action 调用失败: %s", e)
+        return "异常订单处理暂时没执行成功，稍后再试试？"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1427,4 +1474,5 @@ TOOLS = [
     merchant_warnings,
     fulfillment_alert,
     supply_replenish,
+    fulfillment_action,
 ]

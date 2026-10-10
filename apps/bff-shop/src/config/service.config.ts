@@ -68,6 +68,8 @@ export const SERVICE_PATHS = {
   inventoryReplenish: '/inventory/replenish',
   inventoryAutoReplenish: '/inventory/auto-replenish',
   inventoryReplenishRecords: '/inventory/replenish/records',
+  orderFulfillmentAction: '/order/fulfillment/action',
+  orderFulfillmentActions: '/order/fulfillment/actions',
   productReviewNegative: '/product/review/negative?minRating=3&limit=5',
   paymentCreate:     '/payment/create',
   paymentMockPay:    '/payment/sandbox/mock-pay',

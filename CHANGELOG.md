@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.22] - 2026-10-10
+
+### P2 · 供应链优化三期：异常订单自动处理（诊断→预警→处理闭环收尾）
+
+- feat(P2) `order-service` 异常处理模块：Flyway `V20261091__fulfillment_action.sql` 新增 `fulfillment_action` 表（order_id/sku_id/action/reason/status/create_time）；`FulfillmentAction` 实体 + Mapper
+- feat(P2) 接口：`POST /order/fulfillment/action`（action ∈ SPLIT/DELAY/OFF_SHELF/REPLENISH，非法 40031、空订单 40030；仅处理 PAID 订单，写 DONE 记录，reason 缺省用动作默认文案）、`GET /order/fulfillment/actions?limit`（倒序 ≤100）；`pendingFulfillment()` 为每单附加 `handled` 标记（已存在处理记录）
+- feat(P2) 兼容入参：orderIds 支持字符串/数字双形态（19 位 Snowflake 经 String 中转无损解析，修复 `List<Number>` 拒收字符串致 500）
+- feat(P2) AI `fulfillment_action` 工具（TOOLS 23 个）：未传 order_ids 自动全量处理待发货订单（演示口径）；输出处理动作/单数/记录状态，标注「正式版需接入审批流、物流调度与买家通知」
+- feat(P2) BFF `GET /merchant/fulfillment/actions`、`POST /merchant/fulfillment/action`（JwtAuthGuard；修复 orderIds 经 `Number()` 化丢精度——直接透传字符串，CLAUDE.md 红线）
+- feat(P2) H5 商家中心履约异常区块：待发货订单「已处理」标记 + 四个处理动作按钮（拆分发货/延期发货/补货后发货/下架停单）+ 最近处理记录列表（动作/原因/状态/时间）
+- 验证：后端直连 PASS（pending 13 单含 handled → POST 2 单 → actions 2 条 → handled 置真）；AI SSE PASS（「拆分发货」自动全量 13 单，tool_call→tool_result→token 总结）；BFF 三层 Bearer PASS（字符串 orderId 1 单）；H5 type-check+build PASS
+
 ## [0.2.21] - 2026-10-10
 
 ### P2 · 供应链优化二期：自动补货 + 补货中心（诊断→处理闭环）

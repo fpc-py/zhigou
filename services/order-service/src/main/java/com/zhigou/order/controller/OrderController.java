@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController @RequestMapping("/order") @RequiredArgsConstructor
 public class OrderController {
@@ -53,5 +54,23 @@ public class OrderController {
     @Operation(summary = "履约异常：PAID 待发货订单 + SKU 明细（缺货/卡单预警）") @GetMapping("/stats/pending-fulfillment")
     public Result<List<OrderResponse>> pendingFulfillment() {
         return Result.ok(orderService.pendingFulfillment());
+    }
+
+    @Operation(summary = "异常订单自动处理：写处理动作（SPLIT/DELAY/OFF_SHELF/REPLENISH，演示口径）") @PostMapping("/fulfillment/action")
+    public Result<Integer> fulfillmentAction(@RequestBody Map<String, Object> body) {
+        String action = String.valueOf(body.get("action"));
+        @SuppressWarnings("unchecked")
+        List<Object> orderIdsRaw = (List<Object>) body.get("orderIds");
+        // orderId 为 19 位 Snowflake：兼容字符串/数字两种入参，经 String 中转保证无损
+        List<Long> orderIds = orderIdsRaw.stream()
+                .map(id -> Long.valueOf(String.valueOf(id)))
+                .collect(java.util.stream.Collectors.toList());
+        String reason = body.get("reason") == null ? null : String.valueOf(body.get("reason"));
+        return Result.ok(orderService.fulfillmentAction(action, orderIds, reason));
+    }
+
+    @Operation(summary = "最近异常订单处理记录") @GetMapping("/fulfillment/actions")
+    public Result<List<com.zhigou.order.entity.FulfillmentAction>> fulfillmentActions(@RequestParam(defaultValue = "20") int limit) {
+        return Result.ok(orderService.listFulfillmentActions(limit));
     }
 }

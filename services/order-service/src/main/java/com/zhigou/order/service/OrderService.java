@@ -18,4 +18,8 @@ public interface OrderService {
     OrderStatsOverview overview();
     /** 履约异常：PAID 待发货订单 + SKU 明细（供缺货/卡单预警） */
     List<OrderResponse> pendingFulfillment();
+    /** 异常订单自动处理：对指定 PAID 订单写处理动作记录（SPLIT/DELAY/OFF_SHELF/REPLENISH，演示口径直接标记 DONE），返回处理单数 */
+    int fulfillmentAction(String action, List<Long> orderIds, String reason);
+    /** 最近异常订单处理记录（按时间倒序） */
+    List<com.zhigou.order.entity.FulfillmentAction> listFulfillmentActions(int limit);
 }

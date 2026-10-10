@@ -42,6 +42,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMainMapper orderMapper;
     private final OrderItemMapper itemMapper;
     private final OutboxMapper outboxMapper;
+    private final com.zhigou.order.mapper.FulfillmentActionMapper fulfillmentActionMapper;
     private final RestTemplate restTemplate;
 
     @Value("${product-service.url}") private String productServiceUrl;
@@ -336,15 +337,64 @@ public class OrderServiceImpl implements OrderService {
         List<OrderMain> orders = orderMapper.selectList(new LambdaQueryWrapper<OrderMain>()
                 .eq(OrderMain::getOrderStatus, OrderState.PAID.name())
                 .orderByAsc(OrderMain::getCreateTime));
-        return orders.stream().map(this::buildResponse).collect(Collectors.toList());
+        // 已处理订单集合（存在 DONE 处理记录）
+        Set<Long> handled = listFulfillmentActions(1000).stream()
+                .map(com.zhigou.order.entity.FulfillmentAction::getOrderId).collect(Collectors.toSet());
+        return orders.stream().map(o -> buildResponse(o, handled.contains(o.getOrderId()))).collect(Collectors.toList());
+    }
+
+    @Override @Transactional
+    public int fulfillmentAction(String action, List<Long> orderIds, String reason) {
+        if (orderIds == null || orderIds.isEmpty()) throw new BizException(40030, "未指定处理订单");
+        java.util.Set<String> allowed = java.util.Set.of("SPLIT", "DELAY", "OFF_SHELF", "REPLENISH");
+        if (!allowed.contains(action)) throw new BizException(40031, "不支持的处理动作: " + action);
+        int done = 0;
+        for (Long orderId : orderIds) {
+            OrderMain order = requireOrder(orderId);
+            if (!OrderState.PAID.name().equals(order.getOrderStatus())) {
+                log.warn("跳过非 PAID 订单: orderId={}, status={}", orderId, order.getOrderStatus());
+                continue;
+            }
+            com.zhigou.order.entity.FulfillmentAction rec = new com.zhigou.order.entity.FulfillmentAction();
+            rec.setOrderId(orderId);
+            rec.setAction(action);
+            rec.setReason(reason == null || reason.isBlank() ? defaultReason(action) : reason);
+            rec.setStatus("DONE");
+            fulfillmentActionMapper.insert(rec);
+            done++;
+        }
+        log.info("异常订单处理: action={}, orders={}, done={}", action, orderIds.size(), done);
+        return done;
+    }
+
+    private String defaultReason(String action) {
+        switch (action) {
+            case "SPLIT": return "拆分发货：有货 SKU 先发，缺货 SKU 补货后追发";
+            case "DELAY": return "延期发货：已与买家协商延期";
+            case "OFF_SHELF": return "下架停单：SKU 缺货严重，暂停新单";
+            case "REPLENISH": return "补货后发货：已发起补货，补到安全库存后履约";
+            default: return "异常订单处理";
+        }
+    }
+
+    @Override
+    public List<com.zhigou.order.entity.FulfillmentAction> listFulfillmentActions(int limit) {
+        return fulfillmentActionMapper.selectList(new LambdaQueryWrapper<com.zhigou.order.entity.FulfillmentAction>()
+                .orderByDesc(com.zhigou.order.entity.FulfillmentAction::getCreateTime)
+                .last("limit " + Math.max(1, Math.min(limit, 100))));
     }
 
     private OrderResponse buildResponse(OrderMain order) {
+        return buildResponse(order, false);
+    }
+
+    private OrderResponse buildResponse(OrderMain order, boolean handled) {
         List<OrderItem> items = itemMapper.selectList(
                 new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getOrderId()));
         return OrderResponse.builder()
                 .orderId(order.getOrderId()).userId(order.getUserId()).orderStatus(order.getOrderStatus())
                 .totalAmount(order.getTotalAmount()).payAmount(order.getPayAmount())
+                .handled(handled)
                 .items(items.stream().map(i -> OrderResponse.Item.builder()
                         .skuId(i.getSkuId()).skuName(i.getSkuName()).price(i.getPrice()).count(i.getCount()).build())
                         .collect(Collectors.toList()))

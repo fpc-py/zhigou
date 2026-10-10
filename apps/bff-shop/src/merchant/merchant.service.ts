@@ -112,6 +112,41 @@ export class MerchantService {
     return unwrapOrThrow(resp, this.logger, 'merchant/supply/auto-replenish', []);
   }
 
+  /** 异常订单自动处理：对待发货订单写处理动作（SPLIT/DELAY/OFF_SHELF/REPLENISH，演示口径） */
+  async fulfillmentAction(action: string, orderIds: string[], reason?: string): Promise<number | null> {
+    // orderId 为 19 位 Snowflake，禁止 Number() 化（超 JS 安全整数会丢精度，CLAUDE.md 红线）；后端 List<Number> 可无损反序列化字符串
+    const resp = await firstValueFrom(
+      this.http
+        .post(`${SERVICES.orderService.url}${SERVICE_PATHS.orderFulfillmentAction}`, {
+          action,
+          orderIds,
+          reason,
+        })
+        .pipe(
+          timeout(SERVICES.orderService.timeout),
+          catchError((err) => {
+            this.logger.warn(`order-service /order/fulfillment/action 失败: ${err.message}`);
+            return Promise.resolve({ data: { data: 0 } });
+          }),
+        ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/fulfillment/action', 0);
+  }
+
+  /** 最近异常订单处理记录 */
+  async fulfillmentActions(limit = 10): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${SERVICES.orderService.url}${SERVICE_PATHS.orderFulfillmentActions}?limit=${limit}`).pipe(
+        timeout(SERVICES.orderService.timeout),
+        catchError((err) => {
+          this.logger.warn(`order-service /order/fulfillment/actions 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: [] } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/fulfillment/actions', []);
+  }
+
   /** 手动补货：指定 SKU 增加库存（演示口径） */
   async manualReplenish(skuId: number, addQty: number, remark?: string): Promise<any | null> {
     const resp = await firstValueFrom(

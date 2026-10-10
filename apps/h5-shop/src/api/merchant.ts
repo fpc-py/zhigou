@@ -36,6 +36,7 @@ export interface PendingOrder {
   orderId: string;
   orderStatus: string;
   payAmount?: number;
+  handled?: boolean;
   items: FulfillItem[];
 }
 
@@ -78,5 +79,34 @@ export async function manualReplenish(skuId: number, addQty: number, remark?: st
     addQty,
     remark,
   });
+  return res.data.data;
+}
+
+export interface FulfillmentActionRecord {
+  id?: number;
+  orderId: string;
+  action: 'SPLIT' | 'DELAY' | 'OFF_SHELF' | 'REPLENISH';
+  reason?: string;
+  status: string;
+  createTime?: string;
+}
+
+export const ACTION_LABELS: Record<string, string> = {
+  SPLIT: '拆分发货', DELAY: '延期发货', OFF_SHELF: '下架停单', REPLENISH: '补货后发货',
+}
+
+/** 异常订单自动处理（SPLIT/DELAY/OFF_SHELF/REPLENISH，演示口径） */
+export async function runFulfillmentAction(action: string, orderIds: string[], reason?: string): Promise<number | null> {
+  const res = await http.post<{ code: number; data: number | null }>('/merchant/fulfillment/action', {
+    action,
+    orderIds,
+    reason,
+  });
+  return res.data.data;
+}
+
+/** 最近异常订单处理记录 */
+export async function getFulfillmentActions(limit = 10): Promise<FulfillmentActionRecord[] | null> {
+  const res = await http.get<{ code: number; data: FulfillmentActionRecord[] | null }>('/merchant/fulfillment/actions?limit=' + limit);
   return res.data.data;
 }

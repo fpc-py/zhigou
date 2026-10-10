@@ -80,13 +80,30 @@
         <div v-for="o in pendingOrders" :key="o.orderId" class="warn-row">
           <span class="warn-dot fulf" />
           <div class="warn-main">
-            <div class="warn-name">订单 {{ shortId(o.orderId) }}</div>
+            <div class="warn-name">订单 {{ shortId(o.orderId) }}{{ o.handled ? ' · 已处理' : '' }}</div>
             <div class="warn-sub">{{ skuSummary(o.items) }}</div>
           </div>
-          <span class="warn-tag fulf">待发货</span>
+          <span class="warn-tag fulf">{{ o.handled ? '已处理' : '待发货' }}</span>
         </div>
       </div>
       <div v-if="!pendingOrders.length" class="empty">暂无待发货订单</div>
+      <div class="fulfill-actions">
+        <button v-for="a in fulfillActions" :key="a.value" class="fa-btn" :disabled="faLoading"
+          @click="doFulfillAction(a.value)">{{ a.label }}</button>
+      </div>
+      <div v-if="faMsg" class="supply-msg">{{ faMsg }}</div>
+      <div class="warn-label" style="margin-top:10px;">最近处理记录</div>
+      <div v-if="faRecords.length" class="warn-group">
+        <div v-for="r in faRecords" :key="r.id ?? r.createTime" class="warn-row">
+          <span class="warn-dot fulf" />
+          <div class="warn-main">
+            <div class="warn-name">订单 {{ shortId(r.orderId) }} · {{ ACTION_LABELS[r.action] || r.action }}</div>
+            <div class="warn-sub">{{ r.reason || '异常订单处理' }} · {{ (r.createTime || '').slice(0, 19) }}</div>
+          </div>
+          <span class="warn-tag fulf">{{ r.status }}</span>
+        </div>
+      </div>
+      <div v-if="!faRecords.length" class="empty">暂无处理记录</div>
       <div class="fulfill-note">可问 AI 助手：哪些订单会缺货卡单、如何处理（补货/拆分/延期）</div>
     </div>
 
@@ -161,9 +178,13 @@ import {
   getMerchantFulfillment,
   getReplenishRecords,
   autoReplenish,
+  runFulfillmentAction,
+  getFulfillmentActions,
+  ACTION_LABELS,
   type PendingOrder,
   type FulfillItem,
   type ReplenishRecord,
+  type FulfillmentActionRecord,
 } from '@/api/merchant'
 
 const router = useRouter()
@@ -198,6 +219,49 @@ const warnTotal = computed(() => warnings.value.lowStock.length + warnings.value
 const clip = (s: string) => (s || '').length > 26 ? s.slice(0, 26) + '…' : (s || '')
 
 const pendingOrders = ref<PendingOrder[]>([])
+const fulfillActions = [
+  { value: 'SPLIT', label: '拆分发货' },
+  { value: 'DELAY', label: '延期发货' },
+  { value: 'REPLENISH', label: '补货后发货' },
+  { value: 'OFF_SHELF', label: '下架停单' },
+]
+const faLoading = ref(false)
+const faMsg = ref('')
+const faRecords = ref<FulfillmentActionRecord[]>([])
+
+async function doFulfillAction(action: string) {
+  faLoading.value = true
+  faMsg.value = ''
+  try {
+    const ids = pendingOrders.value.map((o) => o.orderId)
+    if (!ids.length) {
+      faMsg.value = '暂无待发货订单可处理'
+      return
+    }
+    const done = await runFulfillmentAction(action, ids)
+    faMsg.value = `${ACTION_LABELS[action] || action}执行完成：${done ?? 0} 单已写入处理记录`
+    await loadFulfill()
+  } catch (e) {
+    faMsg.value = '处理失败，请稍后再试'
+  } finally {
+    faLoading.value = false
+  }
+}
+
+async function loadFulfill() {
+  try {
+    const f = await getMerchantFulfillment()
+    if (f) pendingOrders.value = f
+  } catch (e) {
+    // 保持空态
+  }
+  try {
+    const r = await getFulfillmentActions(10)
+    if (r) faRecords.value = r
+  } catch (e) {
+    // 保持空态
+  }
+}
 const supplyLow = ref<{ skuId: number; available: number }[]>([])
 const supplyRecords = ref<ReplenishRecord[]>([])
 const supplyLoading = ref(false)
@@ -236,12 +300,7 @@ onMounted(async () => {
     // 保持空态；页面可读
   }
   await loadWarnings()
-  try {
-    const f = await getMerchantFulfillment()
-    if (f) pendingOrders.value = f
-  } catch (e) {
-    // 履约异常区块保持空态
-  }
+  await loadFulfill()
   await loadSupply()
 })
 
@@ -333,4 +392,8 @@ async function loadSupply() {
   background: linear-gradient(135deg, #3B82F6, #6366F1); color: #fff; font-size: 14px; font-weight: 600; }
 .supply-btn:disabled { opacity: 0.6; }
 .supply-msg { margin-top: 8px; font-size: 12px; color: #2563EB; background: #EFF6FF; border-radius: 8px; padding: 6px 8px; }
+.fulfill-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.fa-btn { flex: 1; min-width: 72px; padding: 8px 4px; border: 1px solid #F5A623; border-radius: 8px;
+  background: #fff; color: #B7791F; font-size: 12px; font-weight: 600; }
+.fa-btn:disabled { opacity: 0.6; }
 </style>
