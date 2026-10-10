@@ -1451,6 +1451,53 @@ async def fulfillment_action(
         return "异常订单处理暂时没执行成功，稍后再试试？"
 
 
+@tool
+async def logistics_delay_alert(
+    stagnant_hours: int = 48,
+    dispatch_action: str | None = None,
+    shipment_no: str | None = None,
+    reason: str | None = None,
+) -> str:
+    """
+    物流延误预警管家：扫描在途运单的疑似停滞/延误风险，并可一键调度处理。
+    未传 dispatch_action 时只做预警盘点；传了 dispatch_action（URGE 催件 / REDELIVER 重新派送 / SELF_PICKUP 自提 / CHANGE_ADDRESS 改址 / RETURN 退换货）时对指定 shipment_no（不传则对第一个风险单）执行调度。
+    用户问"快递卡住了吗""物流有没有延误""帮我催件/改自提/改地址"时调用。
+    """
+    try:
+        alerts = await _http_get(
+            f"{settings.logistics_service_url}/logistics/delay-alerts?stagnantHours={stagnant_hours}",
+            timeout=5.0,
+        )
+        list_data = alerts.get("data") or []
+        risk = [a for a in list_data if a.get("stagnant")]
+        lines = ["物流延误预警（单商家市场 · 演示口径）："]
+        if not list_data:
+            lines.append("· 当前没有在途运单，无需预警。")
+            return "\n".join(lines)
+        lines.append(f"· 在途运单：{len(list_data)} 单；疑似停滞/延误：{len(risk)} 单")
+        for a in risk[:5]:
+            t = (a.get("latestTime") or "")[:16]
+            lines.append(f"  - {a.get('shipmentNo')}（{a.get('latestNode') or '无轨迹'} @ {t}）：{a.get('hint')}")
+        if risk and dispatch_action:
+            target = shipment_no or risk[0].get("shipmentNo")
+            d = await _http_post(
+                f"{settings.logistics_service_url}/logistics/dispatch",
+                json_data={"shipmentNo": target, "action": dispatch_action, "reason": reason},
+                timeout=5.0,
+            )
+            rec = d.get("data") or {}
+            label = {"URGE": "催件", "REDELIVER": "重新派送", "SELF_PICKUP": "改自提",
+                     "CHANGE_ADDRESS": "改址", "RETURN": "退换货"}.get(dispatch_action, dispatch_action)
+            lines.append(f"· 一键调度：运单 {target} 已执行「{label}」（记录 {rec.get('status') or 'DONE'}，商家/物流侧可查）")
+            lines.append("说明：演示直接写调度记录；正式版需接入承运商 API、物流工单与买家通知。")
+        elif risk and not dispatch_action:
+            lines.append("· 建议：对风险单执行催件/重新派送/改自提/改址/退换货，告诉我即可一键处理。")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("logistics_delay_alert 调用失败: %s", e)
+        return "物流预警暂时获取失败，请稍后再试。"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1466,6 +1513,7 @@ TOOLS = [
     gift_assistant,
     aftersale_assistant,
     logistics_tracker,
+    logistics_delay_alert,
     usage_cycle_assistant,
     groupbuy_finder,
     optimize_cart,

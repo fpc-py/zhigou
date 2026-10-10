@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.23] - 2026-10-10
+
+### P2 · 智能物流管家升级：延误预判 + 主动预警 + 一键调度
+
+- feat(P2) `logistics-service` 延误预警/调度模块：Flyway `V20261091__dispatch_action.sql` 新增 `dispatch_action` 表（shipment_no/action/reason/status/create_time）；`DispatchAction` 实体 + Mapper
+- feat(P2) 接口：`GET /logistics/delay-alerts?stagnantHours=`（在途/待揽收未签收未取消运单，按最近轨迹节点时间判疑似停滞，默认 48h，输出 shipmentNo/orderNo/status/latestNode/latestTime/stagnant/hint）、`POST /logistics/dispatch`（action ∈ URGE/REDELIVER/SELF_PICKUP/CHANGE_ADDRESS/RETURN，非法运单 40040/非法动作 40041/不存在 404，演示口径直接写 DONE 记录；reason 缺省用 `defaultDispatchReason`）
+- fix(P2) 修复 3 个坑：logistics 无 swagger 依赖移除 @Operation；轨迹排序 `compareTo` 遇沙箱 null nodeTime NPE → 改为 for 循环取最大节点（含 null 跳过）；controller 无类级路径前缀且根路径未放行 → 新端点显式 `/logistics/delay-alerts`、`/logistics/dispatch`（SecurityConfig 已放行 `/logistics/**`）
+- feat(P2) AI `logistics_delay_alert` 工具（TOOLS 24 个）：延误预警盘点（在途/停滞清单）；传 `dispatch_action` 对指定运单（不传则首个风险单）一键调度；输出调度记录状态并标注「正式版需接入承运商 API、物流工单与买家通知」
+- feat(P2) BFF `GET /freight/delay-alerts`、`POST /freight/dispatch`（JwtAuthGuard，透传 logistics-service 实际路径）
+- feat(P2) H5 对话页「物流管家」快捷入口升级为延误预警语义（轨迹/延误预警，触发 AI 盘点 + 一键催件）
+- 验证：后端直连 PASS（10 在途 1 停滞 MOCK_SHIP_001「运输中」→ URGE DONE）；AI SSE PASS（自动盘点 + 一键催件，tool_call→tool_result→token 总结）；BFF 三层 Bearer PASS（alerts 10/risk 1、SELF_PICKUP DONE）；BFF/H5 type-check+build PASS
+
 ## [0.2.22] - 2026-10-10
 
 ### P2 · 供应链优化三期：异常订单自动处理（诊断→预警→处理闭环收尾）

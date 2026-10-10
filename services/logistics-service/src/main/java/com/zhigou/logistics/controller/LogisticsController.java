@@ -40,4 +40,17 @@ public class LogisticsController {
     public Result<Void> cancel(@PathVariable String shipmentNo) {
         service.cancel(shipmentNo); return Result.ok();
     }
+
+    @GetMapping("/logistics/delay-alerts")
+    public Result<List<Map<String, Object>>> delayAlerts(@RequestParam(defaultValue = "48") int stagnantHours) {
+        return Result.ok(service.delayAlerts(stagnantHours));
+    }
+
+    @PostMapping("/logistics/dispatch")
+    public Result<com.zhigou.logistics.entity.DispatchAction> dispatch(@RequestBody Map<String, Object> body) {
+        String shipmentNo = String.valueOf(body.get("shipmentNo"));
+        String action = String.valueOf(body.get("action"));
+        String reason = body.get("reason") == null ? null : String.valueOf(body.get("reason"));
+        return Result.ok(service.dispatch(shipmentNo, action, reason));
+    }
 }

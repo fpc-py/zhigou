@@ -7,6 +7,13 @@
 - **修复**：① 迁移改名 V20261091__fulfillment_action.sql + clean package（清 target 残留）；② Controller 改 `List<Object>` + `String.valueOf` 中转解析；③ BFF 直接透传字符串 orderIds（不 Number() 化），后端双兼容
 - **教训**：Flyway 新迁移版本 > 已应用最大版本是铁律（inventory/order 已各踩一次）；19 位 ID 跨层必须字符串透传（CLAUDE.md 红线），BFF 服务层禁止 Number() 化后再回传
 
+## #27 · [0.2.23] 物流延误预警 3 坑：无 swagger @Operation / 轨迹排序 NPE / 端点无类级前缀（已修复）
+
+- **现象**：① logistics-service 编译报「找不到 io.swagger」；② `GET /logistics/delay-alerts` 返回 500；③ `GET /logistics/delay-alerts` 返回 `NoResourceFoundException: No static resource logistics/delay-alerts`
+- **根因**：① logistics 无 swagger 依赖；② `evs.sort((a,b) -> b.getNodeTime().compareTo(a))` 遇沙箱/空轨迹 `nodeTime=null` NPE；③ `LogisticsController` 类级 `@RequestMapping(produces=...)` 无路径前缀，`@GetMapping("/delay-alerts")` 实际映射到根路径 `/delay-alerts`，而 SecurityConfig 只放行 `/logistics/**` → 未授权请求落到静态资源解析 404
+- **修复**：① 移除 @Operation 注解；② 改为 for 循环取最大 `nodeTime`（null 跳过）；③ 新端点显式 `@GetMapping("/logistics/delay-alerts")`、`@PostMapping("/logistics/dispatch")`（对齐已放行的 `/logistics/**`）
+- **教训**：无 swagger 依赖的服务新增端点禁用 @Operation；业务排序前先判空；controller 无类级路径前缀时，方法级路径必须写完整并核对 SecurityConfig 放行范围
+
 # 智购 · 测试问题与 Bug 记录
 
 > 记录测试过程中发现的问题、临时排查命令与修复状态。已修复的条目保留留痕，不删除。

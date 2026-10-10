@@ -48,6 +48,8 @@ export const SERVICE_PATHS = {
   groupBuyMine:       '/group-buy/mine',
   groupBuyDetail:     (id: string) => `/group-buy/group/${id}`,
   freightCalculate:  '/freight/calculate',
+  logisticsDelayAlerts: '/logistics/delay-alerts',
+  logisticsDispatch:    '/logistics/dispatch',
   ragRetrieve:       '/api/v1/rag/retrieve',
   chatSse:           '/api/v1/chat/sse',
   authSendSms:       '/auth/send-sms-code',
