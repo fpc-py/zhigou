@@ -261,6 +261,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化                                                            |
 
 ## 变更记录
+* 2026-10-10（注）：**git push 待重试**——[0.2.12] 与 [0.2.11 防编造补充] 两个 commit 已在本地（origin/main 落后 2），push 多次因 GitHub 443/Connection reset 失败，网络恢复后重试 `git push origin main`。
+
 * 2026-10-10：**P2 内容社区 MVP（[0.2.12]）**：新增 community-service（8091，笔记/评论/点赞收藏/虚假内容识别 SPAM_WORDS+重复检测）；AI 种草文案 writer（真实数据锚点）；BFF 透传 8 路由 + 雪花 ID 字符串化修复 + ai-writer 超时豁免；H5 社区页换真（信息流/发布/AI 写文案/详情评论/营销标记）。验证：直连 11/11、BFF 全链路 7/7、双端构建通过；浏览器 UI 点按实测受 bu 会话 viewport 异常未完成（页面渲染文本验证通过，交互以 API 验收为准）。
 
 
