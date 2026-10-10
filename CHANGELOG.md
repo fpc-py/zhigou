@@ -3,6 +3,22 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.19] - 2026-10-10
+
+### P2 · 商业模式落地：AI 会员订阅（会员中心 + 沙箱订阅支付闭环，wallet 遗留「开通/支付规划中」闭环）
+
+- feat(P2) `wallet-service` 会员订阅后端（沙箱扣余额，30 天周期）：
+  - Flyway `V2__member_subscribe.sql`：`wallet_account` 加 `member_expire_at`（订阅到期，可顺延）
+  - `POST /wallet/subscribe`：ADVANCED ¥29 / FLAGSHIP ¥99（30 天）；余额不足 40044、非法档位 40043；未到期续费到期日自动顺延 +30 天；写 CONSUME 流水（SUB+ 前缀 bizNo）
+  - `GET /wallet/subscription`：当前档位/到期/是否有效/权益清单；演示口径显式标注（沙箱扣余额，不接真实支付通道）
+- feat(P2) BFF 新增 `POST /wallet/subscribe` + `GET /wallet/subscription` 透传（JwtAuthGuard + req.userId + x-user-id 出站头）
+- feat(P2) H5 钱包页升级为会员中心：
+  - 会员卡显示档位/到期日/生效状态（过期提示「续费后恢复权益」）+ 开通/续费按钮
+  - 「开通 / 升级会员」档位卡（高级 ¥29 / 旗舰 ¥99 + 权益对照 + 当前档位高亮）
+  - 订阅确认弹层（套餐价/余额扣款/顺延提示）→ 确认后刷新状态
+- 验证：wallet 直连 PASS（订阅前 ADVANCED → 订阅后 FLAGSHIP + expireAt +30 天 + 余额扣减 + level 更新）；BFF 登录态 200 返回完整订阅信息；H5 type-check+build + 浏览器实测（会员中心/档位/权益渲染 + 过期态与开通入口）
+- 说明：订阅为演示口径（沙箱扣余额）；正式版接入微信/支付宝订阅支付后保留接口与字段语义（金额分/到期/档位）
+
 ## [0.2.18] - 2026-10-10
 
 ### P2 · 商家端 AI 经营体系二期（经营预警：低库存 + 差评负面预警）

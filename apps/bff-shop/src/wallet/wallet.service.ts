@@ -84,4 +84,34 @@ export class WalletService {
     );
     return unwrapOrThrow(resp, this.logger, 'wallet/level', null);
   }
+
+  /** 开通/续费会员（沙箱扣余额） */
+  async subscribe(userId: string, level: string): Promise<any | null> {
+    const url = `${SERVICES.walletSvc.url}${SERVICE_PATHS.walletSubscribe}`;
+    const resp = await firstValueFrom(
+      this.http.post(url, { userId, level }, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.walletSvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`wallet-service /wallet/subscribe 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'wallet/subscribe', null);
+  }
+
+  /** 当前订阅状态 */
+  async subscription(userId: string): Promise<any | null> {
+    const url = `${SERVICES.walletSvc.url}${SERVICE_PATHS.walletSubscription}?userId=${encodeURIComponent(userId)}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.walletSvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`wallet-service /wallet/subscription 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'wallet/subscription', null);
+  }
 }

@@ -23,16 +23,43 @@
       </div>
     </section>
 
-    <!-- 会员等级 -->
+    <!-- 会员中心 -->
     <section v-if="level" class="member card">
       <div class="member-head">
         <h3 class="sec-title"><Icon name="crown" size="xs" /> {{ level.title }}</h3>
-        <span class="member-tag">{{ level.level }}</span>
+        <span class="member-tag" :class="{ exp: subscription && !subscription.active }">{{ subscription?.level || level.level }}</span>
       </div>
       <div class="benefits">
-        <span v-for="b in level.benefits" :key="b">{{ b }}</span>
+        <span v-for="b in (subscription?.benefits?.length ? subscription.benefits : level.benefits)" :key="b">{{ b }}</span>
       </div>
-      <p class="member-note">{{ level.note }}</p>
+      <p class="member-note">
+        <template v-if="subscription">
+          {{ subscription.active
+            ? '会员生效中 · 到期 ' + (subscription.expireAt || '').slice(0, 10)
+            : '会员已过期，续费后恢复权益' }}
+        </template>
+        <template v-else>{{ level.note }}</template>
+      </p>
+      <button class="sub-btn" @click="openSubscribe">
+        {{ subscription?.active ? '续费 / 升级会员' : '开通会员' }}
+      </button>
+    </section>
+
+    <!-- 会员档位 -->
+    <section class="plans card">
+      <h3 class="sec-title">开通 / 升级会员</h3>
+      <div class="plan-list">
+        <div v-for="p in PLAN_LIST" :key="p.level" class="plan" :class="{ cur: (subscription?.level || 'FREE') === p.level }" @click="choosePlan(p)">
+          <div class="plan-main">
+            <p class="plan-name">{{ p.name }} <span class="plan-price">¥{{ p.price }}</span><span class="plan-cycle">/ 30 天</span></p>
+            <p class="plan-brief">{{ p.brief }}</p>
+          </div>
+          <div class="plan-benefits">
+            <span v-for="b in p.benefits" :key="b">{{ b }}</span>
+          </div>
+        </div>
+      </div>
+      <p class="plan-note">演示环境：订阅从余额扣款，未到期续费自动顺延 30 天，不接真实支付通道。</p>
     </section>
 
     <!-- 流水 -->
@@ -55,6 +82,21 @@
         <p v-if="txns.length === 0" class="empty">暂无收支明细</p>
       </div>
     </section>
+
+    <!-- 订阅弹层 -->
+    <div v-if="showSubscribe" class="mask" @click.self="showSubscribe = false">
+      <div class="sheet">
+        <h3 class="sheet-title">确认开通「{{ picked?.name }}」</h3>
+        <div class="sheet-line">套餐价 <b>¥{{ picked?.price }} / 30 天</b>（沙箱演示）</div>
+        <div class="sheet-line">支付方式：钱包余额扣款（当前余额 ¥{{ ((account?.balanceFen ?? 0) / 100).toFixed(2) }}）</div>
+        <div v-if="picked && subscription && subscription.active" class="sheet-line note">当前 {{ subscription.level }} 会员生效中，续费后到期日自动顺延。</div>
+        <p class="sheet-note">演示环境：订阅直接扣余额入账，不接真实支付通道；正式版接入微信/支付宝订阅支付。</p>
+        <div class="sheet-actions">
+          <button class="btn-cancel" @click="showSubscribe = false">取消</button>
+          <button class="btn-ok" @click="submitSubscribe">确认订阅</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 充值弹层 -->
     <div v-if="showRecharge" class="mask" @click.self="showRecharge = false">
@@ -81,8 +123,8 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { showToast } from '@/utils';
 import Icon from '@/components/Icon.vue';
-import { getWalletAccount, getWalletTransactions, rechargeWallet, getMemberLevel } from '@/api/wallet';
-import type { WalletAccount, WalletTransaction, MemberLevelInfo } from '@/api/wallet';
+import { getWalletAccount, getWalletTransactions, rechargeWallet, getMemberLevel, getSubscription, subscribeMember } from '@/api/wallet';
+import type { WalletAccount, WalletTransaction, MemberLevelInfo, SubscriptionInfo } from '@/api/wallet';
 
 const router = useRouter();
 const account = ref<WalletAccount | null>(null);
@@ -90,6 +132,15 @@ const txns = ref<WalletTransaction[]>([]);
 const level = ref<MemberLevelInfo | null>(null);
 const showRecharge = ref(false);
 const amountFen = ref(5000);
+const subscription = ref<SubscriptionInfo | null>(null);
+const showSubscribe = ref(false);
+const picked = ref<PlanItem | null>(null);
+
+interface PlanItem { level: string; name: string; price: number; brief: string; benefits: string[] }
+const PLAN_LIST: PlanItem[] = [
+  { level: 'ADVANCED', name: '高级会员', price: 29, brief: '比价 + 砍价 + 免运费券', benefits: ['跨平台比价', 'AI 砍价助手', '免运费券 6 张/月'] },
+  { level: 'FLAGSHIP', name: '旗舰会员', price: 99, brief: '专属 AI 助理 + 全权益', benefits: ['专属 AI 助理', '全网比价 + 砍价', '免运费券 12 张/月', '生日礼包'] },
+];
 
 function typeEmoji(t: string): string {
   return { RECHARGE: '💰', CONSUME: '🛒', REFUND: '↩️' }[t] || '💳';
@@ -100,10 +151,11 @@ function typeBg(t: string): string {
 
 async function loadAll() {
   try {
-    const [acc, ts, lv] = await Promise.all([getWalletAccount(), getWalletTransactions(), getMemberLevel()]);
+    const [acc, ts, lv, sub] = await Promise.all([getWalletAccount(), getWalletTransactions(), getMemberLevel(), getSubscription()]);
     account.value = acc;
     txns.value = ts;
     level.value = lv;
+    subscription.value = sub;
   } catch {
     /* 忽略 */
   }
@@ -112,6 +164,33 @@ async function loadAll() {
 function openRecharge() {
   amountFen.value = 5000;
   showRecharge.value = true;
+}
+
+function openSubscribe() {
+  const cur = subscription.value?.level;
+  picked.value = PLAN_LIST.find((p) => p.level !== 'FLAGSHIP' && p.level !== cur) ?? PLAN_LIST[1]!;
+  showSubscribe.value = true;
+}
+
+function choosePlan(p: PlanItem) {
+  picked.value = p;
+  showSubscribe.value = true;
+}
+
+async function submitSubscribe() {
+  if (!picked.value) return;
+  const levelName = picked.value.level;
+  try {
+    const sub = await subscribeMember(levelName);
+    if (sub) {
+      subscription.value = sub;
+      showSubscribe.value = false;
+      showToast(`已开通${picked.value.name}（30 天）`);
+      await loadAll();
+    }
+  } catch (e) {
+    showToast((e as any)?.response?.data?.message || '订阅失败，请重试');
+  }
 }
 
 async function submitRecharge() {
@@ -181,4 +260,19 @@ onMounted(loadAll);
 .sheet-actions { display: flex; gap: 10px; }
 .btn-cancel { flex: 1; height: 42px; border-radius: 999px; background: var(--bg); color: var(--ink-2); font-size: 13.5px; font-weight: 600; }
 .btn-ok { flex: 1; height: 42px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 13.5px; font-weight: 600; }
+/* 会员订阅 */
+.sub-btn { margin-top: 10px; width: 100%; padding: 10px 0; background: #4C5CFF; color: #fff; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; }
+.plans { margin-top: 12px; }
+.plan-list { display: flex; flex-direction: column; gap: 10px; }
+.plan { border: 1.5px solid #eee; border-radius: 12px; padding: 12px; cursor: pointer; }
+.plan.cur { border-color: #4C5CFF; background: #F5F6FF; }
+.plan-name { font-size: 15px; font-weight: 700; }
+.plan-price { color: #E5484D; font-weight: 700; margin-left: 4px; }
+.plan-cycle { font-size: 11px; color: #999; font-weight: 400; }
+.plan-brief { font-size: 12px; color: #666; margin-top: 2px; }
+.plan-benefits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.plan-benefits span { font-size: 11px; color: #4C5CFF; background: #EEF0FF; padding: 2px 8px; border-radius: 10px; }
+.plan-note { font-size: 11px; color: #999; margin-top: 10px; }
+.sheet-line { font-size: 13px; color: #444; margin-bottom: 8px; }
+.sheet-line.note { color: #B7791F; }
 </style>

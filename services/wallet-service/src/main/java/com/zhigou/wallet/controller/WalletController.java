@@ -46,4 +46,18 @@ public class WalletController {
     public Result<Map<String, Object>> level(@RequestParam Long userId) {
         return Result.ok(walletService.memberLevel(userId));
     }
+
+    /** 开通/续费会员（沙箱扣余额，演示） */
+    @PostMapping("/wallet/subscribe")
+    public Result<Map<String, Object>> subscribe(@RequestBody Map<String, Object> body) {
+        return Result.ok(walletService.subscribe(
+                Long.valueOf(String.valueOf(body.get("userId"))),
+                (String) body.get("level")));
+    }
+
+    /** 当前订阅状态 */
+    @GetMapping("/wallet/subscription")
+    public Result<Map<String, Object>> subscription(@RequestParam Long userId) {
+        return Result.ok(walletService.subscription(userId));
+    }
 }

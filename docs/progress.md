@@ -36,6 +36,15 @@
 | AI 链路 | chat_service 迁移原生 OpenAI（tiktoken 阻断修复）+ 工具路由 + 超时配置 | ✅ 重写完成 | ✅ 2026-10-10 SSE 实测 5/5 PASS | 随 [0.2.11] 统一提交 |
 | 上线就绪 | release-checklist 改写 + gray-release + monitoring-alerting + 部署资产整改 | ✅ 已完成 | ✅ 静态核验通过 | 随 [0.2.11] 统一提交 |
 
+## 2026-10-10 · P2 商业模式落地：AI 会员订阅 [0.2.19]
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| wallet 订阅后端 | ✅ | `POST /wallet/subscribe`（¥29/¥99 30 天，沙箱扣余额，未到期顺延）+ `GET /wallet/subscription`；V2 迁移加 member_expire_at；直连验证：FLAGSHIP 开通 → expireAt +30 天 + 扣费 + level 更新 |
+| BFF 透传 | ✅ | wallet 模块新增 subscribe/subscription 路由，登录态 200 返回完整订阅信息 |
+| H5 会员中心 | ✅ | 钱包页升级：会员卡（档位/到期/生效态）+ 档位卡（权益对照）+ 订阅确认弹层；type-check+build + 浏览器实测通过 |
+| 提交 | ✅ | 随 [0.2.19] 统一 commit & push（含 [0.2.18] 补推） |
+
 ## 2026-10-10 · P2 商家经营二期：经营预警（低库存 + 差评负面预警）[0.2.18]
 
 | 项 | 状态 | 说明 |

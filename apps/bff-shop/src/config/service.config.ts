@@ -104,4 +104,6 @@ export const SERVICE_PATHS = {
   walletRecharge:     '/wallet/recharge',
   walletTransactions: '/wallet/transactions',
   walletLevel:        '/wallet/level',
+  walletSubscribe:    '/wallet/subscribe',
+  walletSubscription: '/wallet/subscription',
 };

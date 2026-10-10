@@ -43,4 +43,18 @@ export class WalletController {
     const data = await this.wallet.memberLevel(this.uid(req));
     return ApiResponse.ok(data);
   }
+
+  /** 开通/续费会员（沙箱扣余额） */
+  @Post('wallet/subscribe')
+  async subscribe(@Body() body: { level: string }, @Req() req: Request) {
+    const data = await this.wallet.subscribe(this.uid(req), body.level);
+    return ApiResponse.ok(data);
+  }
+
+  /** 当前订阅状态 */
+  @Get('wallet/subscription')
+  async subscription(@Req() req: Request) {
+    const data = await this.wallet.subscription(this.uid(req));
+    return ApiResponse.ok(data);
+  }
 }

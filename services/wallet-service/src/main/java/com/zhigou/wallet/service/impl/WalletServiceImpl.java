@@ -95,6 +95,55 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
+    @Transactional
+    public Map<String, Object> subscribe(Long userId, String level) {
+        WalletAccount acc = myAccount(userId);
+        String lv = level == null ? "" : level.trim().toUpperCase();
+        long price;
+        switch (lv) {
+            case "ADVANCED" -> price = 2900L; // ¥29 / 30 天
+            case "FLAGSHIP" -> price = 9900L; // ¥99 / 30 天
+            default -> throw new BizException(40043, "不支持的会员档位（ADVANCED/FLAGSHIP）");
+        }
+        if (acc.getBalanceFen() < price) throw new BizException(40044, "余额不足，请先充值（沙箱订阅）");
+        LocalDateTime now = LocalDateTime.now();
+        // 未到期续费顺延，否则从当前起算 30 天
+        LocalDateTime base = acc.getMemberExpireAt() != null && acc.getMemberExpireAt().isAfter(now)
+                ? acc.getMemberExpireAt() : now;
+        acc.setBalanceFen(acc.getBalanceFen() - price);
+        acc.setTotalConsumeFen(acc.getTotalConsumeFen() + price);
+        acc.setMemberLevel(lv);
+        acc.setMemberExpireAt(base.plusDays(30));
+        acc.setUpdatedAt(now);
+        accountMapper.updateById(acc);
+
+        WalletTransaction t = new WalletTransaction();
+        t.setUserId(userId);
+        t.setType("CONSUME");
+        t.setAmountFen(price);
+        t.setBalanceAfterFen(acc.getBalanceFen());
+        t.setBizNo("SUB" + now.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")) + userId % 10000);
+        t.setRemark("开通" + (lv.equals("FLAGSHIP") ? "旗舰" : "高级") + "会员 30 天（沙箱订阅，扣余额 ¥" + (price / 100) + "）");
+        t.setCreatedAt(now);
+        txnMapper.insert(t);
+        return subscription(userId);
+    }
+
+    @Override
+    public Map<String, Object> subscription(Long userId) {
+        WalletAccount acc = myAccount(userId);
+        Map<String, Object> r = new HashMap<>();
+        r.put("level", acc.getMemberLevel());
+        LocalDateTime exp = acc.getMemberExpireAt();
+        boolean active = exp != null ? exp.isAfter(LocalDateTime.now()) : !"FREE".equals(acc.getMemberLevel());
+        r.put("expireAt", exp);
+        r.put("active", active);
+        r.put("benefits", memberLevel(userId).get("benefits"));
+        r.put("note", "会员订阅为演示口径：沙箱扣余额，不接真实支付通道");
+        return r;
+    }
+
+    @Override
     public Map<String, Object> memberLevel(Long userId) {
         WalletAccount acc = myAccount(userId);
         Map<String, Object> r = new HashMap<>();

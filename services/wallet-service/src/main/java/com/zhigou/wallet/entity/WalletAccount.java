@@ -30,6 +30,8 @@ public class WalletAccount {
     private Integer totalPoints;
     /** FREE 基础免费 / ADVANCED 高级 ¥29 / FLAGSHIP 旗舰 ¥99 */
     private String memberLevel;
+    /** 会员到期时间（订阅 +30 天，可顺延；演示口径） */
+    private java.time.LocalDateTime memberExpireAt;
     private Integer status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

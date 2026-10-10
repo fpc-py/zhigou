@@ -56,3 +56,23 @@ export async function getMemberLevel(): Promise<MemberLevelInfo | null> {
   const res = await http.get<{ code: number; data: MemberLevelInfo | null }>('/wallet/level');
   return res.data.data;
 }
+
+export interface SubscriptionInfo {
+  level: string; // FREE/ADVANCED/FLAGSHIP
+  active: boolean;
+  expireAt?: string;
+  benefits: string[];
+  note: string;
+}
+
+/** 当前订阅状态 */
+export async function getSubscription(): Promise<SubscriptionInfo | null> {
+  const res = await http.get<{ code: number; data: SubscriptionInfo | null }>('/wallet/subscription');
+  return res.data.data;
+}
+
+/** 开通/续费会员（沙箱扣余额） */
+export async function subscribeMember(level: string): Promise<SubscriptionInfo | null> {
+  const res = await http.post<{ code: number; data: SubscriptionInfo | null }>('/wallet/subscribe', { level });
+  return res.data.data;
+}
