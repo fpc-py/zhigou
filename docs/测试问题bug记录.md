@@ -43,6 +43,10 @@
 | 2026-10-07 | 订单详情页对 CLOSED/REFUNDED 仍显示"申请售后"（不合状态机） | 操作按钮按状态收敛：INIT=取消+支付，PAID/SHIPPED/COMPLETED=申请售后，终态无操作 | `npm run build` 通过 |
 
 > 新增 bug 时在此追加一行；涉及代码修复的同步更新 `CHANGELOG.md`。
+| 2026-10-10 | **mybatis-plus IPage/Page 类不可用**：wallet 首版流水分页用 `selectPage` + `IPage` 编译报「找不到符号」（当前 starter 版本路径问题） | 改用手写 `.last("limit o,s")` 返回 List（与 life 一致） | mvn 编译通过 |
+| 2026-10-10 | **Long 参数解析 500**：直连测试用 `userId=9999999999999999999` 超 Long 最大值 → NumberFormatException 500 | 测试数据改为合法 Long（8888888888888888888） | 惰性创建 PASS |
+
+
 | 2026-10-10 | **closet 列表含已删除衣物**：DELETE 后 myItems 未过滤 status=1，被删衣物仍出现在列表 | myItems 加 `.eq(ClosetItem::getStatus, 1)` | 直连/BFF 复测 items=8（不含已删） |
 | 2026-10-10 | **H5 type-check TS2345**：`switchTab(t.k)` 传 string 给字面量联合类型参数 | switchTab 参数改 string + 内部断言 | vue-tsc 通过 |
 

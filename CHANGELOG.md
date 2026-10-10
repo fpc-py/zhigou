@@ -3,6 +3,19 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.16] - 2026-10-10
+
+### P2 · 会员钱包（新业务域：wallet-service + BFF + H5）
+
+- feat(P2) 新建 `wallet-service`（端口 8094、库 zhigou_wallet、Flyway `flyway_wallet_history`）：
+  - `wallet_account`（余额/累计充值/累计消费/积分/会员等级，惰性创建）、`wallet_transaction`（RECHARGE/CONSUME/REFUND 流水，bizNo 幂等唯一）
+  - 接口：`GET /wallet/account`、`POST /wallet/recharge`（沙箱充值：金额校验 0<amount≤1 万元、同一 bizNo 幂等、充值 1 元=1 积分）、`GET /wallet/transactions`（流水分页）、`GET /wallet/level`（会员等级 FREE/ADVANCED/FLAGSHIP + 静态权益说明）；全量 JWT 鉴权 + 雪花 ID 字符串化
+  - Seed：用户 13800138001 演示账户（余额 ¥500/积分 320/高级会员）+ 4 条历史流水
+- feat(P2) BFF：`walletSvc` 配置 + 4 路由透传（JwtAuthGuard + req.userId + ApiResponse）
+- feat(P2) H5：新增 `views/wallet/index.vue`（余额卡 + 累计统计 + 会员等级卡 + 收支明细 + 沙箱充值弹层），「我的」页菜单新增「我的钱包」入口，路由 /wallet
+- 说明：充值为**沙箱演示**（直接入账，不接真实支付通道，页面显式标注）；会员订阅为演示口径（开通/支付规划中）；余额支付下单为后续项
+- 验证：wallet 直连 9/9（含幂等/超上限 40042/惰性创建/未登录 403）、BFF 6/6、H5 type-check+build + 浏览器实测（充值 ¥50 到账 +50 积分 + 流水 + 会员卡）
+
 ## [0.2.15] - 2026-10-10
 
 ### P2 · 智能衣橱 + 家居管理（新业务域：closet-service + BFF + H5）

@@ -25,6 +25,7 @@ export const SERVICES: Record<string, ServiceEntry> = {
   communitySvc:     { url: 'http://localhost:8091', timeout: 2_000 },
   lifeSvc:           { url: 'http://localhost:8092', timeout: 2_000 },
   closetSvc:         { url: 'http://localhost:8093', timeout: 2_000 },
+  walletSvc:         { url: 'http://localhost:8094', timeout: 2_000 },
 
   // AI 服务（SSE 需要长连接）
   aiOrchestrator: { url: 'http://localhost:8000', timeout: 30_000 },
@@ -96,4 +97,8 @@ export const SERVICE_PATHS = {
   closetHomeList:     '/closet/home/list',
   closetHomeItem:     '/closet/home/item',
   closetHomeReplenish: '/closet/home/replenish',
+  walletAccount:      '/wallet/account',
+  walletRecharge:     '/wallet/recharge',
+  walletTransactions: '/wallet/transactions',
+  walletLevel:        '/wallet/level',
 };
