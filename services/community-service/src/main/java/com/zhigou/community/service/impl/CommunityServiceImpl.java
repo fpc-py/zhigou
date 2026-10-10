@@ -4,10 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zhigou.community.dto.NoteVO;
 import com.zhigou.community.entity.CommunityComment;
 import com.zhigou.community.entity.CommunityInteraction;
+import com.zhigou.community.entity.CommunityLive;
 import com.zhigou.community.entity.CommunityNote;
+import com.zhigou.community.entity.CommunityVideo;
 import com.zhigou.community.mapper.CommunityCommentMapper;
 import com.zhigou.community.mapper.CommunityInteractionMapper;
+import com.zhigou.community.mapper.CommunityLiveMapper;
 import com.zhigou.community.mapper.CommunityNoteMapper;
+import com.zhigou.community.mapper.CommunityVideoMapper;
 import com.zhigou.community.service.CommunityService;
 import com.zhigou.common.BizException;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,8 @@ public class CommunityServiceImpl implements CommunityService {
     private final CommunityNoteMapper noteMapper;
     private final CommunityCommentMapper commentMapper;
     private final CommunityInteractionMapper interactionMapper;
+    private final CommunityVideoMapper videoMapper;
+    private final CommunityLiveMapper liveMapper;
 
     /** 营销/广告信号词（命中即标记疑似营销内容，不拦截仅降权展示） */
     private static final String[] SPAM_WORDS = {
@@ -38,6 +44,8 @@ public class CommunityServiceImpl implements CommunityService {
     private static final int FAKE_FLAG_NO = 0;
     private static final int TYPE_LIKE = 1;
     private static final int TYPE_FAVORITE = 2;
+    private static final int TYPE_VIDEO_LIKE = 3;
+    private static final int TYPE_VIDEO_FAVORITE = 4;
 
     // ── 发布 ──
 
@@ -191,7 +199,7 @@ public class CommunityServiceImpl implements CommunityService {
         noteMapper.updateById(note);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("id", c.getId());
-        r.put("noteId", noteId);
+        r.put("noteId", String.valueOf(noteId));
         r.put("authorName", c.getAuthorName());
         r.put("content", c.getContent());
         r.put("createdAt", c.getCreatedAt().toString());
@@ -244,5 +252,106 @@ public class CommunityServiceImpl implements CommunityService {
             m.put("createdAt", c.getCreatedAt().toString());
             return m;
         }).collect(Collectors.toList());
+    }
+
+    // ===== 短视频（图文 MVP）=====
+
+    @Override
+    public List<CommunityVideo> videoPage(int pageNum, int pageSize) {
+        int pn = Math.max(pageNum, 1);
+        int ps = Math.min(Math.max(pageSize, 1), 50);
+        return videoMapper.selectList(new LambdaQueryWrapper<CommunityVideo>()
+                .eq(CommunityVideo::getStatus, 0)
+                .orderByDesc(CommunityVideo::getCreatedAt)
+                .last("LIMIT " + (pn - 1) * ps + "," + ps));
+    }
+
+    @Override
+    public CommunityVideo videoDetail(Long id) {
+        CommunityVideo v = videoMapper.selectById(id);
+        if (v == null || v.getStatus() != 0) throw new BizException(404, "视频不存在或已删除");
+        v.setViewCount(v.getViewCount() == null ? 1 : v.getViewCount() + 1);
+        videoMapper.updateById(v);
+        return v;
+    }
+
+    @Override
+    @Transactional
+    public CommunityVideo videoPublish(CommunityVideo v) {
+        if (v.getAuthorId() == null) throw new BizException(401, "请先登录");
+        if (!StringUtils.hasText(v.getTitle()) || !StringUtils.hasText(v.getVideoUrl())) {
+            throw new BizException(400, "标题与视频/图文物料不能为空");
+        }
+        if (v.getTitle().length() > 60) throw new BizException(400, "标题最长 60 字");
+        v.setAuthorName(StringUtils.hasText(v.getAuthorName()) ? v.getAuthorName() : "智友" + (v.getAuthorId() % 10000));
+        if (v.getLikeCount() == null) v.setLikeCount(0);
+        if (v.getFavoriteCount() == null) v.setFavoriteCount(0);
+        if (v.getCommentCount() == null) v.setCommentCount(0);
+        if (v.getViewCount() == null) v.setViewCount(0);
+        if (v.getDurationSec() == null) v.setDurationSec(0);
+        if (v.getStatus() == null) v.setStatus(0);
+        v.setCreatedAt(LocalDateTime.now());
+        v.setUpdatedAt(LocalDateTime.now());
+        videoMapper.insert(v);
+        return v;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> videoLike(Long videoId, Long userId) {
+        return videoToggle(videoId, userId, TYPE_VIDEO_LIKE, true);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> videoFavorite(Long videoId, Long userId) {
+        return videoToggle(videoId, userId, TYPE_VIDEO_FAVORITE, false);
+    }
+
+    private Map<String, Object> videoToggle(Long videoId, Long userId, int type, boolean isLike) {
+        CommunityVideo v = videoMapper.selectById(videoId);
+        if (v == null) throw new BizException(404, "视频不存在");
+        CommunityInteraction exist = interactionMapper.selectOne(new LambdaQueryWrapper<CommunityInteraction>()
+                .eq(CommunityInteraction::getNoteId, videoId)
+                .eq(CommunityInteraction::getUserId, userId)
+                .eq(CommunityInteraction::getType, type));
+        boolean active;
+        if (exist != null) {
+            interactionMapper.deleteById(exist.getId());
+            active = false;
+        } else {
+            CommunityInteraction it = new CommunityInteraction();
+            it.setNoteId(videoId);
+            it.setUserId(userId);
+            it.setType(type);
+            it.setCreatedAt(LocalDateTime.now());
+            interactionMapper.insert(it);
+            active = true;
+        }
+        Long cnt = interactionMapper.selectCount(new LambdaQueryWrapper<CommunityInteraction>()
+                .eq(CommunityInteraction::getNoteId, videoId).eq(CommunityInteraction::getType, type));
+        int c = cnt.intValue();
+        if (isLike) v.setLikeCount(c); else v.setFavoriteCount(c);
+        videoMapper.updateById(v);
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put(isLike ? "liked" : "favorited", active);
+        r.put(isLike ? "likeCount" : "favoriteCount", c);
+        return r;
+    }
+
+    // ===== 直播 =====
+
+    @Override
+    public List<CommunityLive> liveList() {
+        return liveMapper.selectList(new LambdaQueryWrapper<CommunityLive>()
+                .orderByAsc(CommunityLive::getStatus)
+                .orderByDesc(CommunityLive::getCreatedAt));
+    }
+
+    @Override
+    public CommunityLive liveDetail(Long id) {
+        CommunityLive l = liveMapper.selectById(id);
+        if (l == null) throw new BizException(404, "直播不存在");
+        return l;
     }
 }

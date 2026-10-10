@@ -43,6 +43,11 @@
 | 2026-10-07 | 订单详情页对 CLOSED/REFUNDED 仍显示"申请售后"（不合状态机） | 操作按钮按状态收敛：INIT=取消+支付，PAID/SHIPPED/COMPLETED=申请售后，终态无操作 | `npm run build` 通过 |
 
 > 新增 bug 时在此追加一行；涉及代码修复的同步更新 `CHANGELOG.md`。
+| 2026-10-10 | **BFF videoPublish 字段名不匹配**：BFF 传 `userId`，后端 CommunityVideo 实体为 `authorId` → 后端判「请先登录」400 | BFF videoPublish 出站 body 改 `authorId: userId` | BFF video-publish PASS |
+| 2026-10-10 | **生成脚本漏字段**：二期实体 CommunityVideo/CommunityLive 生成时遗漏 createdAt/updatedAt（ServiceImpl setCreatedAt 编译报错） | 补实体两字段 | mvn 编译通过 |
+| 2026-10-10 | **H5 type-check 报 CommunityVideo 缺 liked/favorited**（短视频页操作按钮绑定该字段） | api 接口补可选字段 liked/favorited | H5 构建通过 |
+
+
 | 2026-10-10 | **雪花 ID 超 JS Number 精度**：BFF 透传后 `2107757313435291648` 被 JSON 解析失真为 `2107757313435291600`，后端按失真 id 查库恒 400「笔记不存在」（detail/like/comment 全挂，publish/mine 数据里 authorId 已失真） | community 实体/VO `id/authorId/spuId` + comments map 统一 `@JsonSerialize(ToStringSerializer)` / `String.valueOf`（JSON 层全字符串；不改全局 Long 序列化以免 priceFen 变字符串破坏前端计算） | BFF 全链路 7/7：detail/like/comment 恢复 PASS，id 返回字符串 |
 | 2026-10-10 | **BFF ai-writer 恒 500「服务超时」**：① TimeoutInterceptor 全局 3s 一刀切未豁免 AI 长任务；② AI writer 返回裸 JSON（无 code/data 包装），unwrapOrThrow 取不到 `data` 降级 null | ① EXEMPT_PREFIXES 追加 `/community/ai-writer`；② aiWriter 直接透传响应体 | BFF ai-writer PASS（draft 完整返回） |
 | 2026-10-10 | **BFF 补丁脚本重复执行**：config 出现重复键、service/controller 重复方法（TS2393/TS1117）；去重脚本按「首 marker→我的笔记」区间删除误删整个 aiWriter 方法 | 去重改为精确块替换（config 删相邻重复行、service/controller 删首个完整块）→ 重插 aiWriter → 构建通过 | `nest build` 通过 |

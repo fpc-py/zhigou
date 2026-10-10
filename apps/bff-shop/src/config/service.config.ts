@@ -72,5 +72,12 @@ export const SERVICE_PATHS = {
   communityNoteFavorite: (id: string) => `/community/note/${id}/favorite`,
   communityComment:    '/community/comment',
   communityMine:       '/community/mine',
+  communityVideoPage:   '/community/video/page',
+  communityVideoDetail: (id: string) => `/community/video/${id}`,
+  communityVideoLike:   (id: string) => `/community/video/${id}/like`,
+  communityVideoFavorite: (id: string) => `/community/video/${id}/favorite`,
+  communityVideoPublish: '/community/video',
+  communityLiveList:    '/community/live/list',
+  communityLiveDetail:  (id: string) => `/community/live/${id}`,
   communityAiWriter:   '/api/v1/community/writer',
 };

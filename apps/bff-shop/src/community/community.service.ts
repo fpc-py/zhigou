@@ -146,4 +146,110 @@ export class CommunityService {
     );
     return unwrapOrThrow(resp, this.logger, 'community/mine', []);
   }
+
+  /** 短视频信息流 */
+  async videoPage(userId: string): Promise<any[] | null> {
+    const url = `${SERVICES.communitySvc.url}${SERVICE_PATHS.communityVideoPage}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.communitySvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`community-service /community/video/page 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: [] } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'community/video/page', []);
+  }
+
+  /** 短视频详情 */
+  async videoDetail(userId: string, id: string): Promise<any | null> {
+    const url = `${SERVICES.communitySvc.url}${SERVICE_PATHS.communityVideoDetail(id)}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.communitySvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`community-service /community/video/{id} 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'community/video/detail', null);
+  }
+
+  /** 发布短视频 */
+  async videoPublish(userId: string, body: any): Promise<any | null> {
+    const url = `${SERVICES.communitySvc.url}${SERVICE_PATHS.communityVideoPublish}`;
+    const resp = await firstValueFrom(
+      this.http.post(url, { ...body, authorId: userId }, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.communitySvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`community-service /community/video 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'community/video/publish', null);
+  }
+
+  /** 视频点赞/取消 */
+  async videoLike(userId: string, id: string): Promise<any | null> {
+    const url = `${SERVICES.communitySvc.url}${SERVICE_PATHS.communityVideoLike(id)}`;
+    const resp = await firstValueFrom(
+      this.http.post(url, { userId }, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.communitySvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`community-service /community/video/{id}/like 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'community/video/like', null);
+  }
+
+  /** 视频收藏/取消 */
+  async videoFavorite(userId: string, id: string): Promise<any | null> {
+    const url = `${SERVICES.communitySvc.url}${SERVICE_PATHS.communityVideoFavorite(id)}`;
+    const resp = await firstValueFrom(
+      this.http.post(url, { userId }, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.communitySvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`community-service /community/video/{id}/favorite 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'community/video/favorite', null);
+  }
+
+  /** 直播列表 */
+  async liveList(userId: string): Promise<any[] | null> {
+    const url = `${SERVICES.communitySvc.url}${SERVICE_PATHS.communityLiveList}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.communitySvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`community-service /community/live/list 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: [] } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'community/live/list', []);
+  }
+
+  /** 直播详情 */
+  async liveDetail(userId: string, id: string): Promise<any | null> {
+    const url = `${SERVICES.communitySvc.url}${SERVICE_PATHS.communityLiveDetail(id)}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.communitySvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`community-service /community/live/{id} 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'community/live/detail', null);
+  }
 }
+

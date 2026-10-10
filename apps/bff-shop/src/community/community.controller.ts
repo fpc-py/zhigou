@@ -54,6 +54,48 @@ export class CommunityController {
     return ApiResponse.ok(data);
   }
 
+  @Get('community/video/page')
+  async videoPage(@Req() req: Request) {
+    const userId = (req as any).userId as string;
+    return ApiResponse.ok(await this.communityService.videoPage(userId));
+  }
+
+  @Get('community/video/:id')
+  async videoDetail(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    return ApiResponse.ok(await this.communityService.videoDetail(userId, id));
+  }
+
+  @Post('community/video')
+  async videoPublish(@Body() body: any, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    return ApiResponse.ok(await this.communityService.videoPublish(userId, body));
+  }
+
+  @Post('community/video/:id/like')
+  async videoLike(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    return ApiResponse.ok(await this.communityService.videoLike(userId, id));
+  }
+
+  @Post('community/video/:id/favorite')
+  async videoFavorite(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    return ApiResponse.ok(await this.communityService.videoFavorite(userId, id));
+  }
+
+  @Get('community/live/list')
+  async liveList(@Req() req: Request) {
+    const userId = (req as any).userId as string;
+    return ApiResponse.ok(await this.communityService.liveList(userId));
+  }
+
+  @Get('community/live/:id')
+  async liveDetail(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    return ApiResponse.ok(await this.communityService.liveDetail(userId, id));
+  }
+
   @Post('community/ai-writer')
   async aiWriter(@Body() body: any, @Req() req: Request) {
     const userId = (req as any).userId as string;

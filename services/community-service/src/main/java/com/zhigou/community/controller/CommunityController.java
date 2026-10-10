@@ -2,6 +2,8 @@ package com.zhigou.community.controller;
 
 import com.zhigou.common.Result;
 import com.zhigou.community.dto.NoteVO;
+import com.zhigou.community.entity.CommunityLive;
+import com.zhigou.community.entity.CommunityVideo;
 import com.zhigou.community.service.CommunityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -72,4 +74,52 @@ public class CommunityController {
     public Result<List<NoteVO>> mine(@RequestParam Long userId) {
         return Result.ok(communityService.mine(userId));
     }
+
+    // ===== 短视频（图文 MVP）=====
+
+    /** 短视频信息流 */
+    @GetMapping("/community/video/page")
+    public Result<List<CommunityVideo>> videoPage(@RequestParam(defaultValue = "1") int pageNum,
+                                                  @RequestParam(defaultValue = "10") int pageSize) {
+        return Result.ok(communityService.videoPage(pageNum, pageSize));
+    }
+
+    /** 发布短视频（图文物料） */
+    @PostMapping("/community/video")
+    public Result<CommunityVideo> videoPublish(@RequestBody CommunityVideo v) {
+        return Result.ok(communityService.videoPublish(v));
+    }
+
+    /** 短视频详情（自增播放量） */
+    @GetMapping("/community/video/{id}")
+    public Result<CommunityVideo> videoDetail(@PathVariable Long id) {
+        return Result.ok(communityService.videoDetail(id));
+    }
+
+    /** 视频点赞/取消 */
+    @PostMapping("/community/video/{id}/like")
+    public Result<Map<String, Object>> videoLike(@PathVariable Long id, @RequestBody Map<String, Long> body) {
+        return Result.ok(communityService.videoLike(id, body.get("userId")));
+    }
+
+    /** 视频收藏/取消 */
+    @PostMapping("/community/video/{id}/favorite")
+    public Result<Map<String, Object>> videoFavorite(@PathVariable Long id, @RequestBody Map<String, Long> body) {
+        return Result.ok(communityService.videoFavorite(id, body.get("userId")));
+    }
+
+    // ===== 直播 =====
+
+    /** 直播列表（预告/直播中/已结束） */
+    @GetMapping("/community/live/list")
+    public Result<List<CommunityLive>> liveList() {
+        return Result.ok(communityService.liveList());
+    }
+
+    /** 直播详情 */
+    @GetMapping("/community/live/{id}")
+    public Result<CommunityLive> liveDetail(@PathVariable Long id) {
+        return Result.ok(communityService.liveDetail(id));
+    }
 }
+

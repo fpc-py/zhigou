@@ -120,6 +120,8 @@ const entries = [
   { icon: 'closet', label: '智能衣橱', sub: '每日穿搭', bg: '#E3F7F0', color: '#00A87E', action: () => router.push('/closet') },
   { icon: 'scan', label: 'AR试穿', sub: '虚拟上身', bg: '#FFF3DF', color: '#FFA62B', action: () => router.push('/tryon') },
   { icon: 'comm', label: '一起拼团', sub: '2 人成团', bg: '#E3EFFF', color: '#2E7DFF', action: () => router.push('/groupbuy') },
+  { icon: 'video', label: '短视频', sub: '图文种草', bg: '#F3E8FF', color: '#8B5CF6', action: () => router.push('/short-video') },
+  { icon: 'live', label: '看直播', sub: '主播推荐', bg: '#FFE9E9', color: '#F43F5E', action: () => router.push('/live') },
 ];
 
 const todayText = computed(() => {

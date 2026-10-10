@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.13] - 2026-10-10
+
+### P2 · 内容社区二期：短视频（图文 MVP）+ 直播（community-service 扩展 + BFF + H5）
+
+- feat(P2) community-service 迁移 `V2__community_video_live.sql`：`community_video`（短视频：video_url 存图文物料 URL，生产接真实视频仅换 URL）+ `community_live`（直播：状态机 0 预告/1 直播中/2 已结束）+ seed（3 短视频 + 1 直播中 + 1 预告，关联真实 SPU 9000000000000000011/0010/0012）
+  - 接口：`GET /community/video/page`、`POST /community/video`、`GET /community/video/{id}`（自增播放量）、`POST /community/video/{id}/like|favorite`（幂等切换）、`GET /community/live/list`、`GET /community/live/{id}`
+  - 互动复用 `community_interaction`（type 3=视频点赞/4=视频收藏，note_id 存 video_id）+ `community_comment`（noteId 存 videoId），接口语义与笔记一致
+- feat(P2) BFF 透传 +7 路由（videoPage/videoDetail/videoPublish/videoLike/videoFavorite/liveList/liveDetail），雪花 ID 字符串化沿用
+- feat(P2) H5：`views/short-video/index.vue`（竖屏 scroll-snap 图文 feed + 右侧点赞/收藏/评论 + 底部种草商品卡）、`views/live/index.vue`（列表：状态徽标/观看人数/开播时间）+ `views/live/detail.vue`（直播中=封面占位+演示说明、预告=开播时间、商品卡）；路由 /short-video、/live、/live/:id；首页宫格 +「短视频」「看直播」两格；社区页 tab +「视频」
+- 说明：短视频 MVP 采用图文卡片形态（不伪造视频流）；直播流为演示占位并明确标注「演示环境」，真实流接入仅替换 URL/播放器
+- 验证：community 直连 8/8 PASS（video-page/detail/like 幂等/favorite/publish/live-list/live-detail）；BFF 二期接口全通（含 authorId 字段名对齐修复）；H5 type-check+vite build 通过；浏览器渲染验证（短视频 5 条 feed、直播 2 场状态）
+
 ## [0.2.12] - 2026-10-10
 
 ### P2 · 内容社区 MVP（community-service 后端 + AI 种草文案 writer + BFF 透传 + H5 社区页换真）

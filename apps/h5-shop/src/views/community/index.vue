@@ -4,6 +4,7 @@
     <header class="comm-head">
       <div class="tabs">
         <button class="tab" :class="{ on: tab === 'recommend' }" @click="switchTab('recommend')">推荐</button>
+        <button class="tab" @click="router.push('/short-video')">视频</button>
         <button class="tab" :class="{ on: tab === 'mine' }" @click="switchTab('mine')">我的</button>
       </div>
       <button class="publish-btn" @click="openPublish"><Icon name="plus" size="sm" /> 发布</button>
@@ -115,6 +116,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import Icon from '@/components/Icon.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import {
@@ -129,6 +131,7 @@ import {
   type CommunityNote,
 } from '@/api/community';
 
+const router = useRouter();
 const tab = ref('recommend');
 const notes = ref<CommunityNote[]>([]);
 const loading = ref(true);

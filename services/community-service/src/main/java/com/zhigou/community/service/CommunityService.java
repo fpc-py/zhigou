@@ -1,6 +1,8 @@
 package com.zhigou.community.service;
 
 import com.zhigou.community.dto.NoteVO;
+import com.zhigou.community.entity.CommunityLive;
+import com.zhigou.community.entity.CommunityVideo;
 
 import java.util.List;
 import java.util.Map;
@@ -27,4 +29,21 @@ public interface CommunityService {
 
     /** 我的笔记 */
     List<NoteVO> mine(Long userId);
+
+    // ===== 短视频（图文 MVP）=====
+    List<CommunityVideo> videoPage(int pageNum, int pageSize);
+
+    CommunityVideo videoDetail(Long id);
+
+    CommunityVideo videoPublish(CommunityVideo v);
+
+    Map<String, Object> videoLike(Long videoId, Long userId);
+
+    Map<String, Object> videoFavorite(Long videoId, Long userId);
+
+    // ===== 直播 =====
+    List<CommunityLive> liveList();
+
+    CommunityLive liveDetail(Long id);
 }
+
