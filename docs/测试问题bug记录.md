@@ -35,6 +35,13 @@
 - **修复**：全量替换 `SERVICES.marketingService` → `SERVICES.marketingSvc`（含 timeout 引用），重建 dist 重启 3000 后 PASS（plan=3）
 - **教训**：BFF 引用服务配置必须先核对 `service.config.ts` 的键名（marketingSvc 而非 marketingService）；同一个错误标识符可能出现在多处（URL + timeout + 其他管道参数），替换要全量，不能只替换首个可见处
 
+## #31 · [0.2.27] AI 工具 f-string 引号/转义坑 + BizException 包路径 + ReviewReply import（已修复）
+
+- **现象**：① tools.py 报 `SyntaxError: unterminated f-string literal`（定位到 review_assistant 输出 f-string）；② product-service 编译报找不到符号（`com.zhigou.common.exception` 包不存在 + `ReviewReply` 未定义）
+- **根因**：① 补丁脚本往 tools.py 写函数体时，f-string 内嵌套双引号（`action="reply"`）提前闭合字符串、`\n` 转义退化成真实换行 → 字符串未终止（同类坑：SSE/JSON 拼串时引号与转义）；② 项目 BizException 真实包是 `com.zhigou.common.BizException`（构造器 `(int code, String msg)`），误写 `.exception` 子包；新增 `ReviewReply` 类型未 import（字段用了全限定但方法体用了裸类型）
+- **修复**：① review_assistant 输出改用 `%` 格式化 + 工具参数示例改单引号包裹；② 改 `throw new BizException(400, ...)`；③ 方法体内 ReviewReply 用全限定 `com.zhigou.product.entity.ReviewReply`
+- **教训**：生成 Python 函数体时，优先 `%` 格式化（避免 f-string 嵌套引号），需要转义的 `\n` 用 `chr(10)` 或拼接；引用公共异常类先核对包路径；新类型要么 import 要么全限定，不能混用
+
 # 智购 · 测试问题与 Bug 记录
 
 > 记录测试过程中发现的问题、临时排查命令与修复状态。已修复的条目保留留痕，不删除。

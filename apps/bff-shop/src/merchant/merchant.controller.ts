@@ -60,6 +60,20 @@ export class MerchantController {
     return ApiResponse.ok(data);
   }
 
+  /** 评论管理：待回复评论列表（情感 + AI 建议话术） */
+  @Get('merchant/reviews/pending')
+  async reviewsPending() {
+    const data = await this.merchant.reviewsPending();
+    return ApiResponse.ok(data);
+  }
+
+  /** 评论管理：提交回复 */
+  @Post('merchant/reviews/reply')
+  async reviewReply(@Body() body: { reviewId: string; content: string }) {
+    const ok = await this.merchant.reviewReply(body.reviewId, body.content);
+    return ApiResponse.ok({ replied: ok });
+  }
+
   /** 供应链补货中心：最近补货记录 */
   @Get('merchant/supply/records')
   async replenishRecords(@Query('limit') limit?: string) {

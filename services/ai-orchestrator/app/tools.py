@@ -1636,6 +1636,35 @@ async def marketing_plan() -> str:
         )
     return "\n".join(out)
 
+
+
+@tool
+async def review_assistant(action: str = "pending", review_id: str = "", content: str = "") -> str:
+    """商家评论助手：待回复评论盘点（情感 + AI 建议话术 + 负面预警）/ 提交回复。action=pending 查待回复列表；action=reply 时传 review_id + content 提交商家回复。用于商家问"有哪些差评要处理""评论怎么回""负面评论预警""回复评论"。"""
+    try:
+        if action == "reply":
+            if not review_id or not content:
+                return "提交回复需要 review_id 与 content。"
+            await _http_post(
+                settings.product_service_url + "/product/review/merchant/reply",
+                json_data={"reviewId": review_id, "content": content},
+            )
+            return "评论回复已提交 ✅（演示口径已写入 review_reply，正式版接入商家审核流）"
+        resp = await _http_get(settings.product_service_url + "/product/review/merchant/pending?limit=10")
+    except Exception as e:
+        return "评论助手暂时不可用，请稍后再试（" + e.__class__.__name__ + "）"
+    rows = (resp or {}).get("data") or []
+    if not rows:
+        return "暂无待回复评论 🎉"
+    neg = [x for x in rows if x.get("sentiment") == "NEGATIVE"]
+    lines = ["【待回复评论 %d 条 · 负面 %d 条 ⚠️】演示口径（正式版接情感模型+商家审核流）" % (len(rows), len(neg))]
+    for x in rows:
+        flag = {"NEGATIVE": "⚠️负面", "NEUTRAL": "· 中性", "POSITIVE": "✓ 正面"}.get(x.get("sentiment"), x.get("sentiment"))
+        lines.append("- [%s] %s（%s 星）：%s" % (flag, x.get("userName"), x.get("rating"), x.get("content")))
+        lines.append("  AI 建议回复：%s" % x.get("aiSuggestion"))
+        lines.append('  回复请用：review_assistant(action="reply", review_id="%s", content="...")' % x.get("reviewId"))
+    return "\n".join(lines)
+
 TOOLS = [
     search_products,
     get_price,
@@ -1665,4 +1694,5 @@ TOOLS = [
     sales_forecast,
     dynamic_pricing,
     marketing_plan,
+    review_assistant,
 ]

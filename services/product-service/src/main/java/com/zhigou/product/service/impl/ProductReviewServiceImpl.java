@@ -33,6 +33,7 @@ public class ProductReviewServiceImpl implements ProductReviewService {
     private static final int MAX_RATING = 5;
 
     private final ProductReviewMapper reviewMapper;
+    private final com.zhigou.product.mapper.ReviewReplyMapper reviewReplyMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -111,6 +112,54 @@ public class ProductReviewServiceImpl implements ProductReviewService {
                         .orderByDesc(ProductReview::getCreateTime)
                         .last("limit " + Math.max(1, Math.min(limit, 50))));
         return rows.stream().map(this::toVO).collect(Collectors.toList());
+    }
+
+    @Override
+    public java.util.List<java.util.Map<String, Object>> merchantPending(int limit) {
+        int n = Math.max(1, Math.min(limit, 50));
+        List<ProductReview> rows = reviewMapper.selectList(
+                new LambdaQueryWrapper<ProductReview>()
+                        .orderByDesc(ProductReview::getCreateTime)
+                        .last("limit " + n));
+        // 已回复 reviewId 集合
+        List<com.zhigou.product.entity.ReviewReply> replied = reviewReplyMapper.selectList(null);
+        java.util.Set<Long> repliedIds = replied.stream().map(com.zhigou.product.entity.ReviewReply::getReviewId).collect(java.util.stream.Collectors.toSet());
+        java.util.List<java.util.Map<String, Object>> out = new java.util.ArrayList<>();
+        for (ProductReview r : rows) {
+            if (repliedIds.contains(r.getReviewId())) continue;
+            String sentiment = r.getRating() <= 2 ? "NEGATIVE" : (r.getRating() == 3 ? "NEUTRAL" : "POSITIVE");
+            String suggestion;
+            if ("NEGATIVE".equals(sentiment)) {
+                suggestion = "非常抱歉给您带来不好的体验。已联系仓库核查该订单（" + r.getSpuId() + "），并为您申请运费补偿或退换货专属通道，请您留意售后通知。";
+            } else if ("NEUTRAL".equals(sentiment)) {
+                suggestion = "感谢您的真实反馈，已同步产品团队将改进点排入优化清单，欢迎后续复购体验新版本。";
+            } else {
+                suggestion = "感谢您的认可与支持！已为您发放一张复购无门槛优惠券，期待再次光临～";
+            }
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("reviewId", String.valueOf(r.getReviewId()));
+            m.put("spuId", String.valueOf(r.getSpuId()));
+            m.put("userName", r.getUserName());
+            m.put("rating", r.getRating());
+            m.put("content", r.getContent());
+            m.put("sentiment", sentiment);
+            m.put("aiSuggestion", suggestion);
+            m.put("createTime", r.getCreateTime());
+            out.add(m);
+        }
+        return out;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    public void merchantReply(Long reviewId, String content) {
+        if (content == null || content.isBlank()) throw new BizException(400, "回复内容不能为空");
+        com.zhigou.product.entity.ReviewReply rr = new com.zhigou.product.entity.ReviewReply();
+        rr.setReviewId(reviewId);
+        rr.setMerchantId(0L);
+        rr.setReplyContent(content.trim());
+        rr.setStatus("REPLIED");
+        reviewReplyMapper.insert(rr);
     }
 
     private ReviewVO toVO(ProductReview r) {

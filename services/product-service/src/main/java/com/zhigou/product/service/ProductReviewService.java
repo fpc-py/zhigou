@@ -20,4 +20,10 @@ public interface ProductReviewService {
 
     /** 全平台低分评价列表（rating <= minRating，按时间倒序，供商家负面预警） */
     List<ReviewVO> negative(int minRating, int limit);
+
+    /** 商家评论管理：待回复评论列表（未出现在 review_reply），附情感 + AI 建议话术（演示口径） */
+    java.util.List<java.util.Map<String, Object>> merchantPending(int limit);
+
+    /** 商家评论管理：提交回复（写 review_reply，演示口径） */
+    void merchantReply(Long reviewId, String content);
 }

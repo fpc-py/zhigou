@@ -27,6 +27,7 @@ public class SecurityConfig {
                                 "/auth/**", "/actuator/health", "/actuator/health/**",
                                 "/doc.html", "/swagger-ui.html", "/swagger-ui/**",
                                 "/product/merchant/**",
+                                "/product/review/merchant/**",
                                 "/v3/api-docs/**", "/webjars/**"
                         ).permitAll()
                         .anyRequest().authenticated()

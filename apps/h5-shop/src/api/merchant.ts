@@ -152,3 +152,20 @@ export async function getMarketingPlan(): Promise<MarketingPlanItem[] | null> {
   const res = await http.get<{ code: number; data: MarketingPlanItem[] | null }>('/merchant/marketing-plan');
   return res.data.data;
 }
+
+
+/** 评论管理：待回复评论（情感 + AI 建议话术，演示口径） */
+export interface ReviewPendingItem {
+  reviewId: string; spuId: string; userName: string; rating: number; content: string
+  sentiment: 'NEGATIVE' | 'NEUTRAL' | 'POSITIVE'; aiSuggestion: string; createTime: string
+}
+export async function getReviewsPending(): Promise<ReviewPendingItem[] | null> {
+  const res = await http.get<{ code: number; data: ReviewPendingItem[] | null }>('/merchant/reviews/pending');
+  return res.data.data;
+}
+
+/** 评论管理：提交回复 */
+export async function postReviewReply(reviewId: string, content: string): Promise<boolean> {
+  const res = await http.post<{ code: number; data: { replied: boolean } }>('/merchant/reviews/reply', { reviewId, content });
+  return !!res.data.data?.replied;
+}

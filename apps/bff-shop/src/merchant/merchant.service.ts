@@ -220,4 +220,34 @@ export class MerchantService {
     );
     return unwrapOrThrow(resp, this.logger, 'merchant/marketing-plan', null);
   }
+  /** 评论管理：待回复评论（情感 + AI 建议话术，演示口径） */
+  async reviewsPending(): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${SERVICES.productService.url}${SERVICE_PATHS.reviewPending}`).pipe(
+        timeout(SERVICES.productService.timeout),
+        catchError((err) => {
+          this.logger.warn(`product-service /product/review/merchant/pending 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/reviews/pending', null);
+  }
+
+  /** 评论管理：提交回复（reviewId 19 位 Snowflake 字符串透传，禁止 Number() 化，CLAUDE.md 红线） */
+  async reviewReply(reviewId: string, content: string): Promise<boolean> {
+    const resp = await firstValueFrom(
+      this.http
+        .post(`${SERVICES.productService.url}${SERVICE_PATHS.reviewReply}`, { reviewId, content })
+        .pipe(
+          timeout(SERVICES.productService.timeout),
+          catchError((err) => {
+            this.logger.warn(`product-service /product/review/merchant/reply 失败: ${err.message}`);
+            return Promise.resolve({ data: { code: 500 } });
+          }),
+        ),
+    );
+    unwrapOrThrow(resp, this.logger, 'merchant/reviews/reply', null);
+    return true;
+  }
 }

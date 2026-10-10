@@ -110,6 +110,7 @@ _ROUTE_RULES: list[tuple[str, "re.Pattern"]] = [
     ("sales_forecast", re.compile(r"我是商家|我是店主|我是运营|商家|店主|销量预测|智能选品|备货|选品建议|该备多少货|预测.{0,6}(销量|卖得好|卖得)|进货建议|经营大脑")),
     ("dynamic_pricing", re.compile(r"定价|涨价|降价|调价|价格建议|改价")),
     ("marketing_plan", re.compile(r"营销方案|做活动|促销建议|怎么推|活动策划|推广方案")),
+    ("review_assistant", re.compile(r"差评|待回复评论|评论.{0,4}(怎么回|处理|回复)|负面预警|回复评论")),
 ]
 
 

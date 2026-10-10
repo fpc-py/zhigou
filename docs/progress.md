@@ -307,6 +307,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化                                                            |
 
 ## 变更记录
+* 2026-10-10：**P2 3.3 商家端 AI 客服与营销一期（[0.2.27]）**：评论自动回复 + 负面预警 —— product-service Flyway `V20261093__merchant_review_reply.sql`（review_reply 表）+ `GET /product/review/merchant/pending`（情感 + AI 建议话术）+ `POST /product/review/merchant/reply`；AI `review_assistant`（TOOLS 29，pending/reply 双动作）+ system.md/路由；BFF 2 端点；H5 商家中心「评论管理」区块。修复：AI f-string 引号/转义坑、BizException 包路径、ReviewReply import。验证：直连 pending 8 含 3 负面、reply 移出；SSE PASS（负面盘点+一键回复模板）；BFF pending=9/3 负面；双端构建 PASS。
+
 * 2026-10-10：**P2 3.3 商家端 AI 经营大脑二期（[0.2.26]）**：动态定价 `GET /product/merchant/pricing`（趋势/库存/竞品 → UP/DOWN/HOLD + 建议价，演示口径）+ 营销方案 `GET /marketing/plan`（会员价/拼团/满减策略 + 渠道，演示口径）；AI `dynamic_pricing` + `marketing_plan`（TOOLS 28）+ system.md/路由；BFF 2 端点；H5 经营大脑区块追加定价+营销子区。修复：BFF 服务名拼写（marketingService→marketingSvc，含 timeout 引用）。验证：直连 pricing 3/plan 3、SSE 双 PASS、BFF 三层 PASS、双端构建 PASS。
 
 * 2026-10-10：**P2 3.3 商家端 AI 经营大脑一期（[0.2.25]）**：product-service 销量预测 `GET /product/merchant/forecast?days=7|30`（近 7 日日均×天数×(1+趋势) + 建议备货，演示口径）+ 智能选品 `GET /product/merchant/selection`（热度/库存/趋势 → 建议）→ Flyway `V20261092__merchant_forecast.sql`（daily_sales seed 3 SKU×14 天）；AI `sales_forecast` 工具（TOOLS 26）+ system.md 商家经营角色 + 路由强制触发；BFF 2 端点；H5 商家中心经营大脑区块（7/30 切换 + 选品建议）。修复 4 坑（product 库 V20261091 mock 撞版本→V20261092 / selectCount Long→int / TOOLS 显式列表未注册 / system.md 缺商家角色致模型拒经营场景）。验证：直连 7/30+选品、BFF 三层、SSE 商家 query PASS、双端构建 PASS。

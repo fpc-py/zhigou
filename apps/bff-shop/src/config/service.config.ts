@@ -70,6 +70,8 @@ export const SERVICE_PATHS = {
   merchantSelection:     '/product/merchant/selection',
   merchantPricing:       '/product/merchant/pricing',
   marketingPlan:         '/marketing/plan',
+  reviewPending:         '/product/review/merchant/pending?limit=10',
+  reviewReply:           '/product/review/merchant/reply',
   inventoryLowStock:  '/inventory/low-stock?threshold=10',
   inventoryReplenish: '/inventory/replenish',
   inventoryAutoReplenish: '/inventory/auto-replenish',

@@ -3,6 +3,16 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.27] - 2026-10-10
+
+### P2 · 3.3 商家端 AI 客服与营销（一期）：评论自动回复 + 负面预警
+
+- feat(P2) `product-service` 商家评论管理：Flyway `V20261093__merchant_review_reply.sql` 新增 `review_reply`（商家回复，review_id 唯一防重复回复）；`GET /product/review/merchant/pending`（待回复评论 + 情感（星级规则映射）+ AI 建议话术模板）；`POST /product/review/merchant/reply`（提交回复，回复后自动移出待回复列表）；SecurityConfig 放行 `/product/review/merchant/**`（AI 内网直连口径）
+- feat(P2) AI 工具 `review_assistant`（TOOLS 29）：pending（待回复盘点 + 负面预警 + AI 建议话术）/ reply（提交回复）；system.md 商家经营工具表 + 判断词扩围（差评/评论/回复/负面）；`_ROUTE_RULES` 评论路由
+- feat(P2) BFF `GET /merchant/reviews/pending`、`POST /merchant/reviews/reply`；H5 商家中心「评论管理」区块（情感标 + AI 建议 + 采用建议/提交回复）
+- fix(P2) AI 工具函数体引号/转义坑：f-string 嵌套双引号 + `\n` 转义写坏致 `unterminated f-string literal`（改 % 格式化 + 单引号包裹工具参数示例）；product 侧 BizException 真实包为 `com.zhigou.common.BizException`（非 `.exception` 子包）+ `ReviewReply` 需显式 import
+- 验证：直连 PASS（pending 8 条含 3 负面 + aiSuggestion；reply 200 后该条移出 pending）；AI SSE PASS（「差评怎么处理」→ review_assistant 盘点 3 条负面 + 一键回复模板）；BFF PASS（pending=9 含 3 负面）；BFF/H5 构建 PASS
+
 ## [0.2.26] - 2026-10-10
 
 ### P2 · 3.3 商家端 AI 经营大脑（二期）：动态定价 + 营销方案建议

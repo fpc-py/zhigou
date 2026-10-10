@@ -60,6 +60,22 @@ public class ReviewController {
         return Result.ok(reviewService.negative(minRating, limit));
     }
 
+    @Operation(summary = "商家评论管理：待回复评论列表（情感 + AI 建议话术，演示口径）")
+    @GetMapping("/merchant/pending")
+    public Result<java.util.List<java.util.Map<String, Object>>> merchantPending(
+            @RequestParam(defaultValue = "10") int limit) {
+        return Result.ok(reviewService.merchantPending(limit));
+    }
+
+    @Operation(summary = "商家评论管理：提交回复（写 review_reply，演示口径）")
+    @PostMapping("/merchant/reply")
+    public Result<Void> merchantReply(@RequestBody java.util.Map<String, Object> body) {
+        Long reviewId = Long.valueOf(String.valueOf(body.get("reviewId")));
+        String content = (String) body.get("content");
+        reviewService.merchantReply(reviewId, content);
+        return Result.ok();
+    }
+
     /** 从请求上下文取当前用户（JwtAuthFilter 已解析 x-user-id / JWT） */
     private Long currentUserId() {
         return UserContext.getUserId();

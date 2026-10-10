@@ -206,6 +206,27 @@
       <div class="brain-note">数据底座 product-service daily_sales + marketing-service · 演示口径，正式版接入价格弹性/时序模型/券拼团数据</div>
     </div>
 
+    <div class="panel">
+      <div class="panel-title">评论管理<span class="pl-sub">待回复 · AI 建议话术 · 负面预警</span></div>
+      <div class="warn-label" style="margin-top:10px;">待回复评论</div>
+      <div v-if="reviews.length" class="sel-list">
+        <div v-for="rv in reviews" :key="rv.reviewId" class="sel-row">
+          <span class="rank" :class="rv.sentiment === 'NEGATIVE' ? 'down' : rv.sentiment === 'POSITIVE' ? 'top' : 'mid'">{{ rv.sentiment === 'NEGATIVE' ? '⚠ 负面' : rv.sentiment === 'POSITIVE' ? '✓ 正面' : '· 中性' }}</span>
+          <div class="sel-main">
+            <div class="sel-name">{{ rv.userName }} · {{ rv.rating }} 星</div>
+            <div class="sel-reason">{{ rv.content }}</div>
+            <div class="rv-ai">AI 建议：{{ rv.aiSuggestion }}</div>
+            <div class="rv-actions">
+              <button class="rv-btn" @click="applySuggestion(rv)">采用建议回复</button>
+              <button class="rv-btn ghost" @click="submitReply(rv.reviewId, rv.aiSuggestion)">提交回复</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty">暂无待回复评论 🎉</div>
+      <div class="brain-note">演示口径：情感由星级规则映射，AI 建议话术模板生成 · 正式版接入情感模型与商家审核流</div>
+    </div>
+
     <!-- 热销榜 -->
     <div class="section">
       <div class="sec-title">热销商品 Top{{ hotList.length }}</div>
@@ -250,10 +271,13 @@ import {
   getMerchantSelection,
   getMerchantPricing,
   getMarketingPlan,
+  getReviewsPending,
+  postReviewReply,
   type ForecastItem,
   type SelectionItem,
   type PricingItem,
   type MarketingPlanItem,
+  type ReviewPendingItem,
   ACTION_LABELS,
   type PendingOrder,
   type FulfillItem,
@@ -341,6 +365,8 @@ const selection = ref<SelectionItem[]>([])
 const pricing = ref<PricingItem[]>([])
 const plans = ref<MarketingPlanItem[]>([])
 const prLoading = ref(false)
+const reviews = ref<ReviewPendingItem[]>([])
+const reviewLoading = ref(false)
 const fcDays = ref(7)
 const fcLoading = ref(false)
 
@@ -360,22 +386,39 @@ async function switchDays(days: number) {
 async function loadBrain() {
   fcLoading.value = true
   prLoading.value = true
+  reviewLoading.value = true
   try {
-    const [f, s, p, m] = await Promise.all([
+    const [f, s, p, m, rv] = await Promise.all([
       getMerchantForecast(7),
       getMerchantSelection(),
       getMerchantPricing(),
       getMarketingPlan(),
+      getReviewsPending(),
     ])
     if (f) forecast.value = f
     if (s) selection.value = s
     if (p) pricing.value = p
     if (m) plans.value = m
+    if (rv) reviews.value = rv
   } catch (e) {
     // 保持空态
   } finally {
     fcLoading.value = false
     prLoading.value = false
+    reviewLoading.value = false
+  }
+}
+
+/** 采用 AI 建议回复（演示：直接提交） */
+function applySuggestion(rv: ReviewPendingItem) {
+  submitReply(rv.reviewId, rv.aiSuggestion)
+}
+
+async function submitReply(reviewId: string, content: string) {
+  if (!content) return
+  const ok = await postReviewReply(reviewId, content)
+  if (ok) {
+    reviews.value = reviews.value.filter((x) => x.reviewId !== reviewId)
   }
 }
 
@@ -543,3 +586,8 @@ async function loadSupply() {
 .brain-note { font-size: 10px; color: #aaa; margin-top: 8px; }
 
 .pl-ch { font-size: 11px; color: #B7791F; margin-top: 2px; line-height: 1.5; }
+
+.rv-ai { font-size: 11px; color: #2563EB; background: #EFF6FF; border-radius: 6px; padding: 4px 6px; margin-top: 4px; line-height: 1.5; }
+.rv-actions { display: flex; gap: 8px; margin-top: 6px; }
+.rv-btn { flex: 1; border: none; border-radius: 8px; padding: 6px 0; font-size: 12px; color: #fff; background: #F43F5E; }
+.rv-btn.ghost { background: #fff; color: #F43F5E; border: 1px solid #F43F5E; }
