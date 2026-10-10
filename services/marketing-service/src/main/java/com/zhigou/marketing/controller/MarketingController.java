@@ -16,6 +16,11 @@ public class MarketingController {
     private final CouponService couponService;
     private final MarketingServiceImpl marketingService;
 
+    @GetMapping("/marketing/plan")
+    public Result<List<Map<String, Object>>> plan() {
+        return Result.ok(marketingService.marketingPlan());
+    }
+
     @PostMapping("/coupon/issue")
     public Result<Long> issue(@RequestBody Map<String, Long> body) {
         return Result.ok(couponService.issue(body.get("userId"), body.get("templateId")));

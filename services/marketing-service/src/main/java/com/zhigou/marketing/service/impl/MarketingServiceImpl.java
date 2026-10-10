@@ -136,4 +136,36 @@ public class MarketingServiceImpl implements CouponService {
             default -> 0L;
         };
     }
+
+    /** 营销方案建议（演示口径：基于 SKU 热度/库存/趋势的促销策略与触达渠道；正式版聚合销量/库存/券/拼团数据） */
+    public List<Map<String, Object>> marketingPlan() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        Map<String, Object> p1 = new LinkedHashMap<>();
+        p1.put("skuId", "9000000000000000022");
+        p1.put("productName", "无线蓝牙耳机 Pro");
+        p1.put("strategy", "会员价");
+        p1.put("detail", "会员价 ¥189（9.5 折），新客下单再送 10 元券");
+        p1.put("reason", "热销且增长（+50%），用会员价沉淀复购，不伤价格锚点");
+        p1.put("channels", List.of("App 首页 Banner", "会员中心", "Push 推送"));
+        out.add(p1);
+
+        Map<String, Object> p2 = new LinkedHashMap<>();
+        p2.put("skuId", "9000000000000000011");
+        p2.put("productName", "智能手环 5");
+        p2.put("strategy", "拼团引流");
+        p2.put("detail", "2 人团 ¥149（-6%），成团返 5 元无门槛券");
+        p2.put("reason", "需求上行但库存偏低，拼团引流的同时以小单量周转补货周期");
+        p2.put("channels", List.of("拼团页", "短信触达老客", "社群分享"));
+        out.add(p2);
+
+        Map<String, Object> p3 = new LinkedHashMap<>();
+        p3.put("skuId", "9000000000000000033");
+        p3.put("productName", "便携榨汁杯");
+        p3.put("strategy", "满减清库存");
+        p3.put("detail", "满 2 件 8 折 / 买 1 赠 1 限量，售罄即止");
+        p3.put("reason", "需求走弱（-50%），降价清库存回笼资金，避免长期占仓");
+        p3.put("channels", List.of("首页特卖区", "短信触达历史购买用户", "直播间限时"));
+        out.add(p3);
+        return out;
+    }
 }

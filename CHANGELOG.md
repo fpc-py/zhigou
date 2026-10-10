@@ -3,6 +3,17 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.26] - 2026-10-10
+
+### P2 · 3.3 商家端 AI 经营大脑（二期）：动态定价 + 营销方案建议
+
+- feat(P2) `product-service` 动态定价：`GET /product/merchant/pricing`（趋势/库存水位/竞品均价 → 每 SKU 建议价 + UP/DOWN/HOLD 动作 + 理由；演示口径，正式版接价格弹性/促销日历）
+- feat(P2) `marketing-service` 营销方案：`GET /marketing/plan`（会员价/拼团引流/满减清库存策略 + 触达渠道建议；演示口径，正式版聚合销量/库存/券/拼团数据）；SecurityConfig 放行 `/marketing/plan/**`（AI 内网直连口径）
+- feat(P2) AI 工具 `dynamic_pricing` + `marketing_plan`（TOOLS 27/28）；system.md 商家经营工具表 + 判断要点扩词；`_ROUTE_RULES` 增定价/营销确定性路由
+- feat(P2) BFF `GET /merchant/pricing`、`GET /merchant/marketing-plan`；H5 商家中心「经营大脑」区块追加动态定价建议 + 营销方案建议子区
+- fix(P2) BFF 服务名拼写：`SERVICES.marketingService` → `SERVICES.marketingSvc`（service.config 键名为 marketingSvc；首次替换只改 get URL 漏掉 timeout 引用）
+- 验证：直连 PASS（pricing 3：耳机 HOLD 19900/手环 UP 16400/榨汁杯 DOWN 9200；plan 3：会员价/拼团引流/满减清库存）；AI SSE 双 PASS（「该涨价还是降价」→ dynamic_pricing 经营诊断；「营销方案推热销商品」→ marketing_plan 方案输出）；BFF 三层 PASS（pricing=3、marketing-plan=3）；BFF/H5 构建 PASS
+
 ## [0.2.25] - 2026-10-10
 
 ### P2 · 3.3 商家端 AI 经营大脑（一期）：销量预测 + 智能选品

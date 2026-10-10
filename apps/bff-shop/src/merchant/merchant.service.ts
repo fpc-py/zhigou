@@ -193,4 +193,31 @@ export class MerchantService {
     );
     return unwrapOrThrow(resp, this.logger, 'merchant/selection', null);
   }
+  /** 动态定价建议（趋势/库存/竞品，演示口径） */
+  async pricing(): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${SERVICES.productService.url}${SERVICE_PATHS.merchantPricing}`).pipe(
+        timeout(SERVICES.productService.timeout),
+        catchError((err) => {
+          this.logger.warn(`product-service /product/merchant/pricing 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/pricing', null);
+  }
+
+  /** 营销方案建议（促销策略+触达渠道，演示口径） */
+  async marketingPlan(): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${SERVICES.marketingSvc.url}${SERVICE_PATHS.marketingPlan}`).pipe(
+        timeout(SERVICES.marketingSvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`marketing-service /marketing/plan 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/marketing-plan', null);
+  }
 }

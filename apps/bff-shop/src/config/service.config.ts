@@ -68,6 +68,8 @@ export const SERVICE_PATHS = {
   orderPendingFulfillment: '/order/stats/pending-fulfillment',
   merchantForecast:      '/product/merchant/forecast',
   merchantSelection:     '/product/merchant/selection',
+  merchantPricing:       '/product/merchant/pricing',
+  marketingPlan:         '/marketing/plan',
   inventoryLowStock:  '/inventory/low-stock?threshold=10',
   inventoryReplenish: '/inventory/replenish',
   inventoryAutoReplenish: '/inventory/auto-replenish',

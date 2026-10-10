@@ -28,6 +28,13 @@
 - **修复**：① 迁移改名 `V20261092__merchant_forecast.sql`；② 删除 selectCount 分支，按 SKU 尾部映射演示库存；③ TOOLS 列表移至 tools.py 文件末尾并加入 `sales_forecast`（26 个）；④ system.md 顶部改双角色描述 + 新增「商家经营角色」工具表段落，chat_service `_ROUTE_RULES` 增商家经营确定性路由（`我是商家|店主|销量预测|智能选品|备货|该备多少货...`）强制首轮触发
 - **教训**：TOOLS 显式列表场景下新增工具 = 定义 + 入列表（列表放文件末尾可避免顺序问题）；system.md 角色描述必须覆盖全部服务场景，模型默认会固守首段角色；商家侧工具要有确定性路由，不能只靠模型 auto 决策
 
+## #30 · [0.2.26] BFF 服务名拼写错误：marketingService → marketingSvc（含 timeout 引用残留，已修复）
+
+- **现象**：`GET /merchant/marketing-plan` 返回 500「系统繁忙」；日志 `Cannot read properties of undefined (reading 'timeout')`，栈指向 merchant.service.js marketingPlan()
+- **根因**：BFF `service.config.ts` 的键名是 **`marketingSvc`**（`{ url: 'http://localhost:8088', timeout: 2_000 }`），新增代码误写 `SERVICES.marketingService`（undefined）→ get URL 与 timeout 均取 undefined；首次修复只替换了 get URL 一处，**timeout(SERVICES.marketingService.timeout) 残留**仍取 undefined
+- **修复**：全量替换 `SERVICES.marketingService` → `SERVICES.marketingSvc`（含 timeout 引用），重建 dist 重启 3000 后 PASS（plan=3）
+- **教训**：BFF 引用服务配置必须先核对 `service.config.ts` 的键名（marketingSvc 而非 marketingService）；同一个错误标识符可能出现在多处（URL + timeout + 其他管道参数），替换要全量，不能只替换首个可见处
+
 # 智购 · 测试问题与 Bug 记录
 
 > 记录测试过程中发现的问题、临时排查命令与修复状态。已修复的条目保留留痕，不删除。

@@ -132,3 +132,23 @@ export async function getMerchantSelection(): Promise<SelectionItem[] | null> {
   const res = await http.get<{ code: number; data: SelectionItem[] | null }>('/merchant/selection');
   return res.data.data;
 }
+
+
+/** 动态定价建议（趋势/库存/竞品，演示口径） */
+export interface PricingItem {
+  skuId: string; productName: string; currentPriceFen: number; competitorAvgFen: number
+  inventoryLevel: string; trendPct: number; suggestPriceFen: number; action: string; reason: string
+}
+export async function getMerchantPricing(): Promise<PricingItem[] | null> {
+  const res = await http.get<{ code: number; data: PricingItem[] | null }>('/merchant/pricing');
+  return res.data.data;
+}
+
+/** 营销方案建议（促销策略+触达渠道，演示口径） */
+export interface MarketingPlanItem {
+  skuId: string; productName: string; strategy: string; detail: string; reason: string; channels: string[]
+}
+export async function getMarketingPlan(): Promise<MarketingPlanItem[] | null> {
+  const res = await http.get<{ code: number; data: MarketingPlanItem[] | null }>('/merchant/marketing-plan');
+  return res.data.data;
+}

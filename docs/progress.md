@@ -307,6 +307,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化                                                            |
 
 ## 变更记录
+* 2026-10-10：**P2 3.3 商家端 AI 经营大脑二期（[0.2.26]）**：动态定价 `GET /product/merchant/pricing`（趋势/库存/竞品 → UP/DOWN/HOLD + 建议价，演示口径）+ 营销方案 `GET /marketing/plan`（会员价/拼团/满减策略 + 渠道，演示口径）；AI `dynamic_pricing` + `marketing_plan`（TOOLS 28）+ system.md/路由；BFF 2 端点；H5 经营大脑区块追加定价+营销子区。修复：BFF 服务名拼写（marketingService→marketingSvc，含 timeout 引用）。验证：直连 pricing 3/plan 3、SSE 双 PASS、BFF 三层 PASS、双端构建 PASS。
+
 * 2026-10-10：**P2 3.3 商家端 AI 经营大脑一期（[0.2.25]）**：product-service 销量预测 `GET /product/merchant/forecast?days=7|30`（近 7 日日均×天数×(1+趋势) + 建议备货，演示口径）+ 智能选品 `GET /product/merchant/selection`（热度/库存/趋势 → 建议）→ Flyway `V20261092__merchant_forecast.sql`（daily_sales seed 3 SKU×14 天）；AI `sales_forecast` 工具（TOOLS 26）+ system.md 商家经营角色 + 路由强制触发；BFF 2 端点；H5 商家中心经营大脑区块（7/30 切换 + 选品建议）。修复 4 坑（product 库 V20261091 mock 撞版本→V20261092 / selectCount Long→int / TOOLS 显式列表未注册 / system.md 缺商家角色致模型拒经营场景）。验证：直连 7/30+选品、BFF 三层、SSE 商家 query PASS、双端构建 PASS。
 
 * 2026-10-10：**P2 AI 售后助手（[0.2.24]）**：aftersale-service 质保提醒 `GET /aftersale/warranty/alerts`（NORMAL/EXPIRING_SOON 30 天内/EXPIRED + daysLeft/hint）+ 维修预约 `POST /aftersale/repair/appointment` + `GET /aftersale/repair/appointments`（状态机 PENDING/CONFIRMED/DONE/CANCELED）→ Flyway `V20261094__aftersale_repair.sql`（warranty_info seed 3 条 + repair_appointment）；AI `after_sale_repair` 工具（TOOLS 25：质保盘点/预约创建，缺参如实提示）；BFF 3 端点；H5 对话页售后助手入口升级。修复 3 坑（新 Mapper 缺 @Mapper 注解不注册 / LocalDateTime.parse 需 ISO T / aftersale 全量 JWT 拦截 AI 直连 403→放行 warranty/repair）。验证：Bearer 直连 3+1+1、AI SSE 质保盘点 PASS、BFF 三层 3/2+RP 单 PENDING、双端构建 PASS。

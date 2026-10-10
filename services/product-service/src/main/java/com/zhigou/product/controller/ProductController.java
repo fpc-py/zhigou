@@ -47,6 +47,12 @@ public class ProductController {
         return Result.ok(merchantForecastService.forecast(days));
     }
 
+    @Operation(summary = "商家动态定价建议（趋势/库存/竞品，演示口径）")
+    @GetMapping("/merchant/pricing")
+    public Result<List<Map<String, Object>>> pricing() {
+        return Result.ok(merchantForecastService.pricing());
+    }
+
     @Operation(summary = "商家智能选品（热度/库存/趋势，演示口径）")
     @GetMapping("/merchant/selection")
     public Result<List<Map<String, Object>>> selection() {

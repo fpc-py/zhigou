@@ -78,6 +78,62 @@ public class MerchantForecastService {
         return out;
     }
 
+    /** 动态定价建议：趋势/库存/竞品均价 → 调价动作（演示口径，正式版接入价格弹性与促销日历） */
+    public List<Map<String, Object>> pricing() {
+        List<Map<String, Object>> fc = forecast(7);
+        // 演示常量：现价(分)/竞品均价(分)/成本(分)；正式版从商品 SKU 表与 PriceCompare 竞品源读取
+        Map<String, int[]> demo = new HashMap<>();
+        demo.put("9000000000000000022", new int[]{19900, 18500, 12000});
+        demo.put("9000000000000000011", new int[]{15900, 16500, 9500});
+        demo.put("9000000000000000033", new int[]{9900, 7900, 5900});
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> f : fc) {
+            String skuId = (String) f.get("skuId");
+            int[] cfg = demo.getOrDefault(skuId, new int[]{10000, 10000, 6000});
+            int price = cfg[0], compAvg = cfg[1], cost = cfg[2];
+            int stock = (Integer) f.get("currentStock");
+            double trend = ((Number) f.get("trendPct")).doubleValue();
+            String level = stock < 10 ? "LOW" : (stock <= 20 ? "MID" : "HIGH");
+
+            String action; int suggest; String reason;
+            if (trend > 5 && "LOW".equals(level)) {
+                suggest = Math.min(price + (int) Math.round(price * 0.03), (int) Math.round(compAvg * 1.08));
+                suggest = Math.round(suggest / 100f) * 100;
+                if (Math.abs(suggest - price) * 100.0 / price < 2) {
+                    action = "HOLD"; suggest = price;
+                    reason = "现价已接近竞品上限，保持现价（趋势上行 + 低库存，优先补货）";
+                } else {
+                    action = "UP"; reason = "需求上行（+" + trend + "%）且库存偏低，建议提价至 " + (suggest / 100f) + " 元（≤竞品均价 108%），同步补货";
+                }
+            } else if (trend < -10) {
+                suggest = Math.max(price - (int) Math.round(price * 0.07), (int) Math.round(cost * 1.2));
+                suggest = Math.round(suggest / 100f) * 100;
+                if (Math.abs(suggest - price) * 100.0 / price < 2) {
+                    action = "HOLD"; suggest = price;
+                    reason = "已接近成本线，保持现价（需求走弱，建议转营销清库存而非继续降价）";
+                } else {
+                    action = "DOWN"; reason = "需求走弱（" + trend + "%），建议降价至 " + (suggest / 100f) + " 元清库存（不低于成本 120%）";
+                }
+            } else {
+                action = "HOLD"; suggest = price;
+                reason = "供需平稳，保持现价（趋势 " + trend + "%，库存 " + level + "）";
+            }
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("skuId", skuId);
+            m.put("productName", f.get("productName"));
+            m.put("currentPriceFen", price);
+            m.put("competitorAvgFen", compAvg);
+            m.put("inventoryLevel", level);
+            m.put("trendPct", f.get("trendPct"));
+            m.put("suggestPriceFen", suggest);
+            m.put("action", action);
+            m.put("reason", reason);
+            out.add(m);
+        }
+        return out;
+    }
+
     private double sum(List<DailySales> seq, int from, int to) {
         double s = 0;
         for (int i = from; i < to && i < seq.size(); i++) s += seq.get(i).getSalesQty() == null ? 0 : seq.get(i).getSalesQty();

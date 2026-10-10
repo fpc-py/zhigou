@@ -1592,6 +1592,50 @@ async def sales_forecast(days: int = 7, selection: bool = False) -> str:
         )
     return "\n".join(out)
 
+
+
+@tool
+async def dynamic_pricing() -> str:
+    """商家动态定价：基于销量趋势/库存水位/竞品均价给出每个 SKU 的建议价与调价动作（UP/DOWN/HOLD）。用于商家问"该涨价还是降价""定价建议""价格调整"。"""
+    url = settings.product_service_url + "/product/merchant/pricing"
+    try:
+        resp = await _http_get(url)
+    except Exception as e:
+        return f"动态定价暂时不可用，请稍后再试（{e.__class__.__name__}）"
+    rows = (resp or {}).get("data") or []
+    if not rows:
+        return "暂无定价建议数据（演示底座 daily_sales 尚未初始化）"
+    out = ["【动态定价建议 · 演示口径（正式版接入价格弹性/竞品/促销日历）】"]
+    for x in rows:
+        act = x.get("action")
+        flag = {"UP": "▲ 提价", "DOWN": "▼ 降价", "HOLD": "＝ 维持"}.get(act, act)
+        out.append(
+            f"- {x.get('productName')}（SKU {x.get('skuId')}）：现价 ¥{(x.get('currentPriceFen') or 0)/100}，"
+            f"竞品均价 ¥{(x.get('competitorAvgFen') or 0)/100}，库存 {x.get('inventoryLevel')}，"
+            f"趋势 {x.get('trendPct')}% → {flag}至 ¥{(x.get('suggestPriceFen') or 0)/100}。{x.get('reason')}"
+        )
+    return "\n".join(out)
+
+
+@tool
+async def marketing_plan() -> str:
+    """商家营销方案：基于 SKU 热度/库存/趋势生成促销策略（会员价/拼团/满减等）与触达渠道建议。用于商家问"怎么做活动""营销方案""促销建议""怎么推这款商品"。"""
+    url = settings.marketing_service_url + "/marketing/plan"
+    try:
+        resp = await _http_get(url)
+    except Exception as e:
+        return f"营销方案暂时不可用，请稍后再试（{e.__class__.__name__}）"
+    rows = (resp or {}).get("data") or []
+    if not rows:
+        return "暂无营销方案建议"
+    out = ["【营销方案建议 · 演示口径（正式版聚合销量/库存/券/拼团数据）】"]
+    for x in rows:
+        out.append(
+            f"- {x.get('productName')}：策略【{x.get('strategy')}】{x.get('detail')}。"
+            f"理由：{x.get('reason')}。触达渠道：{'、'.join(x.get('channels') or [])}"
+        )
+    return "\n".join(out)
+
 TOOLS = [
     search_products,
     get_price,
@@ -1619,4 +1663,6 @@ TOOLS = [
     supply_replenish,
     fulfillment_action,
     sales_forecast,
+    dynamic_pricing,
+    marketing_plan,
 ]

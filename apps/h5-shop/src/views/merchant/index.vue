@@ -172,7 +172,38 @@
         </div>
       </div>
       <div v-else class="empty">暂无选品建议</div>
-      <div class="brain-note">数据底座 product-service daily_sales · 演示算法，正式版接入时序模型与促销日历</div>
+
+      <div class="warn-label" style="margin-top:12px;">动态定价建议</div>
+      <div v-if="pricing.length" class="fc-list">
+        <div v-for="pr in pricing" :key="pr.skuId" class="fc-row">
+          <div class="fc-main">
+            <div class="fc-name">{{ pr.productName }}
+              <span class="fc-hot" :class="pr.action === 'UP' ? 'up' : pr.action === 'DOWN' ? 'down' : 'mid'">{{ pr.action === 'UP' ? '▲ 提价' : pr.action === 'DOWN' ? '▼ 降价' : '＝ 维持' }}</span>
+            </div>
+            <div class="fc-sub">现价 ¥{{ (pr.currentPriceFen / 100).toFixed(2) }} · 竞品 ¥{{ (pr.competitorAvgFen / 100).toFixed(2) }} · 库存 {{ pr.inventoryLevel }} · 趋势 {{ pr.trendPct }}%</div>
+            <div class="sel-reason">{{ pr.reason }}</div>
+          </div>
+          <div class="fc-right">
+            <div class="fc-qty">¥{{ (pr.suggestPriceFen / 100).toFixed(2) }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty">{{ prLoading ? '定价计算中…' : '暂无定价建议' }}</div>
+
+      <div class="warn-label" style="margin-top:12px;">营销方案建议</div>
+      <div v-if="plans.length" class="sel-list">
+        <div v-for="pl in plans" :key="pl.skuId" class="sel-row">
+          <span class="rank top">{{ pl.strategy }}</span>
+          <div class="sel-main">
+            <div class="sel-name">{{ pl.productName }}</div>
+            <div class="sel-reason">{{ pl.detail }}</div>
+            <div class="pl-ch">{{ pl.reason }}</div>
+            <div class="fc-sub">触达：{{ pl.channels.join(' · ') }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty">暂无营销方案</div>
+      <div class="brain-note">数据底座 product-service daily_sales + marketing-service · 演示口径，正式版接入价格弹性/时序模型/券拼团数据</div>
     </div>
 
     <!-- 热销榜 -->
@@ -217,8 +248,12 @@ import {
   getFulfillmentActions,
   getMerchantForecast,
   getMerchantSelection,
+  getMerchantPricing,
+  getMarketingPlan,
   type ForecastItem,
   type SelectionItem,
+  type PricingItem,
+  type MarketingPlanItem,
   ACTION_LABELS,
   type PendingOrder,
   type FulfillItem,
@@ -303,6 +338,9 @@ async function loadFulfill() {
 }
 const forecast = ref<ForecastItem[]>([])
 const selection = ref<SelectionItem[]>([])
+const pricing = ref<PricingItem[]>([])
+const plans = ref<MarketingPlanItem[]>([])
+const prLoading = ref(false)
 const fcDays = ref(7)
 const fcLoading = ref(false)
 
@@ -321,14 +359,23 @@ async function switchDays(days: number) {
 
 async function loadBrain() {
   fcLoading.value = true
+  prLoading.value = true
   try {
-    const [f, s] = await Promise.all([getMerchantForecast(7), getMerchantSelection()])
+    const [f, s, p, m] = await Promise.all([
+      getMerchantForecast(7),
+      getMerchantSelection(),
+      getMerchantPricing(),
+      getMarketingPlan(),
+    ])
     if (f) forecast.value = f
     if (s) selection.value = s
+    if (p) pricing.value = p
+    if (m) plans.value = m
   } catch (e) {
     // 保持空态
   } finally {
     fcLoading.value = false
+    prLoading.value = false
   }
 }
 
@@ -494,3 +541,5 @@ async function loadSupply() {
 .sel-name { font-size: 13px; color: #333; display: flex; align-items: center; gap: 6px; }
 .sel-reason { font-size: 11px; color: #666; margin-top: 2px; line-height: 1.5; }
 .brain-note { font-size: 10px; color: #aaa; margin-top: 8px; }
+
+.pl-ch { font-size: 11px; color: #B7791F; margin-top: 2px; line-height: 1.5; }

@@ -46,6 +46,20 @@ export class MerchantController {
     return ApiResponse.ok(data);
   }
 
+  /** 动态定价建议（趋势/库存/竞品，演示口径） */
+  @Get('merchant/pricing')
+  async pricing() {
+    const data = await this.merchant.pricing();
+    return ApiResponse.ok(data);
+  }
+
+  /** 营销方案建议（促销策略+触达渠道，演示口径） */
+  @Get('merchant/marketing-plan')
+  async marketingPlan() {
+    const data = await this.merchant.marketingPlan();
+    return ApiResponse.ok(data);
+  }
+
   /** 供应链补货中心：最近补货记录 */
   @Get('merchant/supply/records')
   async replenishRecords(@Query('limit') limit?: string) {
