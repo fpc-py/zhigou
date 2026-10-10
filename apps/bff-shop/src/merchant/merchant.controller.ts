@@ -1,0 +1,20 @@
+/**
+ * Merchant Controller — 商家经营概览（BFF 透传；演示：单商家市场 = 平台聚合口径）
+ */
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
+import { MerchantService } from './merchant.service.js';
+import { ApiResponse } from '../common/dto/api-response.js';
+
+@Controller()
+@UseGuards(JwtAuthGuard)
+export class MerchantController {
+  constructor(private readonly merchant: MerchantService) {}
+
+  /** 商家经营概览 */
+  @Get('merchant/overview')
+  async overview() {
+    const data = await this.merchant.overview();
+    return ApiResponse.ok(data);
+  }
+}

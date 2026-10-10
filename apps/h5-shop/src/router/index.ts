@@ -30,6 +30,7 @@ const router = createRouter({
     { path: '/address', name: 'address', component: () => import('@/views/address/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/coupons', name: 'coupons', component: () => import('@/views/coupons/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/wallet', name: 'wallet', component: () => import('@/views/wallet/index.vue'), meta: { requiresAuth: true, tabbar: false } },
+    { path: '/merchant', name: 'merchant', component: () => import('@/views/merchant/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/groupbuy', name: 'groupbuy', component: () => import('@/views/groupbuy/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/short-video', name: 'short-video', component: () => import('@/views/short-video/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/live', name: 'live', component: () => import('@/views/live/index.vue'), meta: { requiresAuth: true, tabbar: false } },

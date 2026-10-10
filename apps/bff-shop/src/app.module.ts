@@ -39,6 +39,8 @@ import { ClosetController } from './closet/closet.controller.js';
 import { ClosetService } from './closet/closet.service.js';
 import { WalletController } from './wallet/wallet.controller.js';
 import { WalletService } from './wallet/wallet.service.js';
+import { MerchantController } from './merchant/merchant.controller.js';
+import { MerchantService } from './merchant/merchant.service.js';
 
 @Module({
   imports: [
@@ -68,6 +70,7 @@ import { WalletService } from './wallet/wallet.service.js';
     LifeController,
     ClosetController,
     WalletController,
+    MerchantController,
   ],
   providers: [
     HomeService,
@@ -86,6 +89,7 @@ import { WalletService } from './wallet/wallet.service.js';
     LifeService,
     ClosetService,
     WalletService,
+    MerchantService,
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AnalyticsInterceptor },

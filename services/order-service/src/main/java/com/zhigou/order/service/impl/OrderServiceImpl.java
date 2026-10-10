@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zhigou.common.BizException;
 import com.zhigou.order.dto.CreateOrderRequest;
 import com.zhigou.order.dto.OrderResponse;
+import com.zhigou.order.dto.OrderStatsOverview;
 import com.zhigou.order.entity.OrderItem;
 import com.zhigou.order.entity.OrderMain;
 import com.zhigou.order.entity.Outbox;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j @Service @RequiredArgsConstructor
@@ -275,6 +277,58 @@ public class OrderServiceImpl implements OrderService {
         OrderMain o = orderMapper.selectOne(new LambdaQueryWrapper<OrderMain>().eq(OrderMain::getOrderId, orderId));
         if (o == null) throw new BizException(404, "订单不存在");
         return o;
+    }
+
+    @Override
+    public OrderStatsOverview overview() {
+        List<OrderMain> orders = orderMapper.selectList(new LambdaQueryWrapper<OrderMain>().orderByDesc(OrderMain::getCreateTime));
+        List<OrderItem> items = itemMapper.selectList(new LambdaQueryWrapper<OrderItem>());
+
+        OrderStatsOverview ov = new OrderStatsOverview();
+        ov.setTotalOrders((long) orders.size());
+
+        Set<String> paidStates = Set.of("PAID", "SHIPPED", "COMPLETED");
+        long sales = orders.stream()
+                .filter(o -> paidStates.contains(o.getOrderStatus()))
+                .mapToLong(o -> o.getPayAmount() == null ? 0 : o.getPayAmount())
+                .sum();
+        ov.setTotalSalesFen(sales);
+
+        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
+        long todayOrders = orders.stream().filter(o -> o.getCreateTime() != null && o.getCreateTime().isAfter(todayStart)).count();
+        long todaySales = orders.stream()
+                .filter(o -> paidStates.contains(o.getOrderStatus()))
+                .filter(o -> o.getCreateTime() != null && o.getCreateTime().isAfter(todayStart))
+                .mapToLong(o -> o.getPayAmount() == null ? 0 : o.getPayAmount())
+                .sum();
+        ov.setTodayOrders(todayOrders);
+        ov.setTodaySalesFen(todaySales);
+
+        Map<String, Long> dist = orders.stream().collect(Collectors.groupingBy(OrderMain::getOrderStatus, Collectors.counting()));
+        ov.setStatusDist(dist);
+
+        Map<Long, OrderStatsOverview.HotSpu> acc = new HashMap<>();
+        for (OrderItem it : items) {
+            OrderStatsOverview.HotSpu h = acc.computeIfAbsent(it.getSpuId(), k -> {
+                OrderStatsOverview.HotSpu x = new OrderStatsOverview.HotSpu();
+                x.setSpuId(k);
+                x.setSpuName(it.getSkuName());
+                x.setSoldCount(0L);
+                x.setSalesFen(0L);
+                return x;
+            });
+            h.setSoldCount(h.getSoldCount() + it.getCount());
+            h.setSalesFen(h.getSalesFen() + it.getPrice() * it.getCount());
+        }
+        List<OrderStatsOverview.HotSpu> hot = acc.values().stream()
+                .sorted((a, b) -> Long.compare(b.getSoldCount(), a.getSoldCount()))
+                .limit(5)
+                .collect(Collectors.toList());
+        ov.setHotSpus(hot);
+
+        ov.setPendingAfterSale(orders.stream().filter(o -> "REFUNDING".equals(o.getOrderStatus())).count());
+        ov.setGeneratedAt(LocalDateTime.now().toString());
+        return ov;
     }
 
     private OrderResponse buildResponse(OrderMain order) {

@@ -62,6 +62,7 @@ export const SERVICE_PATHS = {
   orderCancel:       (id: string) => `/order/${id}/cancel`,
   orderDetail:       (id: string) => `/order/${id}`,
   orderMine:         '/order/mine',
+  orderStatsOverview: '/order/stats/overview',
   paymentCreate:     '/payment/create',
   paymentMockPay:    '/payment/sandbox/mock-pay',
   userProfile:       '/user/profile',

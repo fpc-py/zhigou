@@ -1,0 +1,37 @@
+/**
+ * Merchant Service — 商家经营（BFF 透传 order-service 经营概览；演示：单商家市场 = 平台聚合）
+ */
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom, catchError, timeout } from 'rxjs';
+import { SERVICES, SERVICE_PATHS } from '../config/service.config.js';
+
+function unwrapOrThrow<T>(resp: { data: { code?: number; message?: string; data?: T } }, logger: Logger, label: string, fallback: T): T {
+  const body = resp.data;
+  if (body == null) return fallback;
+  if (body.code !== undefined && body.code !== 200) {
+    throw new HttpException(body.message || `${label} 业务处理失败`, HttpStatus.BAD_REQUEST);
+  }
+  return (body.data as T) ?? fallback;
+}
+
+@Injectable()
+export class MerchantService {
+  private readonly logger = new Logger(MerchantService.name);
+  constructor(private readonly http: HttpService) {}
+
+  /** 经营概览（平台聚合，商家视角演示口径） */
+  async overview(): Promise<any | null> {
+    const url = `${SERVICES.orderService.url}${SERVICE_PATHS.orderStatsOverview}`;
+    const resp = await firstValueFrom(
+      this.http.get(url).pipe(
+        timeout(SERVICES.orderService.timeout),
+        catchError((err) => {
+          this.logger.warn(`order-service /order/stats/overview 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/overview', null);
+  }
+}

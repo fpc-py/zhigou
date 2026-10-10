@@ -154,10 +154,10 @@ def _tool_schemas() -> list[dict]:
 
 
 async def _dispatch_tool(name: str, args: dict) -> Any:
-    """按工具名分发执行（TOOLS 均为 async 函数）。"""
+    """按工具名分发执行（TOOLS 均为 StructuredTool，用 .name 匹配）。"""
     for tool in TOOLS:
-        if tool.__name__ == name:
-            return await tool(**args)
+        if getattr(tool, 'name', None) == name:
+            return await tool.ainvoke(args)
     raise ValueError(f"未知工具: {name}")
 
 

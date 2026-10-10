@@ -1183,6 +1183,49 @@ async def groupbuy_finder(sku_id: str | None = None, keywords: str | None = None
         return "拼团信息暂时没查到，稍后再试试？"
 
 
+# ── 商家端 AI 经营体系 · 一期：经营概览助手 ──
+
+@tool
+async def merchant_overview() -> str:
+    """
+    商家经营概览 / 销售报表。查询平台订单总数、累计销售额、今日订单与销售额、
+    订单状态分布、热销商品 Top5、待处理售后数（单商家市场，商家视角 = 平台聚合，演示口径）。
+    用户问"经营情况""销售报表""今天卖了多少""订单情况""热销商品"时调用。
+    """
+    try:
+        data = await _http_get(
+            f"{settings.order_service_url}/order/stats/overview",
+            timeout=5.0,
+        )
+        d = data.get("data") or {}
+        sales = d.get("totalSalesFen") or 0
+        today_sales = d.get("todaySalesFen") or 0
+        dist = d.get("statusDist") or {}
+        dist_txt = ", ".join(f"{k} {v} 单" for k, v in dist.items()) or "暂无"
+        lines = [
+            "商家经营概览（平台聚合 · 演示口径）：",
+            f"· 订单总数：{d.get('totalOrders', 0)} 单；今日新增 {d.get('todayOrders', 0)} 单",
+            f"· 累计销售额：¥{sales / 100:.2f}；今日销售额：¥{today_sales / 100:.2f}",
+            f"· 订单状态分布：{dist_txt}",
+            f"· 待处理售后：{d.get('pendingAfterSale', 0)} 单",
+        ]
+        hot = d.get("hotSpus") or []
+        if hot:
+            lines.append("· 热销商品 Top5：")
+            for i, h in enumerate(hot, 1):
+                lines.append(
+                    f"  {i}. {h.get('spuName') or h.get('spuId')} "
+                    f"| 售出 {h.get('soldCount', 0)} 件 | ¥{h.get('salesFen', 0) / 100:.2f}"
+                )
+        else:
+            lines.append("· 热销商品：暂无销售数据")
+        lines.append("提示：演示环境为单商家市场，商家视角取平台聚合数据；正式多商家需按 merchantId 隔离。")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("merchant_overview 调用失败: %s", e)
+        return "经营数据暂时没查到，稍后再试试？"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1202,4 +1245,5 @@ TOOLS = [
     groupbuy_finder,
     optimize_cart,
     create_order,
+    merchant_overview,
 ]

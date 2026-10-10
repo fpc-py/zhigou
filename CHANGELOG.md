@@ -3,6 +3,20 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.17] - 2026-10-10
+
+### P2 · 商家端 AI 经营体系一期（经营助手 MVP：order-service 聚合 + AI 工具 + BFF + H5）
+
+- feat(P2) `order-service` 新增经营统计接口 `GET /order/stats/overview`（无参，全平台聚合）：
+  - 订单总数 / 累计销售额（PAID/SHIPPED/COMPLETED 实付合计）/ 今日订单与销售额 / 订单状态分布 / 热销 SPU Top5（按 order_item 聚合销量）/ 待处理售后（REFUNDING 计数，演示口径）
+  - 新增 `OrderStatsOverview` DTO（内嵌 HotSpu）；实现为内存聚合（演示数据量小，正式量级应改 SQL 聚合）
+- feat(P2) `ai-orchestrator` 新增 AI 经营助手工具 `merchant_overview`（无参，调 8085 /order/stats/overview，产出经营简报文本；提示语注明单商家市场演示口径）
+- feat(P2) BFF 新增 `merchant` 模块：`GET /merchant/overview` 透传（JwtAuthGuard + ApiResponse）
+- feat(P2) H5 新增商家中心页 `/merchant`（演示口径标注 + 累计/今日指标卡 + 状态分布条 + 热销榜 + AI 经营助手入口跳对话页 `?q=` 预填经营问题）；「我的」页菜单新增「商家中心」
+- fix(P2) **AI 工具 SSE 分发修复**：`chat_service._dispatch_tool` 用 `tool.__name__` 匹配（StructuredTool 无该属性）→ 改为 `getattr(tool,'name',None)` + `tool.ainvoke(args)`；该 bug 影响全部 19 个工具的 SSE 调用（此前触发即报「工具执行失败」被模型转述为兜底文案）
+- 验证：order 直连经营统计 PASS（34 单/¥1139/今日 4 单/状态分布/热销 Top5）；BFF 未登录 401 + 登录态全量 PASS；H5 type-check+build + 浏览器实测（商家中心页全数据渲染 + AI 助手入口跳转预填）；SSE 全链路 tool_call→tool_result→AI 经营简报 PASS
+- 说明：单商家市场，商家视角 = 平台聚合（演示口径）；热销 Top1 为历史测试订单占位名（SKU-<雪花id>），正式需联 product-service 映射真实 SPU 名；PENDING 为遗留非标准状态，图表已容忍未知枚举
+
 ## [0.2.16] - 2026-10-10
 
 ### P2 · 会员钱包（新业务域：wallet-service + BFF + H5）

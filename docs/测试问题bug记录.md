@@ -43,6 +43,10 @@
 | 2026-10-07 | 订单详情页对 CLOSED/REFUNDED 仍显示"申请售后"（不合状态机） | 操作按钮按状态收敛：INIT=取消+支付，PAID/SHIPPED/COMPLETED=申请售后，终态无操作 | `npm run build` 通过 |
 
 > 新增 bug 时在此追加一行；涉及代码修复的同步更新 `CHANGELOG.md`。
+| 2026-10-10 | **AI 工具 SSE 全部调用失败（历史隐患）**：chat_service `_dispatch_tool` 用 `tool.__name__` 匹配，而 `@tool` 包装后为 StructuredTool（无 `__name__`）→ 任意工具被模型选中即报「工具执行失败: ... __name__」并被转述为「暂时没查到」兜底 | 改为 `getattr(tool,'name',None) == name` + `tool.ainvoke(args)` | SSE 全链路 tool_call→tool_result→AI 简报 PASS（19 工具全部受益） |
+| 2026-10-10 | **H5 商家中心页数据 NaN**：api/merchant.ts 直接返回 axios response，页面误取 `res.data`（实为 BFF body） | 按 wallet.ts 模板改 `res.data.data` 解包 | 页面全数据渲染 |
+
+
 | 2026-10-10 | **mybatis-plus IPage/Page 类不可用**：wallet 首版流水分页用 `selectPage` + `IPage` 编译报「找不到符号」（当前 starter 版本路径问题） | 改用手写 `.last("limit o,s")` 返回 List（与 life 一致） | mvn 编译通过 |
 | 2026-10-10 | **Long 参数解析 500**：直连测试用 `userId=9999999999999999999` 超 Long 最大值 → NumberFormatException 500 | 测试数据改为合法 Long（8888888888888888888） | 惰性创建 PASS |
 

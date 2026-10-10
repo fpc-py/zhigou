@@ -3,6 +3,7 @@ package com.zhigou.order.controller;
 import com.zhigou.common.Result;
 import com.zhigou.order.dto.CreateOrderRequest;
 import com.zhigou.order.dto.OrderResponse;
+import com.zhigou.order.dto.OrderStatsOverview;
 import com.zhigou.order.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -42,5 +43,10 @@ public class OrderController {
     @Operation(summary = "我的订单列表") @GetMapping("/mine")
     public Result<List<OrderResponse>> mine(@RequestParam Long userId) {
         return Result.ok(orderService.mine(userId));
+    }
+
+    @Operation(summary = "平台经营概览（商家视角，演示口径）") @GetMapping("/stats/overview")
+    public Result<OrderStatsOverview> overview() {
+        return Result.ok(orderService.overview());
     }
 }
