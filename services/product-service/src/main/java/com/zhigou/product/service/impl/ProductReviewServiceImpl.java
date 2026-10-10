@@ -103,6 +103,16 @@ public class ProductReviewServiceImpl implements ProductReviewService {
                 .build();
     }
 
+    @Override
+    public List<ReviewVO> negative(int minRating, int limit) {
+        List<ProductReview> rows = reviewMapper.selectList(
+                new LambdaQueryWrapper<ProductReview>()
+                        .le(ProductReview::getRating, minRating)
+                        .orderByDesc(ProductReview::getCreateTime)
+                        .last("limit " + Math.max(1, Math.min(limit, 50))));
+        return rows.stream().map(this::toVO).collect(Collectors.toList());
+    }
+
     private ReviewVO toVO(ProductReview r) {
         return ReviewVO.builder()
                 .reviewId(r.getReviewId())

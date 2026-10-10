@@ -53,6 +53,13 @@ public class ReviewController {
         return Result.ok(reviewService.stats(spuId));
     }
 
+    @Operation(summary = "全平台低分评价列表（商家负面预警，演示口径）")
+    @GetMapping("/negative")
+    public Result<java.util.List<ReviewVO>> negative(@RequestParam(defaultValue = "3") int minRating,
+                                                     @RequestParam(defaultValue = "5") int limit) {
+        return Result.ok(reviewService.negative(minRating, limit));
+    }
+
     /** 从请求上下文取当前用户（JwtAuthFilter 已解析 x-user-id / JWT） */
     private Long currentUserId() {
         return UserContext.getUserId();

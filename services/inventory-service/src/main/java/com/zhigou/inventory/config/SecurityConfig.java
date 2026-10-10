@@ -29,7 +29,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/webjars/**",
                                 // 库存读写是内网服务调用（order/aftersale），无用户上下文；生产应加内网白名单
                                 "/inventory/preDeduct", "/inventory/confirm",
-                                "/inventory/rollback"
+                                "/inventory/rollback",
+                                "/inventory/low-stock"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

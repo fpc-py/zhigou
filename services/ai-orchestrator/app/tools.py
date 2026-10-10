@@ -1226,6 +1226,49 @@ async def merchant_overview() -> str:
         return "经营数据暂时没查到，稍后再试试？"
 
 
+# ── 商家端 AI 经营体系 · 二期：经营预警助手 ──
+
+@tool
+async def merchant_warnings(threshold: int = 10) -> str:
+    """
+    商家经营预警：低库存 SKU 列表 + 近期低分差评（负面预警）。
+    用户问"有什么需要处理的""库存预警""缺货提醒""差评预警""负面评价"时调用。
+    threshold 为低库存阈值（余量小于等于该值告警），默认 10。
+    """
+    try:
+        low = await _http_get(
+            f"{settings.inventory_service_url}/inventory/low-stock?threshold={threshold}",
+            timeout=5.0,
+        )
+        neg = await _http_get(
+            f"{settings.product_service_url}/product/review/negative?minRating=3&limit=5",
+            timeout=5.0,
+            headers={"X-User-Id": "2107757313435291648"},
+        )
+        low_list = low.get("data") or []
+        neg_list = neg.get("data") or []
+        lines = ["商家经营预警（单商家市场 · 演示口径）："]
+        if low_list:
+            lines.append(f"· 低库存 SKU（余量 ≤ {threshold}）：")
+            for s in low_list:
+                lines.append(f"  - skuId={s.get('skuId')} 剩余 {s.get('available')} 件（库存 0 需补货）")
+        else:
+            lines.append(f"· 低库存 SKU（余量 ≤ {threshold}）：无，库存健康")
+        if neg_list:
+            lines.append("· 近期差评（rating ≤ 3）：")
+            for r in neg_list:
+                content = (r.get("content") or "").replace("\n", " ")[:40]
+                lines.append(f"  - spuId={r.get('spuId')} {r.get('rating')} 星：{content}")
+            lines.append("建议：优先回复差评解释原因，并对高频问题（质量/尺码/面料）做商品页改进。")
+        else:
+            lines.append("· 近期差评：无，评价口碑良好")
+        lines.append("提示：库存为演示阈值口径；正式多商家需按 merchantId 隔离并接入推送触达。")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("merchant_warnings 调用失败: %s", e)
+        return "经营预警数据暂时没查到，稍后再试试？"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1246,4 +1289,5 @@ TOOLS = [
     optimize_cart,
     create_order,
     merchant_overview,
+    merchant_warnings,
 ]

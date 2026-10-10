@@ -47,4 +47,9 @@ public class InventoryController {
     public Result<Stock> query(@PathVariable("skuId") Long skuId) {
         return Result.ok(inventoryService.query(skuId));
     }
+
+    @GetMapping("/low-stock")
+    public Result<java.util.List<Stock>> lowStock(@RequestParam(defaultValue = "10") int threshold) {
+        return Result.ok(inventoryService.lowStock(threshold));
+    }
 }

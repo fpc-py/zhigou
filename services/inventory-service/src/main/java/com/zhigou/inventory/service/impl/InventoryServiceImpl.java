@@ -109,4 +109,11 @@ public class InventoryServiceImpl implements InventoryService {
         if (skuId == null) return null;
         return stockMapper.selectOne(new LambdaQueryWrapper<Stock>().eq(Stock::getSkuId, skuId));
     }
+
+    @Override
+    public List<Stock> lowStock(int threshold) {
+        return stockMapper.selectList(new LambdaQueryWrapper<Stock>()
+                .le(Stock::getAvailable, threshold)
+                .orderByAsc(Stock::getAvailable));
+    }
 }

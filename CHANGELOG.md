@@ -3,6 +3,25 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.18] - 2026-10-10
+
+### P2 · 商家端 AI 经营体系二期（经营预警：低库存 + 差评负面预警）
+
+- feat(P2) `inventory-service` 新增低库存接口 `GET /inventory/low-stock?threshold=10`：
+  - `InventoryService.lowStock(int threshold)` 实现 `available <= threshold` 按余量升序（DB 直查，演示口径）
+  - SecurityConfig permitAll 追加 `/inventory/low-stock`（内网经营读接口，同 preDeduct 白名单模式）
+  - 坑：inventory-service pom 无 swagger 依赖，`@Operation` 编译报错 → 该接口不带 swagger 注解
+- feat(P2) `product-service` 新增全平台低分评价接口 `GET /product/review/negative?minRating=3&limit=5`：
+  - `ProductReviewService.negative(int minRating, int limit)`：`rating <= minRating` 按 createTime 倒序，limit 钳制 1-50
+  - product SecurityConfig 为全量 JWT → **内网调用需带 `X-User-Id` header**（JwtAuthFilter 支持内网透传模式）
+- feat(P2) `ai-orchestrator` 新增 AI 经营预警工具 `merchant_warnings(threshold=10)`：
+  - 聚合 8086 低库存 + 8083 差评（差评调用带 X-User-Id 内网头），输出低库存 SKU 清单 + 差评清单 + 处理建议
+  - 兜底 except → 「经营预警数据暂时没查到」；演示口径显式标注（单商家市场）
+- feat(P2) BFF 新增 `GET /merchant/warnings`：聚合 lowStock + negative（Promise.all 并行 + timeout + catchError 兜底 []）
+- feat(P2) H5 商家中心页新增「经营预警」区块：预警总数角标 + 低库存 SKU 列表 + 近期差评列表（spuId/星级/内容截断/标签）+ 空态「暂无预警，经营健康」
+- 验证：两接口直连 PASS（低库存 2 条：SKU3 余 1 / SKU2 余 10；差评 5 条含 spuId 12/11/10 rating 2-3）；AI 工具直调 + SSE 全链路 tool_call→tool_result PASS；BFF 登录态 200 聚合 PASS；H5 type-check+build + 浏览器实测（预警 7 条完整渲染）
+- 说明：库存/差评为演示口径（单商家市场 = 平台聚合）；差评调用为固定演示 userId 内网头，正式多商家需按 merchantId 隔离 + 推送触达
+
 ## [0.2.17] - 2026-10-10
 
 ### P2 · 商家端 AI 经营体系一期（经营助手 MVP：order-service 聚合 + AI 工具 + BFF + H5）

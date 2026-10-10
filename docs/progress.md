@@ -36,6 +36,17 @@
 | AI 链路 | chat_service 迁移原生 OpenAI（tiktoken 阻断修复）+ 工具路由 + 超时配置 | ✅ 重写完成 | ✅ 2026-10-10 SSE 实测 5/5 PASS | 随 [0.2.11] 统一提交 |
 | 上线就绪 | release-checklist 改写 + gray-release + monitoring-alerting + 部署资产整改 | ✅ 已完成 | ✅ 静态核验通过 | 随 [0.2.11] 统一提交 |
 
+## 2026-10-10 · P2 商家经营二期：经营预警（低库存 + 差评负面预警）[0.2.18]
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| inventory 低库存接口 | ✅ | `GET /inventory/low-stock?threshold=10`（available<=threshold 升序），SecurityConfig 放行；直连 2 条：SKU3 余 1 / SKU2 余 10 |
+| product 差评接口 | ✅ | `GET /product/review/negative?minRating=3&limit=5`（rating<=3 倒序），内网调用需 `X-User-Id` 头；直连 5 条（spuId 12/11/10，rating 2-3，含内容摘要） |
+| AI 预警工具 | ✅ | `merchant_warnings(threshold=10)` 聚合低库存+差评；直调 PASS + SSE 全链路 tool_call→tool_result PASS |
+| BFF 透传 | ✅ | `GET /merchant/warnings` 聚合返回 lowStock+negative（Promise.all+兜底 []），登录态 200 |
+| H5 预警区块 | ✅ | 商家中心页「经营预警」角标 7 + 低库存/差评列表 + 空态；type-check+build + 浏览器实测通过 |
+| 提交 | ✅ | 随 [0.2.18] 统一 commit & push |
+
 ## 2026-10-10 · 上线就绪文档（M4 对齐）
 
 | 项 | 状态 | 说明 |

@@ -34,4 +34,34 @@ export class MerchantService {
     );
     return unwrapOrThrow(resp, this.logger, 'merchant/overview', null);
   }
+
+  /** 经营预警：低库存 SKU + 近期差评（演示：单商家市场 = 平台聚合口径） */
+  async warnings(): Promise<{ lowStock: any[]; negative: any[] } | null> {
+    const low = (await firstValueFrom(
+      this.http.get(`${SERVICES.inventorySvc.url}${SERVICE_PATHS.inventoryLowStock}`).pipe(
+        timeout(SERVICES.inventorySvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`inventory-service /inventory/low-stock 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: [] } });
+        }),
+      ),
+    )) as any;
+    const neg = (await firstValueFrom(
+      this.http
+        .get(`${SERVICES.productService.url}${SERVICE_PATHS.productReviewNegative}`, {
+          headers: { 'X-User-Id': '2107757313435291648' },
+        })
+        .pipe(
+          timeout(SERVICES.productService.timeout),
+          catchError((err) => {
+            this.logger.warn(`product-service /product/review/negative 失败: ${err.message}`);
+            return Promise.resolve({ data: { data: [] } });
+          }),
+        ),
+    )) as any;
+    return {
+      lowStock: unwrapOrThrow(low, this.logger, 'merchant/warnings/lowStock', []),
+      negative: unwrapOrThrow(neg, this.logger, 'merchant/warnings/negative', []),
+    };
+  }
 }

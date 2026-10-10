@@ -17,4 +17,11 @@ export class MerchantController {
     const data = await this.merchant.overview();
     return ApiResponse.ok(data);
   }
+
+  /** 商家经营预警（低库存 + 差评） */
+  @Get('merchant/warnings')
+  async warnings() {
+    const data = await this.merchant.warnings();
+    return ApiResponse.ok(data);
+  }
 }

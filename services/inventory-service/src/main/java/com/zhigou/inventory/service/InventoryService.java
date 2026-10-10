@@ -14,4 +14,6 @@ public interface InventoryService {
     void warmUp();
     /** 按 skuId 查询库存（供 AI 导购等下游服务调用） */
     Stock query(Long skuId);
+    /** 低库存列表：available <= threshold（按余量升序，供商家经营预警） */
+    List<Stock> lowStock(int threshold);
 }

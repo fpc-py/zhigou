@@ -7,6 +7,7 @@
 
 | # | 问题描述 | 涉及端 | 状态 | 备注 |
 |---|---|---|---|---|
+| 22 | **P2 商家经营二期预警接口 3 坑**：① inventory-service 无 swagger 依赖，`@Operation` 编译报「找不到 io.swagger」→ 移除注解（`/inventory/low-stock` 与 `/{skuId}` 路径精确匹配不冲突）；② product-service `anyRequest().authenticated()` 全量拦截 `/product/review/negative` → 内网调用需带 `X-User-Id` header（JwtAuthFilter 内网透传模式）；③ BFF `merchant/warnings` 首次 TS 报错（firstValueFrom 联合类型推断）→ 逐 await + `as any` | inventory + product + BFF | ✅ | ① 编译通过直连 200；② 带 X-User-Id 直连 5 条差评；③ tsc=0 + BFF 登录态 200 |
 | 15 | **P2 拼团联调 4 坑**：① Flyway 版本冲突——新迁移 `V20261010` 版本低于已有 mock 迁移 20261090，被跳过不执行；② BFF 拼团透传未带 `x-user-id` 头，marketing Security 全量 JWT → 出站 403 空数组；③ BFF `catchError` 吞业务错误（后端 HTTP 200+code≠200 如 40041/40043）→ 前端看不到真实失败原因；④ 脚本误判「成团团单应出现在招募列表」（openGroups 仅展示 OPEN 招募中团，SUCCESS 团不进招募） | marketing + BFF + H5 | ✅ | ① 迁移改名 `V20261099__group_buy.sql`（> 20261090）重打包重启；② marketing.service 统一注入 `authHeader(userId)`；③ `unwrapOrThrow`：code≠200 抛 HttpException(400, message)，H5 try/catch 展示；④ 按 detail 接口口径验证 members=2 remain=0，非产品缺陷 |
 | 16 | **AI 链路 Windows tiktoken 阻断**：langchain-openai 顶层 import tiktoken Rust 扩展被「应用程序控制策略」阻止（`DLL load failed while importing _tiktoken`），进程级必崩，SSE 5 工具全 FAIL | ai-orchestrator | ✅ | `chat_service.py` 迁移为原生 openai `AsyncOpenAI` 流式 + 手动工具循环；`convert_to_openai_tool` 生成 schema（不触发 tiktoken）；SSE 契约不变 |
 | 17 | **AI 工具触发不稳定（同 query 时好时坏）**：① system.md 第 8 条「不是客服，不处理退款/物流」与触发规则自相矛盾，模型随机拒绝；② 模型对强场景 query 偶发不调工具 | ai-orchestrator + prompts | ✅ | ① system.md 改为「命中场景必须调对应工具」；② 新增确定性工具路由 `_route_tool`（关键词命中 → 首轮 `tool_choice` 强制），SSE 5/5 PASS |

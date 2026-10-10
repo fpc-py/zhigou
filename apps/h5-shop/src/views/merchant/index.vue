@@ -44,6 +44,34 @@
       <div class="empty" v-else>暂无订单数据</div>
     </div>
 
+    <!-- 经营预警 -->
+    <div class="section warn-sec">
+      <div class="sec-title">经营预警 <span class="warn-badge">{{ warnTotal }}</span></div>
+      <div v-if="warnings.lowStock.length" class="warn-group">
+        <div class="warn-label">低库存 SKU（余量 ≤ 10）</div>
+        <div v-for="s in warnings.lowStock" :key="s.skuId" class="warn-row">
+          <span class="warn-dot low" />
+          <div class="warn-main">
+            <div class="warn-name">SKU {{ s.skuId }}</div>
+            <div class="warn-sub">剩余 {{ s.available }} 件，建议补货</div>
+          </div>
+          <span class="warn-tag low">低库存</span>
+        </div>
+      </div>
+      <div v-if="warnings.negative.length" class="warn-group">
+        <div class="warn-label">近期差评（rating ≤ 3）</div>
+        <div v-for="r in warnings.negative" :key="r.spuId + r.createTime" class="warn-row">
+          <span class="warn-dot neg" />
+          <div class="warn-main">
+            <div class="warn-name">SPU {{ r.spuId }} · {{ r.rating }} 星</div>
+            <div class="warn-sub">{{ clip(r.content) }}</div>
+          </div>
+          <span class="warn-tag neg">差评</span>
+        </div>
+      </div>
+      <div v-if="!warnings.lowStock.length && !warnings.negative.length" class="empty">暂无预警，经营健康</div>
+    </div>
+
     <!-- 热销榜 -->
     <div class="section">
       <div class="sec-title">热销商品 Top{{ hotList.length }}</div>
@@ -76,7 +104,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMerchantOverview } from '@/api/merchant'
+import { getMerchantOverview, getMerchantWarnings } from '@/api/merchant'
 
 const router = useRouter()
 
@@ -104,6 +132,11 @@ const statusRows = computed(() => {
 })
 const hotList = computed(() => overview.value.hotSpus || [])
 
+interface Warnings { lowStock: { skuId: number; available: number }[]; negative: { spuId: string; rating: number; content: string; createTime?: string }[] }
+const warnings = ref<Warnings>({ lowStock: [], negative: [] })
+const warnTotal = computed(() => warnings.value.lowStock.length + warnings.value.negative.length)
+const clip = (s: string) => (s || '').length > 26 ? s.slice(0, 26) + '…' : (s || '')
+
 function goChat() {
   router.push({ path: '/chat', query: { q: '帮我看看今天的经营情况：订单、销售额和热销商品' } })
 }
@@ -114,6 +147,12 @@ onMounted(async () => {
     if (data) overview.value = data
   } catch (e) {
     // 保持空态；页面可读
+  }
+  try {
+    const w = await getMerchantWarnings()
+    if (w) warnings.value = w
+  } catch (e) {
+    // 预警区块保持空态
   }
 })
 </script>
@@ -157,4 +196,19 @@ onMounted(async () => {
 .ai-sub { font-size: 11px; opacity: .85; margin-top: 2px; }
 .ai-arrow { font-size: 22px; }
 .footnote { text-align: center; color: #bbb; font-size: 11px; margin-top: 8px; padding: 0 16px; word-break: break-all; }
+.warn-sec { border: 1px solid #FFE3E5; }
+.warn-badge { background: #E5484D; color: #fff; font-size: 11px; border-radius: 10px; padding: 1px 7px; margin-left: 4px; vertical-align: 1px; }
+.warn-group { margin-bottom: 8px; }
+.warn-label { font-size: 12px; color: #888; margin: 6px 0 4px; }
+.warn-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #f5f6f8; }
+.warn-row:last-child { border-bottom: none; }
+.warn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.warn-dot.low { background: #F5A623; }
+.warn-dot.neg { background: #E5484D; }
+.warn-main { flex: 1; min-width: 0; }
+.warn-name { font-size: 13px; color: #333; }
+.warn-sub { font-size: 11px; color: #999; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.warn-tag { font-size: 10px; border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
+.warn-tag.low { background: #FEF3E2; color: #B7791F; }
+.warn-tag.neg { background: #FFE9E9; color: #C03038; }
 </style>

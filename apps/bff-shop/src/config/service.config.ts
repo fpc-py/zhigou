@@ -63,6 +63,8 @@ export const SERVICE_PATHS = {
   orderDetail:       (id: string) => `/order/${id}`,
   orderMine:         '/order/mine',
   orderStatsOverview: '/order/stats/overview',
+  inventoryLowStock:  '/inventory/low-stock?threshold=10',
+  productReviewNegative: '/product/review/negative?minRating=3&limit=5',
   paymentCreate:     '/payment/create',
   paymentMockPay:    '/payment/sandbox/mock-pay',
   userProfile:       '/user/profile',
