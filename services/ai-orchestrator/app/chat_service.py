@@ -118,6 +118,22 @@ def _route_tool(query: str) -> Optional[str]:
     return None
 
 
+# ── 防编造护栏 ──
+# 工具返回空/未命中时，LLM 收到空结果可能自行编造商品名/品牌/价格/评分。
+# 在此类结果上强制附加明确禁令，作为工具回执的一部分（LLM 对工具回执的服从度最高）。
+_FORGE_GUARD = "【重要】以上结果为最终真实数据。若结果为空/暂无匹配/未查到，请直接如实告知用户「平台暂时没有查到相关商品/信息」，并可给不指名具体商品的一般性建议；严禁编造任何商品名、品牌、价格、评分、评价内容或购买链接。"
+
+
+def _guard_result(result_str: str) -> str:
+    """结果为空或含“暂无/未查到”语义时追加防编造护栏。"""
+    s = str(result_str or "").strip()
+    if not s:
+        return "（工具未返回内容）" + _FORGE_GUARD
+    if any(k in s for k in ("暂无", "没有搜到", "没有找到", "未查到", "没有匹配", "暂时没有", "无合适", "搜索为空")):
+        return s + _FORGE_GUARD
+    return s
+
+
 # ── 工具 schema 与分发（原生 OpenAI 工具循环，不依赖 tiktoken） ──
 
 _tool_schemas_cache: Optional[list[dict]] = None
@@ -224,10 +240,10 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
             yield {"event": "tool_call", "data": json.dumps({"tool": name, "args": safe_args}, ensure_ascii=False)}
             try:
                 result = await _dispatch_tool(name, args)
-                result_str = str(result) if result is not None else ""
+                result_str = _guard_result(result)
             except Exception as e:  # 工具自身异常 → 反馈给 LLM 继续
                 logger.warning("工具 %s 执行失败: %s", name, e)
-                result_str = f"工具执行失败: {e}"
+                result_str = f"工具执行失败: {e}" + _FORGE_GUARD
             yield {"event": "tool_result", "data": json.dumps({"tool": name, "result": result_str}, ensure_ascii=False)}
             messages.append(
                 {"role": "tool", "tool_call_id": tc["id"] or f"call_{idx}", "content": result_str}

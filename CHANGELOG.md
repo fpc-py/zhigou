@@ -21,6 +21,8 @@
 - docs 上线就绪：`release-checklist.md` 改写（去 Nacos/K8s，compose 蓝绿三编排）、新建 `gray-release.md`（分批放量+回滚）、`monitoring-alerting.md`（RED/USE+SLO+告警定级）、`docs/README.md` 索引登记
 - chore 部署资产整改：`infra/compose/services.yml` 11 镜像改 `${ZHIGOU_REPO:-zhigou}/<svc>:${TAG:-0.1.0}` 占位；`deploy.yml` 注入 `ZHIGOU_REPO=ghcr.io/fpc-py/zhigou`；compose config 双模式渲染验证通过（默认/生产）
 - **验证**：拼团 API 全链路 v2（干净数据）——登录→activities=3→开团→重复开团拒绝「你已开过该商品的团」→自参团拒绝「你已是该团团主」→user2 参团成团 SUCCESS→mine 两人各 2 条→detail members=2 remain=0（8/8 业务断言通过；脚本 1 处「成团团单应出现在招募列表」与业务设计不符——openGroups 仅展示招募中 OPEN 团，已按 detail 口径验证）；AI 攒批 5 工具 SSE 实测 **5/5 PASS**（gift/aftersale/logistics/usage_cycle/groupbuy_finder 均触发并返回真实数据）；`tests/test_chat.py` 重写适配新实现
+- fix(ai) **工具空结果后 LLM 编造商品**（浏览器实测暴露）：gift_assistant 空结果被 LLM 转编造「苏泊尔电子秤/硅胶工具套装」等库外商品 → system.md 第 4 条强化 + chat_service `_guard_result` 防编造护栏（空/暂无结果强制附禁令回执）；HTTP 复测无编造（补充提交）
+- **验证（补充）**：e2e 冒烟 **17/17 PASS**（补齐 cart 8084 / inventory 8086 / payment 8087 后重跑）；H5 浏览器实测——首页第 5 宫格进入拼团页正常、开团 → 「1/3 人·还差 2 人·你已是该团团主」、重复开团错误提示正确透出、AI 快捷入口 5 卡片触发对话正常
 - **限制说明**：AI 工具路由基于关键词规则（覆盖攒批场景），其余场景仍模型 auto 决策；H5 拼团页/AI 快捷入口待浏览器端到端复验（接口层已全绿）
 
 ## [0.2.10] - 2026-10-08
