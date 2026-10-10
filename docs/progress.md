@@ -285,6 +285,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项） |
 
 ## 变更记录
+* 2026-10-10（注）：**[0.2.29] commit c5cbcd6 已本地提交；push 曾因 GitHub 443 连接超时失败**——已于后续批次网络恢复时补推（同 [0.2.11]/[0.2.12] 留痕惯例）。
+
 * 2026-10-10：**P0 用户画像 / 收藏 / 浏览历史底座（[0.2.29]）**：user-service 画像底座（Flyway `V20261091__user_favorite_browse.sql` 两表 + 实体/Mapper/DTO + UserProfileService/Impl 收藏幂等/浏览聚合/画像洞察 + Controller 8 端点 + SecurityConfig 放行 `/user/insight`）；BFF +9 透传路径；AI `analyze_user_context` 三源融合（/user/insight + 历史订单 + 画像并入）；H5 详情页收藏/浏览真接口 + /favorites /history 页 + 我的页入口。**修复 #32 JS Number 精度丢失**（favorite/ids 19 位 Snowflake 经 JSON.parse 201→300 —— 后端改 `List<String>` 字符串透传）；修复 PowerShell ANSI 编码事故（Impl/Controller 重写，UTF-8 无 BOM）。验证：8081+BFF favorite/ids 均返回字符串数组；BFF 8 端点全 200；H5 浏览器端到端 PASS（详情页收藏写入 + 刷新「已收藏」态 + /favorites 1 件 + /history 看过 2 次 + 我的页入口）。
 
 * 2026-10-10：**文档体系对齐（[0.2.28]）**：以《智购功能文档.md》《智购-企业级工程化技术方案.md》为基准对齐 10+1 份文档 —— ① README/CLAUDE/docs-README：服务 12→16（补 community/life/closet/wallet）、AI 8000→8095、AI 工具 5→29、CI 已接入（13 checks 绿）、目录树/端口表/架构图/数据流/启动命令同步；② progress：待办池按真实进度勾销（P0 收尾完成项 + P1 全项 + P2 全项，保留 4 个未闭环项）、当前阶段/风险与阻塞更新、[0.2.12] push 留痕注更新；③ 技术方案 v2.0：「当前实现」对比行（16 服务/29 工具）+ 里程碑 M2-M4 状态；④ 前端改造说明：衣橱/社区改「已实现」、AI 启动 8095；⑤ release-checklist / gray-release / monitoring-alerting / mock-data-cleanup-guide：服务清单/分批表/监控 targets/mock 表补 4 个新服务；⑥ 新建 `docs/adr/ADR-0001-服务治理与AI端口迁移.md`（填补空 adr 引用，对齐技术方案 ADR 纪律）。
