@@ -52,4 +52,26 @@ public class InventoryController {
     public Result<java.util.List<Stock>> lowStock(@RequestParam(defaultValue = "10") int threshold) {
         return Result.ok(inventoryService.lowStock(threshold));
     }
+
+    @PostMapping("/replenish")
+    public Result<Stock> replenish(@RequestBody Map<String, Object> body) {
+        Long skuId = ((Number) body.get("skuId")).longValue();
+        int addQty = ((Number) body.get("addQty")).intValue();
+        String remark = body.get("remark") == null ? null : String.valueOf(body.get("remark"));
+        return Result.ok(inventoryService.replenish(skuId, addQty, remark));
+    }
+
+    @PostMapping("/auto-replenish")
+    public Result<java.util.List<com.zhigou.inventory.entity.ReplenishRecord>> autoReplenish(
+            @RequestBody(required = false) Map<String, Object> body) {
+        int threshold = body != null && body.get("threshold") != null ? ((Number) body.get("threshold")).intValue() : 10;
+        int targetQty = body != null && body.get("targetQty") != null ? ((Number) body.get("targetQty")).intValue() : 50;
+        return Result.ok(inventoryService.autoReplenish(threshold, targetQty));
+    }
+
+    @GetMapping("/replenish/records")
+    public Result<java.util.List<com.zhigou.inventory.entity.ReplenishRecord>> replenishRecords(
+            @RequestParam(defaultValue = "20") int limit) {
+        return Result.ok(inventoryService.replenishRecords(limit));
+    }
 }

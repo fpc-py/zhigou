@@ -1333,6 +1333,77 @@ async def fulfillment_alert() -> str:
         return "履约预警数据暂时没查到，稍后再试试？"
 
 
+@tool
+async def supply_replenish(
+    threshold: int = 10,
+    target_qty: int = 50,
+    do_replenish: bool = False,
+) -> str:
+    """
+    供应链补货助手：低库存 SKU 盘点 + 最近补货记录查询；do_replenish=True 时执行自动补货（演示口径，低库存补到 target_qty）。
+    用户问"补货""自动补货""低库存怎么处理""库存不足""补货记录""下单补货"时调用。
+    threshold 为低库存阈值（默认 10），target_qty 为补货目标库存（默认 50）。
+    仅演示触发真实补货动作；正式版应改为生成补货单并走供应商审批流程。
+    """
+    try:
+        low = await _http_get(
+            f"{settings.inventory_service_url}/inventory/low-stock?threshold={threshold}",
+            timeout=5.0,
+        )
+        recs = await _http_get(
+            f"{settings.inventory_service_url}/inventory/replenish/records?limit=5",
+            timeout=5.0,
+        )
+        low_list = low.get("data") or []
+        rec_list = recs.get("data") or []
+        lines = ["供应链补货（单商家市场 · 演示口径）："]
+        if low_list:
+            lines.append(f"· 低库存 SKU（余量 ≤ {threshold}）：")
+            for s in low_list:
+                lines.append(
+                    f"  - skuId={s.get('skuId')} 剩余 {s.get('available')} 件"
+                    f"（低于安全库存，建议补货至 {target_qty} 件）"
+                )
+        else:
+            lines.append(f"· 低库存 SKU（余量 ≤ {threshold}）：无，库存健康")
+
+        if do_replenish:
+            body = {"threshold": threshold, "targetQty": target_qty}
+            resp = await _http_post(
+                f"{settings.inventory_service_url}/inventory/auto-replenish",
+                json_data=body,
+                timeout=5.0,
+            )
+            done = resp.get("data") or []
+            if done:
+                lines.append(f"· 自动补货执行：{len(done)} 个 SKU 已补货")
+                for r in done:
+                    lines.append(
+                        f"  - skuId={r.get('skuId')} {r.get('beforeQty')} → "
+                        f"{r.get('afterQty')}（+{r.get('addQty')}，{r.get('triggerType')}）"
+                    )
+            else:
+                lines.append("· 自动补货执行：无低库存 SKU，无需补货")
+            lines.append("说明：演示直接改库存；正式版应生成补货单并接入供应商审批与采购回执。")
+        else:
+            lines.append("· 最近补货记录（5 条）：")
+            if rec_list:
+                for r in rec_list:
+                    lines.append(
+                        f"  - skuId={r.get('skuId')} {r.get('beforeQty')} → "
+                        f"{r.get('afterQty')}（+{r.get('addQty')}，{r.get('triggerType')}）"
+                        f" {r.get('createTime') or ''}"
+                    )
+            else:
+                lines.append("  （暂无补货记录）")
+            lines.append("如需自动补货请明确告知（将低库存 SKU 补至目标库存）。")
+        lines.append("提示：库存为演示阈值口径；正式版接入库存实时变动推送、补货单审批与供应商采购回执。")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("supply_replenish 调用失败: %s", e)
+        return "补货数据暂时没查到，稍后再试试？"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1355,4 +1426,5 @@ TOOLS = [
     merchant_overview,
     merchant_warnings,
     fulfillment_alert,
+    supply_replenish,
 ]

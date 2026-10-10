@@ -44,3 +44,39 @@ export async function getMerchantFulfillment(): Promise<PendingOrder[] | null> {
   const res = await http.get<{ code: number; data: PendingOrder[] | null }>('/merchant/fulfillment');
   return res.data.data;
 }
+
+export interface ReplenishRecord {
+  id?: number;
+  skuId: number;
+  beforeQty: number;
+  addQty: number;
+  afterQty: number;
+  triggerType: 'MANUAL' | 'AUTO';
+  remark?: string;
+  createTime?: string;
+}
+
+/** 最近补货记录（供应链补货中心） */
+export async function getReplenishRecords(limit = 10): Promise<ReplenishRecord[] | null> {
+  const res = await http.get<{ code: number; data: ReplenishRecord[] | null }>('/merchant/supply/records?limit=' + limit);
+  return res.data.data;
+}
+
+/** 自动补货：低库存 SKU 补到目标库存（演示口径） */
+export async function autoReplenish(threshold = 10, targetQty = 50): Promise<ReplenishRecord[] | null> {
+  const res = await http.post<{ code: number; data: ReplenishRecord[] | null }>('/merchant/supply/auto-replenish', {
+    threshold,
+    targetQty,
+  });
+  return res.data.data;
+}
+
+/** 手动补货：指定 SKU 增加库存（演示口径） */
+export async function manualReplenish(skuId: number, addQty: number, remark?: string): Promise<ReplenishRecord | null> {
+  const res = await http.post<{ code: number; data: ReplenishRecord | null }>('/merchant/supply/replenish', {
+    skuId,
+    addQty,
+    remark,
+  });
+  return res.data.data;
+}

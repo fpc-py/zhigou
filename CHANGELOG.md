@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.21] - 2026-10-10
+
+### P2 · 供应链优化二期：自动补货 + 补货中心（诊断→处理闭环）
+
+- feat(P2) `inventory-service` 补货模块：Flyway `V20261091__replenish.sql` 新增 `replenish_record` 表；`replenish()` 手动补货（指定 SKU+数量，写 MANUAL 记录并同步 Redis 库存）；`autoReplenish()` 自动补货（低库存 ≤threshold 补至 targetQty，写 AUTO 记录）；`replenishRecords()` 最近补货记录（倒序 limit≤100）
+- feat(P2) 接口：`POST /inventory/replenish`（非法数量 40020/SKU 不存在 404）、`POST /inventory/auto-replenish`、`GET /inventory/replenish/records`；SecurityConfig 补放行（内网服务调用口径）
+- feat(P2) AI `supply_replenish` 工具（TOOLS 22 个）：低库存盘点 + 最近补货记录查询 + `do_replenish=True` 触发自动补货（演示口径）；说明文案显式标注「正式版应生成补货单走供应商审批」
+- feat(P2) BFF `GET /merchant/supply/records`、`POST /merchant/supply/auto-replenish`、`POST /merchant/supply/replenish`（JwtAuthGuard）
+- feat(P2) H5 商家中心「补货中心」区块：低库存 SKU 列表 + 一键自动补货按钮 + 最近补货记录（触发类型/库存变化/时间）
+- 验证：补货后端直连 PASS（手动 1→11、自动 SKU2 10→50、造数 SKU20 5→50 后恢复 93）；AI SSE PASS（查询+触发两路径，tool_call→tool_result→token）；BFF 登录态三端点 200；H5 type-check+build PASS
+- 说明：库存演示阈值口径（≤10 告警）；自动补货为演示直改库存，正式版需补货单审批+采购回执+供应商对账
+
 ## [0.2.20] - 2026-10-10
 
 ### P2 · 供应链优化一期：履约异常预警（待发货订单 × 低库存匹配缺货卡单）

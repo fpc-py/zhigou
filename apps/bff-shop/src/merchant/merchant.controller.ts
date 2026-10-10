@@ -1,7 +1,7 @@
 /**
  * Merchant Controller — 商家经营概览（BFF 透传；演示：单商家市场 = 平台聚合口径）
  */
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { MerchantService } from './merchant.service.js';
 import { ApiResponse } from '../common/dto/api-response.js';
@@ -29,6 +29,27 @@ export class MerchantController {
   @Get('merchant/fulfillment')
   async fulfillment() {
     const data = await this.merchant.fulfillment();
+    return ApiResponse.ok(data);
+  }
+
+  /** 供应链补货中心：最近补货记录 */
+  @Get('merchant/supply/records')
+  async replenishRecords(@Query('limit') limit?: string) {
+    const data = await this.merchant.replenishRecords(limit ? Number(limit) : 10);
+    return ApiResponse.ok(data);
+  }
+
+  /** 供应链补货中心：自动补货（低库存补到目标库存，演示口径） */
+  @Post('merchant/supply/auto-replenish')
+  async autoReplenish(@Body() body: { threshold?: number; targetQty?: number }) {
+    const data = await this.merchant.autoReplenish(body?.threshold ?? 10, body?.targetQty ?? 50);
+    return ApiResponse.ok(data);
+  }
+
+  /** 供应链补货中心：手动补货指定 SKU（演示口径） */
+  @Post('merchant/supply/replenish')
+  async manualReplenish(@Body() body: { skuId: number; addQty: number; remark?: string }) {
+    const data = await this.merchant.manualReplenish(body.skuId, body.addQty, body.remark);
     return ApiResponse.ok(data);
   }
 }

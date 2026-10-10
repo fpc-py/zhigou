@@ -90,6 +90,39 @@
       <div class="fulfill-note">可问 AI 助手：哪些订单会缺货卡单、如何处理（补货/拆分/延期）</div>
     </div>
 
+    <!-- 补货中心（供应链） -->
+    <div class="section supply-sec">
+      <div class="sec-title">补货中心</div>
+      <div class="warn-label">低库存自动补货 · 演示口径（≤10 件补至 50 件）</div>
+      <div v-if="supplyLow.length" class="warn-group">
+        <div v-for="s in supplyLow" :key="s.skuId" class="warn-row">
+          <span class="warn-dot low" />
+          <div class="warn-main">
+            <div class="warn-name">SKU {{ s.skuId }}</div>
+            <div class="warn-sub">剩余 {{ s.available }} 件，低于安全库存</div>
+          </div>
+          <span class="warn-tag low">需补货</span>
+        </div>
+      </div>
+      <div v-if="!supplyLow.length" class="empty">暂无低库存 SKU，库存健康</div>
+      <button class="supply-btn" :disabled="supplyLoading" @click="runAutoReplenish">
+        {{ supplyLoading ? '补货执行中…' : '一键自动补货' }}
+      </button>
+      <div v-if="supplyMsg" class="supply-msg">{{ supplyMsg }}</div>
+      <div class="warn-label" style="margin-top:10px;">最近补货记录</div>
+      <div v-if="supplyRecords.length" class="warn-group">
+        <div v-for="r in supplyRecords" :key="r.id ?? r.createTime" class="warn-row">
+          <span class="warn-dot" :class="r.triggerType === 'AUTO' ? 'fulf' : 'low'" />
+          <div class="warn-main">
+            <div class="warn-name">SKU {{ r.skuId }} · {{ r.beforeQty }} → {{ r.afterQty }}（+{{ r.addQty }}）</div>
+            <div class="warn-sub">{{ r.triggerType === 'AUTO' ? '自动补货' : '手动补货' }} · {{ (r.createTime || '').slice(0, 19) }}</div>
+          </div>
+          <span class="warn-tag" :class="r.triggerType === 'AUTO' ? 'fulf' : 'low'">{{ r.triggerType }}</span>
+        </div>
+      </div>
+      <div v-if="!supplyRecords.length" class="empty">暂无补货记录</div>
+    </div>
+
     <!-- 热销榜 -->
     <div class="section">
       <div class="sec-title">热销商品 Top{{ hotList.length }}</div>
@@ -122,7 +155,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMerchantOverview, getMerchantWarnings, getMerchantFulfillment, type PendingOrder, type FulfillItem } from '@/api/merchant'
+import {
+  getMerchantOverview,
+  getMerchantWarnings,
+  getMerchantFulfillment,
+  getReplenishRecords,
+  autoReplenish,
+  type PendingOrder,
+  type FulfillItem,
+  type ReplenishRecord,
+} from '@/api/merchant'
 
 const router = useRouter()
 
@@ -156,6 +198,28 @@ const warnTotal = computed(() => warnings.value.lowStock.length + warnings.value
 const clip = (s: string) => (s || '').length > 26 ? s.slice(0, 26) + '…' : (s || '')
 
 const pendingOrders = ref<PendingOrder[]>([])
+const supplyLow = ref<{ skuId: number; available: number }[]>([])
+const supplyRecords = ref<ReplenishRecord[]>([])
+const supplyLoading = ref(false)
+const supplyMsg = ref('')
+
+async function runAutoReplenish() {
+  supplyLoading.value = true
+  supplyMsg.value = ''
+  try {
+    const done = await autoReplenish(10, 50)
+    if (done && done.length) {
+      supplyMsg.value = `自动补货完成：${done.length} 个 SKU 已补货（${done.map((r) => 'SKU' + r.skuId).join('、')}）`
+    } else {
+      supplyMsg.value = '暂无低库存 SKU，无需补货'
+    }
+    await Promise.all([loadWarnings(), loadSupply()])
+  } catch (e) {
+    supplyMsg.value = '补货失败，请稍后再试'
+  } finally {
+    supplyLoading.value = false
+  }
+}
 const shortId = (id: string) => String(id).slice(-8)
 const skuSummary = (items: FulfillItem[] | undefined) =>
   (items || []).map((i) => `${i.skuName} ×${i.count}`).join('、') || '无商品'
@@ -171,19 +235,39 @@ onMounted(async () => {
   } catch (e) {
     // 保持空态；页面可读
   }
-  try {
-    const w = await getMerchantWarnings()
-    if (w) warnings.value = w
-  } catch (e) {
-    // 预警区块保持空态
-  }
+  await loadWarnings()
   try {
     const f = await getMerchantFulfillment()
     if (f) pendingOrders.value = f
   } catch (e) {
     // 履约异常区块保持空态
   }
+  await loadSupply()
 })
+
+async function loadWarnings() {
+  try {
+    const w = await getMerchantWarnings()
+    if (w) warnings.value = w
+  } catch (e) {
+    // 预警区块保持空态
+  }
+}
+
+async function loadSupply() {
+  try {
+    const w = await getMerchantWarnings()
+    if (w) supplyLow.value = w.lowStock || []
+  } catch (e) {
+    // 保持空态
+  }
+  try {
+    const r = await getReplenishRecords(10)
+    if (r) supplyRecords.value = r
+  } catch (e) {
+    // 保持空态
+  }
+}
 </script>
 
 <style scoped>
@@ -244,4 +328,9 @@ onMounted(async () => {
 .warn-dot.fulf { background: #F5A623; }
 .warn-tag.fulf { background: #FEF3E2; color: #B7791F; }
 .fulfill-note { font-size: 11px; color: #B7791F; margin-top: 6px; background: #FFFBF0; border-radius: 8px; padding: 6px 8px; }
+.supply-sec { border: 1px solid #D6E4FF; }
+.supply-btn { display: block; width: 100%; margin-top: 10px; padding: 10px 0; border: none; border-radius: 10px;
+  background: linear-gradient(135deg, #3B82F6, #6366F1); color: #fff; font-size: 14px; font-weight: 600; }
+.supply-btn:disabled { opacity: 0.6; }
+.supply-msg { margin-top: 8px; font-size: 12px; color: #2563EB; background: #EFF6FF; border-radius: 8px; padding: 6px 8px; }
 </style>

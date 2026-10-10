@@ -30,7 +30,9 @@ public class SecurityConfig {
                                 // 库存读写是内网服务调用（order/aftersale），无用户上下文；生产应加内网白名单
                                 "/inventory/preDeduct", "/inventory/confirm",
                                 "/inventory/rollback",
-                                "/inventory/low-stock"
+                                "/inventory/low-stock",
+                                "/inventory/replenish", "/inventory/auto-replenish",
+                                "/inventory/replenish/records"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

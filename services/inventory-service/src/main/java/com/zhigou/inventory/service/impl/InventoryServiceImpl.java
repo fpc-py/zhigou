@@ -3,7 +3,9 @@ package com.zhigou.inventory.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.zhigou.common.BizException;
+import com.zhigou.inventory.entity.ReplenishRecord;
 import com.zhigou.inventory.entity.Stock;
+import com.zhigou.inventory.mapper.ReplenishRecordMapper;
 import com.zhigou.inventory.mapper.StockMapper;
 import com.zhigou.inventory.service.InventoryService;
 import jakarta.annotation.PostConstruct;
@@ -25,6 +27,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     private final StringRedisTemplate redis;
     private final StockMapper stockMapper;
+    private final ReplenishRecordMapper replenishMapper;
     private final DefaultRedisScript<Long> deductScript = new DefaultRedisScript<>();
 
     private static final String KEY_PREFIX = "stock:";
@@ -115,5 +118,62 @@ public class InventoryServiceImpl implements InventoryService {
         return stockMapper.selectList(new LambdaQueryWrapper<Stock>()
                 .le(Stock::getAvailable, threshold)
                 .orderByAsc(Stock::getAvailable));
+    }
+
+    @Override @Transactional
+    public Stock replenish(Long skuId, int addQty, String remark) {
+        if (addQty <= 0) throw new BizException(40020, "补货数量必须大于 0");
+        Stock stock = stockMapper.selectOne(new LambdaQueryWrapper<Stock>().eq(Stock::getSkuId, skuId));
+        if (stock == null) throw new BizException(404, "SKU 不存在: " + skuId);
+        int before = stock.getAvailable();
+        stock.setAvailable(before + addQty);
+        stockMapper.updateById(stock);
+        redis.opsForValue().set(KEY_PREFIX + skuId, String.valueOf(stock.getAvailable()));
+        ReplenishRecord rec = new ReplenishRecord();
+        rec.setSkuId(skuId);
+        rec.setBeforeQty(before);
+        rec.setAddQty(addQty);
+        rec.setAfterQty(stock.getAvailable());
+        rec.setTriggerType("MANUAL");
+        rec.setRemark(remark == null || remark.isBlank() ? "手动补货（演示）" : remark);
+        replenishMapper.insert(rec);
+        log.info("手动补货: skuId={}, add={}, before={}, after={}", skuId, addQty, before, stock.getAvailable());
+        return stock;
+    }
+
+    @Override @Transactional
+    public List<ReplenishRecord> autoReplenish(int threshold, int targetQty) {
+        if (targetQty <= 0) throw new BizException(40020, "目标库存必须大于 0");
+        List<Stock> low = stockMapper.selectList(new LambdaQueryWrapper<Stock>()
+                .le(Stock::getAvailable, threshold)
+                .orderByAsc(Stock::getAvailable));
+        List<ReplenishRecord> records = new java.util.ArrayList<>();
+        for (Stock stock : low) {
+            int add = targetQty - stock.getAvailable();
+            if (add <= 0) continue;
+            int before = stock.getAvailable();
+            stock.setAvailable(targetQty);
+            stockMapper.updateById(stock);
+            redis.opsForValue().set(KEY_PREFIX + stock.getSkuId(), String.valueOf(targetQty));
+            ReplenishRecord rec = new ReplenishRecord();
+            rec.setSkuId(stock.getSkuId());
+            rec.setBeforeQty(before);
+            rec.setAddQty(add);
+            rec.setAfterQty(targetQty);
+            rec.setTriggerType("AUTO");
+            rec.setRemark("自动补货（低库存 ≤" + threshold + " → 目标 " + targetQty + "）");
+            replenishMapper.insert(rec);
+            records.add(rec);
+            log.info("自动补货: skuId={}, add={}, before={}, after={}", stock.getSkuId(), add, before, targetQty);
+        }
+        if (records.isEmpty()) log.info("自动补货: 无低库存 SKU（threshold={}）", threshold);
+        return records;
+    }
+
+    @Override
+    public List<ReplenishRecord> replenishRecords(int limit) {
+        return replenishMapper.selectList(new LambdaQueryWrapper<ReplenishRecord>()
+                .orderByDesc(ReplenishRecord::getCreateTime)
+                .last("limit " + Math.max(1, Math.min(limit, 100))));
     }
 }

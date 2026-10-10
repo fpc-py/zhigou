@@ -36,6 +36,16 @@
 | AI 链路 | chat_service 迁移原生 OpenAI（tiktoken 阻断修复）+ 工具路由 + 超时配置 | ✅ 重写完成 | ✅ 2026-10-10 SSE 实测 5/5 PASS | 随 [0.2.11] 统一提交 |
 | 上线就绪 | release-checklist 改写 + gray-release + monitoring-alerting + 部署资产整改 | ✅ 已完成 | ✅ 静态核验通过 | 随 [0.2.11] 统一提交 |
 
+## 2026-10-10 · P2 供应链优化二期：自动补货 + 补货中心 [0.2.21]
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| 补货后端 | ✅ | inventory：replenish_record 表（Flyway V20261091）+ 手动/自动补货/记录三接口；直连 PASS（手动 1→11、自动 SKU2 10→50、造数 SKU20 5→50 恢复 93） |
+| AI 补货工具 | ✅ | `supply_replenish`（TOOLS 22）：盘点+记录+do_replenish 触发；SSE 查询/触发两路径 PASS |
+| BFF 透传 | ✅ | `/merchant/supply/records`、`auto-replenish`、`replenish`；登录态 200 |
+| H5 补货中心 | ✅ | 商家中心补货区块（低库存+一键补货+记录列表）；type-check+build PASS |
+| 提交 | ⏳ | 随 [0.2.21] 统一 commit & push（含 [0.2.18]-[0.2.20] 补推） |
+
 ## 2026-10-10 · P2 供应链优化一期：履约异常预警 [0.2.20]
 
 | 项 | 状态 | 说明 |

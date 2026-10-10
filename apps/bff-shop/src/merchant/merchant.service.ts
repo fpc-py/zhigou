@@ -78,4 +78,57 @@ export class MerchantService {
       negative: unwrapOrThrow(neg, this.logger, 'merchant/warnings/negative', []),
     };
   }
+
+  /** 最近补货记录（供应链补货中心，演示口径） */
+  async replenishRecords(limit = 10): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http.get(`${SERVICES.inventorySvc.url}${SERVICE_PATHS.inventoryReplenishRecords}?limit=${limit}`).pipe(
+        timeout(SERVICES.inventorySvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`inventory-service /inventory/replenish/records 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: [] } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/supply/records', []);
+  }
+
+  /** 自动补货：低库存 SKU 补到 targetQty（演示口径直接改库存） */
+  async autoReplenish(threshold = 10, targetQty = 50): Promise<any[] | null> {
+    const resp = await firstValueFrom(
+      this.http
+        .post(`${SERVICES.inventorySvc.url}${SERVICE_PATHS.inventoryAutoReplenish}`, {
+          threshold,
+          targetQty,
+        })
+        .pipe(
+          timeout(SERVICES.inventorySvc.timeout),
+          catchError((err) => {
+            this.logger.warn(`inventory-service /inventory/auto-replenish 失败: ${err.message}`);
+            return Promise.resolve({ data: { data: [] } });
+          }),
+        ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/supply/auto-replenish', []);
+  }
+
+  /** 手动补货：指定 SKU 增加库存（演示口径） */
+  async manualReplenish(skuId: number, addQty: number, remark?: string): Promise<any | null> {
+    const resp = await firstValueFrom(
+      this.http
+        .post(`${SERVICES.inventorySvc.url}${SERVICE_PATHS.inventoryReplenish}`, {
+          skuId,
+          addQty,
+          remark,
+        })
+        .pipe(
+          timeout(SERVICES.inventorySvc.timeout),
+          catchError((err) => {
+            this.logger.warn(`inventory-service /inventory/replenish 失败: ${err.message}`);
+            return Promise.resolve({ data: { data: null } });
+          }),
+        ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'merchant/supply/replenish', null);
+  }
 }
