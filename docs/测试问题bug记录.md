@@ -1,5 +1,16 @@
 # 测试问题 & Bug 记录
 
+## #35 · [工作流1] 并发幂等兜底三次修复失败：REPEATABLE READ 快照读 → FOR UPDATE 死锁 → REQUIRES_NEW 连接池耗尽 → READ COMMITTED 正解（已修复，含实测数据）
+
+- **现象**：30 并发同 requestId 下单（`scenario1_idempotency_race.py`）——数据正确（唯一索引 `uk_user_request` 兜住，仅 1 单落库），但 HTTP 1×200 + 29×500（DuplicateKeyException）。「先查后插」幂等在并发窗口下靠唯一索引兜底，兜底直接抛 500，重复点击变「系统繁忙」
+- **根因（三层，逐轮实证）**：
+  1. **快照读陷阱**：MySQL 全局/会话均为 REPEATABLE READ（已查证）。事务内第一次 SELECT 建立一致性快照，catch 内回查仍读旧快照——并发线程刚提交的订单不可见 → 返回 null → rethrow → 500。日志铁证：catch 打了「重复下单(唯一索引兜底)」、selectList 已执行，但回查结果 null
+  2. **FOR UPDATE 死锁**（第 2 版尝试）：回查改 `SELECT ... FOR UPDATE` 当前读 → 200 升到 23，但 28/30 报 `DeadlockLoserDataAccessException`——INSERT 撞唯一索引时 InnoDB 令事务持有冲突记录 S 锁等待，catch 内 FOR UPDATE 需 S→X 锁升级，多事务互持 S 锁升级 X 构成经典死锁
+  3. **REQUIRES_NEW 连接池耗尽**（第 3 版尝试）：catch 内开独立事务回查（新快照、无锁参与）→ 7/30 报 `CannotCreateTransactionException: Could not open JDBC Connection`——30 并发 ×(主事务+REQUIRES_NEW)=60 连接需求 > HikariCP 默认池 10
+- **修复**：create 事务显式 `@Transactional(isolation = Isolation.READ_COMMITTED)`——每语句重建快照，catch 内普通 SELECT 即可读到最新已提交的并发订单；无锁、无额外连接、无死锁（`OrderServiceImpl.create`，含注释说明弃用方案）
+- **验证（修复后实测）**：30 并发 → **30×200、0 错误、1 单落库、29 幂等返回、4.1s**；100 并发 → **100×200、0 错误、1 单落库、99 幂等返回、2.1s**；修复前基线 1×200+29×500、12.5s
+- **教训**：幂等兜底不是「catch 一下就完」——必须理解事务隔离级别决定「读得到什么」：REPEATABLE READ 快照读看不到刚提交的并发行；FOR UPDATE 锁读会引入 S→X 升级死锁；REQUIRES_NEW 会让连接占用翻倍打爆连接池。需要「读最新已提交 + 不加锁」时，READ COMMITTED 是标准解。面试叙事完整版见 `docs/交易一致性实测报告.md` 第四节
+
 ## #34 · [0.2.31] 售后凭证闭环 500 误判 + PowerShell 中文 body GBK 编码坑 + 端口核对教训（已定位 / 测试技巧）
 
 - **现象**：① 直连 `POST /aftersale/apply`（body 带中文 reason + images 数组）返回 500「系统繁忙」，一度误判为 orderClient 校验链路故障；② 随后对 8088 调 `/order/mine`、对 8085 调 `/aftersale/apply` 均 500，疑环境故障

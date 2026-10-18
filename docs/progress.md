@@ -4,6 +4,13 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-18 · 工作流1 交易一致性深挖：5 类故障注入实测 + 真实 Bug 修复 [0.2.32]
+
+- **#127 实测环境**：6 交易服务（auth/product/cart/order/inventory/payment）dev 全启动；zhigou-mysql/redis/rocketmq 全 healthy；MySQL 隔离级别核实 REPEATABLE READ
+- **#127 5 场景故障注入**（scripts/consistency-fault-injection/）：① 30/100 并发幂等下单 → 修复后 30×200/0 错/1 单/4.1s、100×200/0 错/1 单/2.1s；② 100 并发库存 1 → 成功 1/0 超卖/Redis 0；③ 30 并发重复回调 → 30×200/payment 仅 1 条 SUCCESS/订单 PAID；④ outbox 双通道 → SETNX 幂等累计释放恰 1（重复 ×5 不叠加）；⑤ 50 并发支付 vs 关单 → 支付 25 胜出、取消 25×40050 拦截、终态 PAID、库存 0 变化
+- **#127 真实 Bug 修复（#35）**：并发幂等兜底三次失败尝试（REPEATABLE READ 快照读 / FOR UPDATE S→X 锁升级死锁 / REQUIRES_NEW 连接池耗尽）→ `create` 事务 READ COMMITTED 终版闭环；30/100 并发全 200
+- **#127 交付**：`docs/交易一致性实测报告.md`（面试叙事、统一口径数据、复现方法）+ bug #35 + CHANGELOG [0.2.32]；git 提交推送
+- 附带澄清（设计事实非 bug）：用户取消仅走 ORDER_CLOSED MQ 单通道（+0 同步），超时关单才是同步+MQ 双通道；SETNX 保证任一双通道只释放一次
 ## 2026-10-10 · P0 文件服务增强：图片压缩/格式转换/尺寸限制 + 售后凭证接入 [0.2.31]
 
 - **#126 后端（file-service）**：图片处理管线（像素上限防 DoS 40003 / 等比缩放 / JPEG 0.8 压缩 / PNG 无损 / convertTo 转换）；增强 upload 五参数（compress/convertTo/bizType/maxWidth/maxHeight）；FileMeta 加 bizType/width/height（Flyway V20261093）；UploadResponse 扩展元数据回显

@@ -3,6 +3,14 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.32] - 2026-10-18
+
+### 工作流1 · 交易一致性深挖（故障注入实测 + 真实 Bug 修复）
+
+- fix(工作流1) **并发幂等兜底 500 修复（#35）**：`OrderServiceImpl.create` 事务显式 `@Transactional(isolation = Isolation.READ_COMMITTED)`。修复链条：先查后插+唯一索引兜底在 30 并发同 requestId 下 29×500（DuplicateKeyException）→ 三次修复尝试逐一实证失败（① catch 内快照读回查：REPEATABLE READ 读事务首读快照，看不到刚提交的并发行 → null → rethrow；② FOR UPDATE 当前读：唯一键冲突 S 锁→X 锁升级与并发互持 S 锁构成死锁，28/30 DeadlockLoser；③ REQUIRES_NEW 独立事务：连接占用翻倍（30 并发 ×2=60）打爆 HikariCP 池 10，7/30 CannotCreateTransaction）→ READ COMMITTED 每语句重建快照、无锁无额外连接，终版落地。实测：30 并发 **30×200/0 错/1 单/29 幂等/4.1s**；100 并发 **100×200/0 错/1 单/99 幂等/2.1s**（修复前基线 1×200+29×500/12.5s）
+- test(工作流1) 5 类故障注入脚本实测全通过（scripts/consistency-fault-injection/）：① 30/100 并发幂等下单；② 100 并发库存 1 抢购 0 超卖（Lua 原子扣减）；③ 30 并发重复支付回调无重复入账（payment 唯一索引+状态判断）；④ outbox 双通道只释放一次（SETNX 幂等，重复 rollback×5 不叠加）；⑤ 50 并发支付 vs 关单竞态终态唯一（状态机拦截 25×40050）
+- docs(工作流1) 新增 `docs/交易一致性实测报告.md`：5 场景统一口径实测数据 + 场景 1 三次失败修复全过程（面试叙事格式）+ 复现方法；锚定「买家不重复扣款、商家不超卖」
+- chore(工作流1) 坑记录 #35 追加至 `docs/测试问题bug记录.md`（现象/根因/修复/验证/教训，含并发数与耗时实测数据）
 ## [0.2.31] - 2026-10-10
 
 ### P0 · 文件服务增强：图片压缩 / 格式转换 / 尺寸限制 + 售后凭证统一接入

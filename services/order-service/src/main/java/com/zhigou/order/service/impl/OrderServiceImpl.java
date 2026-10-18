@@ -25,6 +25,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
@@ -51,7 +52,13 @@ public class OrderServiceImpl implements OrderService {
     /** 占位价（product-service 不可用时的回退值，与历史实现一致） */
     private static final long FALLBACK_PRICE = 100L;
 
-    @Override @Transactional
+    /**
+     * create 事务显式用 READ COMMITTED（而非 MySQL 默认 REPEATABLE READ），解决并发幂等兜底回查：
+     * REPEATABLE READ 下事务内普通 SELECT 是快照读（读事务首次读建立的快照），catch 回查看不到并发线程刚提交的订单，
+     * 返回 null 只能 rethrow，幂等退化为 500；READ COMMITTED 每语句重建快照，回查能读到最新已提交数据。
+     * 备选方案均弃用：FOR UPDATE 当前读 → 唯一键冲突的 S 锁升级 X 锁与并发互持 S 锁死锁；REQUIRES_NEW 独立事务 → 连接占用翻倍，30 并发打爆 HikariCP 默认池。
+     */
+    @Override @Transactional(isolation = Isolation.READ_COMMITTED)
     public OrderResponse create(Long userId, CreateOrderRequest req) {
         // 1. 幂等检查
         OrderMain existing = orderMapper.selectOne(new LambdaQueryWrapper<OrderMain>()
@@ -90,7 +97,18 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderStatus(OrderState.INIT.name());
         order.setTotalAmount(totalAmount); order.setPayAmount(totalAmount);
         order.setCouponId(req.getCouponId());
-        orderMapper.insert(order);
+        try {
+            orderMapper.insert(order);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // 并发兜底：先查后插存在竞态窗口，唯一索引 uk_user_request(user_id, request_id) 是最后防线。
+            // 撞索引说明请求已被并发线程成功落库，转幂等返回既有订单，避免把 500 抛给用户。
+            log.info("重复下单(唯一索引兜底): requestId={}", req.getRequestId());
+            // create 事务为 READ COMMITTED，此处普通 SELECT 每语句重建快照，能读到刚提交的并发订单。
+            OrderMain dup = orderMapper.selectOne(new LambdaQueryWrapper<OrderMain>()
+                    .eq(OrderMain::getUserId, userId).eq(OrderMain::getRequestId, req.getRequestId()));
+            if (dup != null) return buildResponse(dup);
+            throw e;
+        }
 
         for (OrderItem item : items) itemMapper.insert(item);
 
