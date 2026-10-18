@@ -161,6 +161,8 @@
 
 ## 已完成
 
+* 2026-10-18：**工作流3 #9 全链路压测+瓶颈定位（生产级加固第三块）**：自研 threading 压测器分层对比（BFF vs 直连，50/100/200VU）。**坑1**：asyncio+同步 urllib 假并发；**坑2（关键）**：HTTP 201 被断言误判为错误 → "BFF 19% 错误率"假结论，修正后全零错误（bug #40）。**结论**：瓶颈=BFF 转发层单实例（并发翻倍 RPS 反降 173→137→114），服务层稳定 >370 RPS 非瓶颈；可解释容量=服务层 >370 RPS、BFF ~170 RPS；扩容方向=BFF 横向多实例。详见 CHANGELOG [0.2.36]。
+
 * 2026-10-18：**工作流3 #7 服务间超时/熔断（生产级加固第二块）**：公共库 ResilientHttp 编程式熔断（4 处调用点 orderFetchSku/orderReleaseInventory/cartValidateSku/paymentNotifyOrder）+ 参数配置化 + 状态事件日志。**实测（故障注入杀 product）**：CLOSED→OPEN（12 连发失败）→熔断期间占位价 100 降级下单（业务不中断）→product 恢复半开探活→CLOSED 金额回真实价 9900。坑：@CircuitBreaker 注解对同类 private 方法失效（AOP 代理 self-invocation）→ 编程式（bug #39）。详见 CHANGELOG [0.2.35]。
 
 ## 已完成

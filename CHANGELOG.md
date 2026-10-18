@@ -3,6 +3,13 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.36] 工作流3 #9：全链路压测+瓶颈定位（2026-10-18）
+
+- **自研压测器** scripts/load-test/test_chain_load.py（threading 真并发；踩坑：asyncio+同步 urllib 假并发→重写；**HTTP 201 被误判为错误→"BFF 19% 错误率"假结论→修正 200/201 均成功）**
+- **分层对比法瓶颈定位**（同并发 BFF 入口 vs 直连服务）：50VU RPS 173 vs 177；100VU 137 vs 381；200VU 114 vs 375——并发翻倍 BFF 不升反降、直连稳定 → **瓶颈=BFF 转发层单实例（~170 RPS 有效容量）**，服务层 >370 RPS P50<50ms 非瓶颈
+- **可解释容量**：本机单实例部署服务层稳定容量 >370 RPS（P50 <50ms）；扩容方向=BFF 横向多实例+连接池调优（数据支撑非猜测）
+- **零错误率**（修正后全档位 0 错误；200VU 直连 0.41% 为单 SKU 库存瞬时竞态，已记录为已知限制）
+- 报告 docs/生产级加固实测报告.md 新增 #9 章节
 ## [0.2.35] 工作流3 #7：服务间超时/熔断（2026-10-18）
 
 - **公共库 ResilientHttp 编程式熔断**（resilience4j-spring-boot3 传递全服务）：4 处服务间调用全部包熔断——orderFetchSku（order→product）、orderReleaseInventory（order→inventory）、cartValidateSku（cart→product）、paymentNotifyOrder（payment→order）
