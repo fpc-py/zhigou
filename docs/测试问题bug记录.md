@@ -1,5 +1,10 @@
 # 测试问题 & Bug 记录
 
+## #38 公共库 optional 依赖不传递导致 NoClassDefFoundError（工作流3 #10，2026-10-18）
+- **现象**：公共库 TraceAutoConfiguration 注册 Feign 拦截器（实现 feign.RequestInterceptor），product-service 启动失败 `java.lang.NoClassDefFoundError: feign/RequestInterceptor`，Spring 上下文初始化中断。
+- **根因**：公共库 openfeign 依赖声明 `<optional>true</optional>`（为避免强制下游携带），optional 依赖**不传递**给下游；下游无 Feign 类 → 自动配置类含 feign 方法签名 → 类加载即失败。
+- **修复**：拆 TraceFeignAutoConfiguration（独立类 + `@ConditionalOnClass(EnableFeignClients.class)`），仅启用 OpenFeign 的服务装配 Feign 拦截器；TraceAutoConfiguration 只保留无 Feign 引用的 TraceIdFilter。
+- **教训**：公共库可选依赖 + 自动配置 = 必须按条件拆类，任何方法签名引用可选依赖类都会炸。
 ## #37 SSE 断链重连 UI 缺口（工作流2，2026-10-18 浏览器端到端实测）
 - **现象**：浏览器对话页实测杀 AI 8095 → SSE 流中断，页面仅输入框恢复可用，**无任何「重连中/连接已断开」提示**；重启 AI 后新消息链路恢复正常（完整 token 流）。
 - **根因**：sse-polyfill.ts 已实现 onReconnect（每次重连前回调）+ 重连耗尽发 `onMessage("error", ...)`，但 chat/index.vue **未接这两个回调**，断链/重连状态未映射到 UI。

@@ -40,6 +40,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
+        <!-- OpenFeign（TraceIdFeignRequestInterceptor 透传 traceId，optional 不强依赖下游） -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+            <optional>true</optional>
+        </dependency>
         <!-- JWT 验签（与 auth-center 一致的 Nimbus JOSE） -->
         <dependency>
             <groupId>com.nimbusds</groupId>

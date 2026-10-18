@@ -1,9 +1,12 @@
 package com.zhigou.cart.config;
 
+import com.zhigou.common.trace.TraceIdClientHttpRequestInterceptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
 
 @Configuration
 public class RestTemplateConfig {
@@ -12,6 +15,9 @@ public class RestTemplateConfig {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(300);
         factory.setReadTimeout(300);
-        return new RestTemplate(factory);
+        // 工作流3 #10：注入 traceId 透传拦截器，出站请求带 x-trace-id 头
+        RestTemplate restTemplate = new RestTemplate(factory);
+        restTemplate.setInterceptors(List.of(new TraceIdClientHttpRequestInterceptor()));
+        return restTemplate;
     }
 }

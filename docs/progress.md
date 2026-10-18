@@ -161,6 +161,10 @@
 
 ## 已完成
 
+## 已完成
+
+* 2026-10-18：**工作流3 #10 traceId 全链路（生产级加固第一块）**：公共库 trace 包（TraceIdFilter 入站注入 x-trace-id→MDC→响应头回写；RestTemplate 拦截器 + Feign 拦截器出站透传）+ TraceFeignAutoConfiguration @ConditionalOnClass 条件装配 + 11 服务日志带 traceId。**实测**：x-trace-id=TRACETEST123456 下单 → order 8085 + product 8083 两条日志 traceId 完全一致（跨服务贯穿闭环）。踩坑：公共库 optional openfeign 依赖不传递 → 无 Feign 服务 NoClassDefFoundError → 拆自动配置按需装配（bug #38）。详见 CHANGELOG [0.2.34]。
+
 * 2026-10-08：**P0-D1 日志脱敏 AOP（生产非功能第一块）**
 * 2026-10-08：**P0-D2 容器化部署能力落地（生产非功能第二块）**
 * 2026-10-08：**P0-D3 CI/CD 流水线（生产非功能第三块）**

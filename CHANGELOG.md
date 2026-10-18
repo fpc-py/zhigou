@@ -3,6 +3,13 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.34] 工作流3 #10：traceId 全链路（2026-10-18）
+
+- **公共库新增 trace 包**：TraceIdFilter（入站注入 x-trace-id → MDC → 响应头回写，优先级最高）、TraceIdClientHttpRequestInterceptor（RestTemplate 出站透传）、TraceIdFeignRequestInterceptor（Feign 出站透传）
+- **自动配置拆分**：TraceAutoConfiguration（无 feign 引用）+ TraceFeignAutoConfiguration（@ConditionalOnClass(EnableFeignClients.class) 按需装配）——修复 optional 依赖不传递导致的 NoClassDefFoundError（真实踩坑）
+- **cart/order RestTemplate** 注入透传拦截器；11 个服务 application-dev.yml 日志 pattern 带 %X{traceId}（JSON 结构化日志 MDC 自动输出 traceId）
+- **实测**：带 x-trace-id 下单 → order 8085 + product 8083 两条日志 traceId 完全一致（跨服务贯穿闭环）
+
 ## [0.2.33] - 2026-10-18
 
 ### 工作流2 · AI 工程化深挖：工具可靠性 / 防编造 / RAG 检索质量 / SSE 连接管理 / 链路可观测

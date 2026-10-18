@@ -12,5 +12,7 @@ server:
 
 # dev 环境可在此覆盖任何配置，如 debug 日志
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5p [%X{traceId}] [%thread] %logger{36} - %msg%n"
   level:
     com.zhigou: DEBUG

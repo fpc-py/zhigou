@@ -1,2 +1,4 @@
 com.zhigou.common.config.MyBatisPlusAutoConfiguration
 com.zhigou.common.mask.MaskAutoConfiguration
+com.zhigou.common.trace.TraceAutoConfiguration
+com.zhigou.common.trace.TraceFeignAutoConfiguration
