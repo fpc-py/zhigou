@@ -161,6 +161,8 @@
 
 ## 已完成
 
+* 2026-10-18：**工作流3 #7 服务间超时/熔断（生产级加固第二块）**：公共库 ResilientHttp 编程式熔断（4 处调用点 orderFetchSku/orderReleaseInventory/cartValidateSku/paymentNotifyOrder）+ 参数配置化 + 状态事件日志。**实测（故障注入杀 product）**：CLOSED→OPEN（12 连发失败）→熔断期间占位价 100 降级下单（业务不中断）→product 恢复半开探活→CLOSED 金额回真实价 9900。坑：@CircuitBreaker 注解对同类 private 方法失效（AOP 代理 self-invocation）→ 编程式（bug #39）。详见 CHANGELOG [0.2.35]。
+
 ## 已完成
 
 * 2026-10-18：**工作流3 #10 traceId 全链路（生产级加固第一块）**：公共库 trace 包（TraceIdFilter 入站注入 x-trace-id→MDC→响应头回写；RestTemplate 拦截器 + Feign 拦截器出站透传）+ TraceFeignAutoConfiguration @ConditionalOnClass 条件装配 + 11 服务日志带 traceId。**实测**：x-trace-id=TRACETEST123456 下单 → order 8085 + product 8083 两条日志 traceId 完全一致（跨服务贯穿闭环）。踩坑：公共库 optional openfeign 依赖不传递 → 无 Feign 服务 NoClassDefFoundError → 拆自动配置按需装配（bug #38）。详见 CHANGELOG [0.2.34]。

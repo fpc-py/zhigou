@@ -3,6 +3,14 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.35] 工作流3 #7：服务间超时/熔断（2026-10-18）
+
+- **公共库 ResilientHttp 编程式熔断**（resilience4j-spring-boot3 传递全服务）：4 处服务间调用全部包熔断——orderFetchSku（order→product）、orderReleaseInventory（order→inventory）、cartValidateSku（cart→product）、paymentNotifyOrder（payment→order）
+- **为什么编程式而非 @CircuitBreaker 注解**：注解走 AOP 代理，同类 private 方法 self-invocation 不生效（经典坑）；编程式 `CircuitBreakerRegistry.executeSupplier` 无代理依赖
+- **熔断参数统一**（滑动窗口 10/失败率 50%/慢调用 2s/打开 10s/半开 3 探活），三个服务 application.yml 配置化
+- **可观测埋点**：熔断状态变迁事件日志（CLOSED→OPEN→HALF_OPEN→CLOSED），#8 告警输入
+- **实测（故障注入杀 product）**：12 连发失败→OPEN；熔断期间订单以占位价 100 降级创建（业务不中断、快速失败不占线程）；product 恢复后 10s 半开探活成功→CLOSED，金额回到真实价 9900。报告 docs/生产级加固实测报告.md
+
 ## [0.2.34] 工作流3 #10：traceId 全链路（2026-10-18）
 
 - **公共库新增 trace 包**：TraceIdFilter（入站注入 x-trace-id → MDC → 响应头回写，优先级最高）、TraceIdClientHttpRequestInterceptor（RestTemplate 出站透传）、TraceIdFeignRequestInterceptor（Feign 出站透传）

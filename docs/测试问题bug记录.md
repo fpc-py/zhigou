@@ -1,5 +1,11 @@
 # 测试问题 & Bug 记录
 
+## #39 @CircuitBreaker 注解对同类 private 方法失效（工作流3 #7，2026-10-18）
+- **现象**：Resilience4j @CircuitBreaker 注解加在 fetchSkuInfo（private 方法）上，熔断完全不生效。
+- **根因**：@CircuitBreaker 走 Spring AOP 代理增强，只有**经过代理的外部调用**才生效；同类内部 self-invocation 绕过代理，注解不拦截（经典 AOP 坑，@Transactional 同理）。
+- **修复**：改编程式——注入 CircuitBreakerRegistry，调用点 `registry.circuitBreaker(name).executeSupplier(call)` 包住远程调用，失败由既有 catch 降级；封装为公共库 ResilientHttp 组件，4 处调用点统一接入。
+- **教训**：注解式降级/熔断/事务对"同类私有方法内部调用"一律无效；要注解生效需提 public + 自注入代理，侵入大，编程式更可控。
+
 ## #38 公共库 optional 依赖不传递导致 NoClassDefFoundError（工作流3 #10，2026-10-18）
 - **现象**：公共库 TraceAutoConfiguration 注册 Feign 拦截器（实现 feign.RequestInterceptor），product-service 启动失败 `java.lang.NoClassDefFoundError: feign/RequestInterceptor`，Spring 上下文初始化中断。
 - **根因**：公共库 openfeign 依赖声明 `<optional>true</optional>`（为避免强制下游携带），optional 依赖**不传递**给下游；下游无 Feign 类 → 自动配置类含 feign 方法签名 → 类加载即失败。

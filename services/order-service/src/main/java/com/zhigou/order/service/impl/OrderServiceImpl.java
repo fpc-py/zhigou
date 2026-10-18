@@ -45,6 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final OutboxMapper outboxMapper;
     private final com.zhigou.order.mapper.FulfillmentActionMapper fulfillmentActionMapper;
     private final RestTemplate restTemplate;
+    private final com.zhigou.common.resilience.ResilientHttp resilientHttp;
 
     @Value("${product-service.url}") private String productServiceUrl;
     @Value("${inventory-service.url}") private String inventoryServiceUrl;
@@ -134,7 +135,9 @@ public class OrderServiceImpl implements OrderService {
             headers.set("X-User-Id", String.valueOf(userId));
             HttpEntity<Void> entity = new HttpEntity<>(headers);
             String url = productServiceUrl + "/product/page?pageNum=1&pageSize=100";
-            ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            // 工作流3 #7：熔断（orderFetchSku）——product 故障时快速失败，由 catch 降级占位值
+            ResponseEntity<String> resp = resilientHttp.execute("orderFetchSku",
+                    () -> restTemplate.exchange(url, HttpMethod.GET, entity, String.class));
             if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
                 log.warn("product-service /product/page 非 2xx: {}", resp.getStatusCode());
                 return;
@@ -250,9 +253,11 @@ public class OrderServiceImpl implements OrderService {
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-User-Id", String.valueOf(order.getUserId()));
             headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-            ResponseEntity<String> resp = restTemplate.exchange(
-                    inventoryServiceUrl + "/inventory/rollback", HttpMethod.POST,
-                    new HttpEntity<>(body, headers), String.class);
+            // 工作流3 #7：熔断（orderReleaseInventory）——inventory 故障时快速失败，留待对账/MQ 兜底
+            ResponseEntity<String> resp = resilientHttp.execute("orderReleaseInventory",
+                    () -> restTemplate.exchange(
+                            inventoryServiceUrl + "/inventory/rollback", HttpMethod.POST,
+                            new HttpEntity<>(body, headers), String.class));
             if (resp.getStatusCode().is2xxSuccessful()) {
                 log.info("释放库存成功: orderId={}, items={}", order.getOrderId(), skuList.size());
             } else {

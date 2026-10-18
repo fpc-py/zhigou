@@ -29,6 +29,7 @@ public class CartServiceImpl implements CartService {
     private final RestTemplate restTemplate;
 
     @Value("${product-service.url}") private String productServiceUrl;
+    private final com.zhigou.common.resilience.ResilientHttp resilientHttp;
 
     private static final String KEY_PREFIX = "cart:";
 
@@ -106,9 +107,11 @@ public class CartServiceImpl implements CartService {
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-User-Id", String.valueOf(userId));
             HttpEntity<Void> entity = new HttpEntity<>(headers);
-            ResponseEntity<String> resp = restTemplate.exchange(
-                    productServiceUrl + "/product/sku/" + skuId + "/validate",
-                    org.springframework.http.HttpMethod.GET, entity, String.class);
+            // 工作流3 #7：熔断（cartValidateSku）——product 故障时快速失败，由 catch 抛降级错误
+            ResponseEntity<String> resp = resilientHttp.execute("cartValidateSku",
+                    () -> restTemplate.exchange(
+                            productServiceUrl + "/product/sku/" + skuId + "/validate",
+                            org.springframework.http.HttpMethod.GET, entity, String.class));
             if (!resp.getStatusCode().is2xxSuccessful()) {
                 throw new BizException(400, "商品不存在或已下架");
             }

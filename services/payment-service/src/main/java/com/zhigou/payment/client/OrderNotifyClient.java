@@ -1,6 +1,7 @@
 package com.zhigou.payment.client;
 
 import cn.hutool.http.HttpUtil;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -10,10 +11,11 @@ import org.springframework.stereotype.Component;
  * 说明：失败不阻断支付主流程（支付单已 SUCCESS），重试 3 次后仅记录日志，
  * 由 T+1 对账/补偿任务兜底（见 docs/真实支付接入指南.md 3.4 方案 A）。
  */
-@Slf4j @Component
+@Slf4j @Component @RequiredArgsConstructor
 public class OrderNotifyClient {
 
     @Value("${payment.order-service-url:http://localhost:8085}") private String orderServiceUrl;
+    private final com.zhigou.common.resilience.ResilientHttp resilientHttp;
 
     /**
      * 通知订单已支付。HTTP 失败重试 3 次（指数退避）。
@@ -24,7 +26,8 @@ public class OrderNotifyClient {
         String url = orderServiceUrl + "/order/payCallback/" + orderNo;
         for (int i = 1; i <= 3; i++) {
             try {
-                String body = HttpUtil.post(url, "");
+                // 工作流3 #7：熔断（paymentNotifyOrder）——order 故障时快速失败，由外层重试/对账兜底
+                String body = resilientHttp.execute("paymentNotifyOrder", () -> HttpUtil.post(url, ""));
                 log.info("通知订单支付成功: orderNo={}, resp={}", orderNo, body);
                 return true;
             } catch (Exception e) {

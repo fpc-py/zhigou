@@ -54,3 +54,23 @@ management:
 
 jwt:
   secret: ${JWT_SECRET:change-me-to-a-random-256-bit-string}
+# ==================== Resilience4j 服务间熔断（工作流3 #7） ====================
+# 编程式熔断（ResilientHttp）：滑动窗口 10 次、失败率阈值 50%、慢调用 2s 占比 50% 触发熔断；
+# 打开 10s 后自动转半开放 3 个探活请求，成功则关闭恢复。参数化便于压测/线上调优。
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        sliding-window-type: COUNT_BASED
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 2000ms
+        slow-call-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+    instances:
+      orderFetchSku:
+        base-config: default
+      orderReleaseInventory:
+        base-config: default
