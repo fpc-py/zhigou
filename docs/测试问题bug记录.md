@@ -1,5 +1,29 @@
 # 测试问题 & Bug 记录
 
+## #36 · [0.2.33] 工作流2 AI 工程化 5 坑：ivfflat 小数据退化 / 护栏漏词 / mock 500 无 body / SSE 登录时序 / PowerShell 文件编辑（已修复 / 部分留痕）
+
+- **坑1（真实性能 Bug，已修复）ivfflat 小数据退化**：pgvector `products_vec` 仅 5 条向量，索引 `ivfflat(lists=100)`。
+  `EXPLAIN ANALYZE` 证实走 Index Scan、probe=1 只扫 1 个 list → 4 个真实查询 3 空 1 错，**Top-1 命中率 0%**。
+  换 `HNSW(m=16, ef_construction=64)` 后 Top-1/Top-3 命中率 **100%**（0.7905/0.7095/0.7025/0.785）；
+  另设 `min_score=0.50` 相关性阈值（无关查询最高 0.3751 被滤，命中下限 0.7025 保留，margin≈0.35）。
+  **教训**：ivfflat 的 lists 数必须远小于数据量（行/lists≈1000+），小数据上列表近全空召回必然退化；索引选型要与数据规模匹配。
+- **坑2（真实安全缺陷，已修复）护栏关键词漏「未搜索到」**：`_guard_result` 原 8 词不含「未搜索到」，
+  而 search_products 空结果文案恰是「未搜索到相关商品。」→ 该路径不触发防编造护栏 → LLM 可对空结果自由编造。
+  补全 `_NOT_FOUND_MARKERS` 15 词；回归测试 18 项全 PASS 固化。**教训**：护栏关键词表必须覆盖工具实际输出文案，回归测试是找缺陷的。
+- **坑3（测试技巧，已固化）mock HTTP server 500 必须带 body**：无 body 的 500 让 httpx 抛 `RemoteProtocolError`
+  （解析层错误）而非可重试的 `HTTPStatusError` → 故障注入测试把「该重试」误判成「解析失败」，掩盖真实行为。
+  keep-alive 下 POST 未读 body 还会 `ReadError` → mock 用 HTTP/1.0 + do_POST 显式读 Content-Length。
+- **坑4（环境技巧，留痕）SSE 全链路登录时序**：登录 token 在 `data.accessToken`（不是 data.token）；
+  验证码**单次消费**（登录成功 redis 键即失效）；`docker exec 2>&1` 在 PowerShell 下污染 stdout（NativeCommandError 包装），
+  取验证码按行正则 `^\d{6}# 测试问题 & Bug 记录
+
+ 提取；验证码过期 4001 是 GBK 乱码。
+- **坑5（文件编辑，留痕）Edit 工具对刚读文件仍报「未读」**：本项目改走 PowerShell 文件级替换
+  `[IO.File]::ReadAllText/Replace/WriteAllText`（显式 `New-Object Text.UTF8Encoding $false` 无 BOM），写回后回读校验；
+  PowerShell 单引号字符串内反引号 `r`n 不执行转义（写坏过 import asyncio 行，用 `[char]96` 拼字面修复）；
+  Linux 沙箱环境（无 Windows 路径）下改走 sed 精确替换 + python ast 语法验证。
+- **验证**：test_tool_reliability.py 7 项全 PASS（flaky500 重试 2 次/持续 500 耗尽/404 不重试/慢接口超时/retries=0/POST 不重试/护栏降级）；
+  test_forge_guard.py 18 项全 PASS；AI 模块语法编译 + import 通过；RAG/SSE 实测脚本交付（需用户环境 pgvector+BFF+JWT 复跑）。
 ## #35 · [工作流1] 并发幂等兜底三次修复失败：REPEATABLE READ 快照读 → FOR UPDATE 死锁 → REQUIRES_NEW 连接池耗尽 → READ COMMITTED 正解（已修复，含实测数据）
 
 - **现象**：30 并发同 requestId 下单（`scenario1_idempotency_race.py`）——数据正确（唯一索引 `uk_user_request` 兜住，仅 1 单落库），但 HTTP 1×200 + 29×500（DuplicateKeyException）。「先查后插」幂等在并发窗口下靠唯一索引兜底，兜底直接抛 500，重复点击变「系统繁忙」

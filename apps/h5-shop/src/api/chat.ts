@@ -20,7 +20,7 @@ export function chatSse(
     '/api/chat/sse',
     { query, userId: '', sessionId, imageUrl }, // userId 由 BFF 从 JWT 提取
     onMessage,
-    signal,
+    { signal }, // 工作流2：postSse 第 4 参已升级为 SseOptions（断线重连/假死超时释放）
   );
 }
 

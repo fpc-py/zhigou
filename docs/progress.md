@@ -4,6 +4,20 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-18 · 工作流2：AI 工程化深挖（可靠性+防编造+RAG+SSE+可观测）[0.2.33]
+
+- **#128 工具可靠性**：config 新增 ai_tool_timeout_s/retries/retry_delay_s（env 可覆盖）；_http_get 只读幂等重试（5xx/传输错误重试、4xx 不重试、0.3s×attempt 退避）、_http_post 写操作不重试（防重复下单）；清理 27 处散落 timeout，保留 3 特例（比价 8s/下单 8s/vision 60s）
+- **#128 防编造**：回归发现真实护栏漏洞（关键词表缺「未搜索到」→ 空结果路径不触发护栏）→ 补全 _NOT_FOUND_MARKERS 15 词 + 空/None 强制挂护栏
+- **#128 RAG 检索质量（真实 Bug）**：ivfflat(lists=100) 在 5 条向量上退化（EXPLAIN 实证 probe=1 扫空 list，Top-1 命中率 0%）→ HNSW(m=16, ef_construction=64) + min_score=0.50 阈值 → Top-1/Top-3 命中率 100%（0.7905/0.7095/0.7025/0.785，无关 0.3751 被滤）
+- **#128 SSE 连接管理**：sse-polyfill.ts 重写（断线指数退避重连/幂等续传/心跳活性/假死超时释放 30s）；chat.ts 适配 { signal }（修复旧签名静默丢取消信号）；type-check 通过
+- **#128 AI 链路可观测**：_run_agent 全链路 TRACE 日志（llm_req/llm_resp/tool_call[脱敏]/tool_result[ok+guarded+耗时ms]/finish）
+- **#128 测试**：test_tool_reliability.py 7 项全 PASS + test_forge_guard.py 18 项全 PASS（沙箱直测）；test_rag_quality.py / test_sse_e2e.py 交付（需用户环境 pgvector+BFF+JWT 复跑）
+- **#128 提交**：CHANGELOG [0.2.33] / bug #36 / docs/AI可靠性实测报告.md
+- **#128 沙箱补跑（2026-10-18，环境受限下尽量闭环）**：
+  - ✅ **H5 type-check 通过**：沙箱 node22 + npm 装 h5-shop 依赖，`npm run type-check`（vue-tsc --build）0 错误
+  - ✅ **SSE 传输层全链路验证通过**：沙箱起 AI 8095（临时 fallback.yml ai.enabled=false 降级模式）+ BFF 3000 + 自签 HS256 JWT（默认 secret，sub=手机号）→ `POST /chat/sse` 返回 **HTTP 201 + text/event-stream + `event: token`（固定降级文案）+ `event: done`**；验证了 BFF JWT 鉴权、x-user-id 注入、BFF→AI SSE 透传、事件格式与 sse-polyfill 解析器兼容（验证后已恢复 fallback.yml enabled=true）
+  - ⚠️ **仍需用户本机**：① RAG 评测（沙箱无 Docker→无 pgvector，且无 embedding key）；② SSE 完整 token 流（需 LLM key，沙箱仅验证了降级模式传输层）；③ 浏览器断网/杀进程端到端（需完整链路+浏览器会话）
+- ⚠️ 复验待办剩余（用户本机）：RAG 评测、SSE 完整 token 流、浏览器断网/杀进程端到端
 ## 2026-10-18 · 工作流1 交易一致性深挖：5 类故障注入实测 + 真实 Bug 修复 [0.2.32]
 
 - **#127 实测环境**：6 交易服务（auth/product/cart/order/inventory/payment）dev 全启动；zhigou-mysql/redis/rocketmq 全 healthy；MySQL 隔离级别核实 REPEATABLE READ

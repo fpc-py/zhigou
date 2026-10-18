@@ -57,12 +57,18 @@ async def init_db() -> None:
             updated_at TIMESTAMPTZ DEFAULT now()
         )
     """.format(dim=EMBEDDING_DIM))
+    # 工作流2 实测：ivfflat(lists=100) 在小数据量下严重退化（probe=1 只扫 1 个 list，
+    # 大部分 list 为空 → 真实查询返回 0 行，检索不稳定）。pgvector 0.8.7 支持 HNSW，
+    # 无 probe/lists 敏感性、小数据精确度高 → 换 HNSW。
     await _execute("""
-        CREATE INDEX IF NOT EXISTS idx_products_vec_embedding
-        ON products_vec USING ivfflat (embedding vector_cosine_ops)
-        WITH (lists = 100)
+        DROP INDEX IF EXISTS idx_products_vec_embedding
     """)
-    logger.info("pgvector 表已就绪")
+    await _execute("""
+        CREATE INDEX IF NOT EXISTS idx_products_vec_embedding_hnsw
+        ON products_vec USING hnsw (embedding vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64)
+    """)
+    logger.info("pgvector 表已就绪（HNSW 索引）")
 
 
 # ── 写入 ──
@@ -119,21 +125,31 @@ async def batch_upsert(records: list[tuple[int, str, list[float]]]) -> int:
 # ── 检索 ──
 
 
-async def similarity_search(query_embedding: list[float], top_k: int = 10) -> list[RetrieveItem]:
+async def similarity_search(
+    query_embedding: list[float],
+    top_k: int = 10,
+    min_score: float = 0.50,
+) -> list[RetrieveItem]:
     """
-    Cosine 相似度检索。使用 <=> 算子（余弦距离）。
-    返回按相似度降序的 RetrieveItem 列表。
+    Cosine 相似度检索（HNSW 索引）。使用 <=> 算子（余弦距离）。
+
+    工作流2 检索质量增强：
+    - min_score 相关性阈值：低于阈值(0.50)的低相关结果直接过滤，避免「强行检索到无关商品」
+      让 LLM 拿噪音数据作答（评测基线：无关品类查询最高分仅 0.28-0.41，真实命中 ≥0.55）。
+    - 阈值过滤后为空 → 返回空列表，由上层（防编造护栏）告知用户查不到，不编造。
     """
     vec_str = f"[{','.join(str(v) for v in query_embedding)}]"
     rows = await _fetch(
         """
         SELECT spu_id, text, 1 - (embedding <=> $1::vector) AS score
         FROM products_vec
+        WHERE 1 - (embedding <=> $1::vector) >= $3
         ORDER BY embedding <=> $1::vector
         LIMIT $2
         """,
         vec_str,
         top_k,
+        min_score,
     )
     return [
         RetrieveItem(spu_id=row["spu_id"], text=row["text"], score=round(row["score"], 4))

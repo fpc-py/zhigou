@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.33] - 2026-10-18
+
+### 工作流2 · AI 工程化深挖：工具可靠性 / 防编造 / RAG 检索质量 / SSE 连接管理 / 链路可观测
+
+- feat(工作流2) **AI 工具可靠性治理**：`config.py` 新增 `ai_tool_timeout_s=5.0 / ai_tool_retries=1 / ai_tool_retry_delay_s=0.3`（`ZHIGOU_` 前缀 env 覆盖）；`tools.py` `_http_get` 配置驱动超时 + 只读 GET 幂等重试（5xx/传输错误重试、间隔 0.3s×attempt 线性递增、**4xx 不重试**），`_http_post` 写操作一律不重试（防重复下单）；清理全文件约 27 处散落硬编码 timeout，仅保留 3 处特例（比价 8.0s / 下单 8.0s / vision 60s）
+- fix(工作流2) **防编造护栏真实漏洞**：`_guard_result` 关键词表原 8 词缺「未搜索到」（search_products 空结果文案恰为此）→ 空结果路径不触发护栏，LLM 可自由编造；补全 `_NOT_FOUND_MARKERS` 15 词，空结果/None 强制挂护栏；回归 18 项全 PASS 固化
+- fix(工作流2) **RAG 检索质量（真实性能 Bug）**：pgvector `products_vec` 5 条数据上 `ivfflat(lists=100)` 退化（EXPLAIN 实证 Index Scan probe=1 扫空 list，Top-1 命中率 0%）→ 换 `HNSW(m=16, ef_construction=64)`（init_db 自动 DROP 旧索引）+ `min_score=0.50` 相关性阈值（无关查询 0.3751 滤掉）；Top-1/Top-3 命中率 **0%→100%**（0.7905/0.7095/0.7025/0.785）
+- feat(工作流2) **SSE 连接管理**：`sse-polyfill.ts` 重写（SseOptions 第 4 参）——断线指数退避重连（1s/2s/4s/8s、maxReconnects=4、onReconnect 回调）、幂等续传（同 sessionId 重发，服务端 done 才写回历史）、心跳活性（sse_starlette 15s ping、客户端读字节=存活）、假死超时释放（idleTimeoutMs 30s → cancel → 重连；用户 AbortSignal 取消不重连）；`chat.ts` 适配 `{ signal }`（旧签名静默丢弃取消信号）；type-check 通过
+- feat(工作流2) **AI 链路可观测**：`chat_service.py` `_run_agent` 全链路 trace 日志（llm_req → llm_resp → tool_call[脱敏 args] → tool_result[ok/guarded/耗时ms] → finish），一条日志还原 LLM 决策链
+- test(工作流2) 新增 `scripts/ai-fault-injection/` 四脚本：`test_tool_reliability.py`（故障注入 7 项全 PASS：flaky500 重试 2 次/持续 500 耗尽/404 不重试/慢接口超时/retries=0/POST 不重试/护栏降级）、`test_forge_guard.py`（18 项全 PASS）、`test_rag_quality.py`（RAG 前后基线评测，需 pgvector+embedding）、`test_sse_e2e.py`（BFF→AI SSE 全链路，需 JWT）
+- docs(工作流2) 新增 `docs/AI可靠性实测报告.md`；bug 记录 #36（5 坑：ivfflat 退化/护栏漏词/mock 500 无 body/SSE 登录时序/文件编辑）；`docs/progress.md` 同步
+- ⚠️ 复验待办：RAG 评测（pgvector+embedding）、SSE 完整 token 流（BFF+JWT）、浏览器断网/杀进程端到端——需在用户本机环境执行（本提交为代码+纯逻辑测试已闭环版）
 ## [0.2.32] - 2026-10-18
 
 ### 工作流1 · 交易一致性深挖（故障注入实测 + 真实 Bug 修复）

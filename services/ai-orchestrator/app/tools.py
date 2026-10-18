@@ -5,6 +5,7 @@
 不一致返回 403 错误信息。调用后端服务失败时返回友好提示。
 """
 
+import asyncio
 import json
 import logging
 from contextvars import ContextVar
@@ -36,16 +37,51 @@ def _check_user_id(param_user_id: str) -> None:
         raise PermissionError(f"userId 不一致: 当前请求用户 {current}，工具入参 {param_user_id}")
 
 
-async def _http_get(url: str, timeout: float = 5.0, headers: dict | None = None) -> dict[str, Any]:
-    """执行 HTTP GET 并返回 JSON body。"""
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.get(url, headers=headers or {})
-        resp.raise_for_status()
-        return resp.json()
+async def _http_get(
+    url: str,
+    timeout: float | None = None,
+    headers: dict | None = None,
+    retry: bool = True,
+) -> dict[str, Any]:
+    """执行 HTTP GET 并返回 JSON body。
+
+    工作流2 可靠性治理：
+    - 超时默认取 settings.ai_tool_timeout_s（5s），可通过 ZHIGOU_AI_TOOL_TIMEOUT_S 覆盖；
+    - 只读 GET 自动重试 settings.ai_tool_retries 次（默认 1），5xx/网络错误重试、4xx 业务错误不重试；
+    - 重试间隔按尝试次数线性递增（0.3s / 0.6s …），避免惊群。
+    """
+    timeout = settings.ai_tool_timeout_s if timeout is None else timeout
+    max_attempts = settings.ai_tool_retries + 1 if retry else 1
+    last_err: Exception | None = None
+    for attempt in range(max_attempts):
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.get(url, headers=headers or {})
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as e:
+            # 4xx 是业务错误（参数/鉴权/不存在），重试无意义 → 直接抛；5xx 属于服务端瞬时故障 → 重试
+            if e.response is not None and e.response.status_code < 500:
+                raise
+            last_err = e
+        except (httpx.TransportError, httpx.TimeoutException) as e:
+            last_err = e
+        if attempt < max_attempts - 1:
+            await asyncio.sleep(settings.ai_tool_retry_delay_s * (attempt + 1))
+    raise last_err or RuntimeError("_http_get unreachable")
 
 
-async def _http_post(url: str, json_data: dict, timeout: float = 5.0, headers: dict | None = None) -> dict[str, Any]:
-    """执行 HTTP POST 并返回 JSON body。"""
+async def _http_post(
+    url: str,
+    json_data: dict,
+    timeout: float | None = None,
+    headers: dict | None = None,
+) -> dict[str, Any]:
+    """执行 HTTP POST 并返回 JSON body。
+
+    写操作一律不自动重试（重试可能导致重复下单/重复入账），超时失败交由上层降级处理。
+    """
+    timeout = settings.ai_tool_timeout_s if timeout is None else timeout
     async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.post(url, json=json_data, headers=headers or {})
         resp.raise_for_status()
@@ -70,7 +106,7 @@ async def search_products(keyword: str, limit: int = 10) -> str:
         url = f"{settings.product_service_url}/product/page?keyword={keyword}&pageNum=1&pageSize={limit}"
         # product-service 要求认证，内网调用通过 x-user-id 透传身份
         headers = {"x-user-id": _get_current_user()}
-        data = await _http_get(url, timeout=5.0, headers=headers)
+        data = await _http_get(url, headers=headers)
         items = data.get("data", {}).get("records", [])
         if not items:
             return "未搜索到相关商品。"
@@ -101,7 +137,7 @@ async def get_price(sku_id: str) -> str:
     try:
         url = f"{settings.product_service_url}/product/sku/{sku_id}"
         headers = {"x-user-id": _get_current_user()}
-        data = await _http_get(url, timeout=5.0, headers=headers)
+        data = await _http_get(url, headers=headers)
         sku = data.get("data") or {}
         if not sku:
             return "未查询到该 SKU 的价格信息。"
@@ -123,7 +159,7 @@ async def check_inventory(sku_id: str) -> str:
     try:
         url = f"{settings.inventory_service_url}/inventory/{sku_id}"
         headers = {"x-user-id": _get_current_user()}
-        data = await _http_get(url, timeout=5.0, headers=headers)
+        data = await _http_get(url, headers=headers)
         inv = data.get("data")
         if not inv:
             return "该商品暂无库存记录。"
@@ -149,7 +185,7 @@ async def get_user_profile(user_id: str) -> str:
 
         url = f"{settings.user_service_url}/user/profile"
         headers = {"x-user-id": user_id}
-        data = await _http_get(url, timeout=5.0, headers=headers)
+        data = await _http_get(url, headers=headers)
         profile = data.get("data")
         if not profile:
             return "暂无该用户画像信息。"
@@ -175,7 +211,7 @@ async def apply_coupon(user_id: str, items: list[str]) -> str:
         _check_user_id(user_id)
 
         url = f"{settings.marketing_service_url}/coupon/mine?userId={user_id}&status=UNUSED"
-        data = await _http_get(url, timeout=5.0)
+        data = await _http_get(url)
         coupons = data.get("data", [])
         if not coupons:
             return "当前暂无可用优惠券。"
@@ -331,20 +367,19 @@ async def review_analysis(spu_id: str) -> str:
     try:
         headers = {"x-user-id": _get_current_user()}
         # 1) SPU 基础信息（入参兼容：若 LLM 传的是 skuId，直查 SPU 失败则按 skuId 反查）
-        data = await _http_get(f"{settings.product_service_url}/product/{spu_id}", timeout=5.0, headers=headers)
+        data = await _http_get(f"{settings.product_service_url}/product/{spu_id}", headers=headers)
         spu = data.get("data") or {}
         if not spu:
             try:
                 sku_data = await _http_get(
                     f"{settings.product_service_url}/product/sku/{spu_id}",
-                    timeout=5.0,
                     headers=headers,
                 )
                 sku_info = sku_data.get("data") or {}
                 real_spu = sku_info.get("spuId")
                 if real_spu:
                     spu_id = str(real_spu)
-                    data = await _http_get(f"{settings.product_service_url}/product/{spu_id}", timeout=5.0, headers=headers)
+                    data = await _http_get(f"{settings.product_service_url}/product/{spu_id}", headers=headers)
                     spu = data.get("data") or {}
             except Exception as e:
                 logger.warning("review_analysis 反查 SPU 失败 skuId=%s: %s", spu_id, e)
@@ -357,7 +392,6 @@ async def review_analysis(spu_id: str) -> str:
         # 2) 真实评价统计
         stats_data = await _http_get(
             f"{settings.product_service_url}/product/review/stats?spuId={spu_id}",
-            timeout=5.0,
             headers=headers,
         )
         stats = stats_data.get("data") or {}
@@ -380,7 +414,6 @@ async def review_analysis(spu_id: str) -> str:
                 low_data = await _http_get(
                     f"{settings.product_service_url}/product/review?spuId={spu_id}"
                     f"&minRating=1&maxRating=3&pageSize=5",
-                    timeout=5.0,
                     headers=headers,
                 )
                 low_records = (low_data.get("data") or {}).get("records") or []
@@ -425,14 +458,14 @@ async def analyze_user_context() -> str:
         insight: dict | None = None
         try:
             url = f"{settings.user_service_url}/user/insight"
-            data = await _http_get(url, timeout=3.0, headers=headers)
+            data = await _http_get(url, headers=headers)
             insight = data.get("data") or None
         except Exception as e:
             logger.warning("analyze_user_context 画像底座不可用 userId=%s: %s", user_id, e)
 
         # ② 历史订单统计
         url = f"{settings.order_service_url}/order/mine?userId={user_id}"
-        data = await _http_get(url, timeout=5.0, headers=headers)
+        data = await _http_get(url, headers=headers)
         orders = data.get("data") or []
 
         if not orders and not insight:
@@ -523,7 +556,7 @@ async def optimize_cart() -> str:
 
         # 1) 拉购物车（选中项）
         cart_headers = {"x-user-id": user_id}
-        cart_data = await _http_get(f"{settings.cart_service_url}/cart/mine", timeout=5.0, headers=cart_headers)
+        cart_data = await _http_get(f"{settings.cart_service_url}/cart/mine", headers=cart_headers)
         items = cart_data.get("data") or []
         selected = [i for i in items if i.get("selected", True)]
         if not selected:
@@ -543,7 +576,6 @@ async def optimize_cart() -> str:
                 try:
                     sku_data = await _http_get(
                         f"{settings.product_service_url}/product/sku/{sku_id}",
-                        timeout=5.0,
                         headers={"x-user-id": user_id},
                     )
                     sku_info = sku_data.get("data") or {}
@@ -565,7 +597,6 @@ async def optimize_cart() -> str:
         base = await _http_post(
             f"{settings.marketing_service_url}/discount/calculate",
             {"userId": int(user_id), "items": calc_items},
-            timeout=5.0,
             headers={"x-user-id": user_id},
         )
         base_data = base.get("data") or {}
@@ -575,7 +606,6 @@ async def optimize_cart() -> str:
         # 4) 逐券试算，选最优
         coupons_data = await _http_get(
             f"{settings.marketing_service_url}/coupon/mine?userId={user_id}&status=UNUSED",
-            timeout=5.0,
             headers={"x-user-id": user_id},
         )
         coupons = coupons_data.get("data") or []
@@ -589,7 +619,6 @@ async def optimize_cart() -> str:
                 r = await _http_post(
                     f"{settings.marketing_service_url}/discount/calculate",
                     {"userId": int(user_id), "items": calc_items, "couponId": int(cid)},
-                    timeout=5.0,
                     headers={"x-user-id": user_id},
                 )
                 rd = r.get("data") or {}
@@ -700,7 +729,7 @@ async def recommend_products(scene: str = "home", limit: int = 6) -> str:
         user_id = _get_current_user()
         url = f"{settings.product_service_url}/recommend?scene={scene}&limit={limit}"
         headers = {"x-user-id": user_id}
-        data = await _http_get(url, timeout=5.0, headers=headers)
+        data = await _http_get(url, headers=headers)
         resp = data.get("data") or {}
         items = resp.get("items") or []
         if not items:
@@ -829,7 +858,7 @@ async def aftersale_assistant(issue: str = "", aftersale_no: str = "") -> str:
         headers = {"x-user-id": _get_current_user()}
         if aftersale_no:
             url = f"{settings.aftersale_service_url}/aftersale/{aftersale_no}"
-            data = await _http_get(url, timeout=5.0, headers=headers)
+            data = await _http_get(url, headers=headers)
             o = data.get("data") or {}
             if not o:
                 return f"未查到售后单 {aftersale_no}，请核对单号。"
@@ -858,7 +887,7 @@ async def aftersale_assistant(issue: str = "", aftersale_no: str = "") -> str:
         if not issue:
             try:
                 url = f"{settings.aftersale_service_url}/aftersale/mine?userId={_get_current_user()}"
-                data = await _http_get(url, timeout=5.0, headers=headers)
+                data = await _http_get(url, headers=headers)
                 items = data.get("data") or []
                 if items:
                     lines = ["你的售后单列表："]
@@ -915,7 +944,7 @@ async def logistics_tracker(shipment_no: str) -> str:
     try:
         url = f"{settings.logistics_service_url}/shipment/{shipment_no}/track"
         headers = {"x-user-id": _get_current_user()}
-        data = await _http_get(url, timeout=5.0, headers=headers)
+        data = await _http_get(url, headers=headers)
         events = data.get("data") or []
         if not events:
             return f"未查到运单 {shipment_no} 的物流轨迹，请核对运单号。"
@@ -971,7 +1000,7 @@ async def usage_cycle_assistant() -> str:
     try:
         url = f"{settings.order_service_url}/order/mine?userId={_get_current_user()}"
         headers = {"x-user-id": _get_current_user()}
-        data = await _http_get(url, timeout=5.0, headers=headers)
+        data = await _http_get(url, headers=headers)
         orders = data.get("data") or []
         seen_items: dict[str, int] = {}
         for o in orders:
@@ -1098,7 +1127,7 @@ async def gift_assistant(recipient: str, occasion: str, budget: float = 0) -> st
         for kw in rule["keywords"]:
             try:
                 url = f"{settings.product_service_url}/product/page?keyword={kw}&pageNum=1&pageSize=5"
-                data = await _http_get(url, timeout=5.0, headers=headers)
+                data = await _http_get(url, headers=headers)
                 items = data.get("data", {}).get("records", []) or []
                 for it in items:
                     skus = it.get("skus") or []
@@ -1175,7 +1204,6 @@ async def groupbuy_finder(sku_id: str | None = None, keywords: str | None = None
         headers = {"x-user-id": _get_current_user()}
         data = await _http_get(
             f"{settings.marketing_service_url}/group-buy/activities",
-            timeout=5.0,
             headers=headers,
         )
         acts = data.get("data") or []
@@ -1224,7 +1252,6 @@ async def merchant_overview() -> str:
     try:
         data = await _http_get(
             f"{settings.order_service_url}/order/stats/overview",
-            timeout=5.0,
         )
         d = data.get("data") or {}
         sales = d.get("totalSalesFen") or 0
@@ -1267,11 +1294,9 @@ async def merchant_warnings(threshold: int = 10) -> str:
     try:
         low = await _http_get(
             f"{settings.inventory_service_url}/inventory/low-stock?threshold={threshold}",
-            timeout=5.0,
         )
         neg = await _http_get(
             f"{settings.product_service_url}/product/review/negative?minRating=3&limit=5",
-            timeout=5.0,
             headers={"X-User-Id": "2107757313435291648"},
         )
         low_list = low.get("data") or []
@@ -1308,11 +1333,9 @@ async def fulfillment_alert() -> str:
     try:
         pending = await _http_get(
             f"{settings.order_service_url}/order/stats/pending-fulfillment",
-            timeout=5.0,
         )
         low = await _http_get(
             f"{settings.inventory_service_url}/inventory/low-stock?threshold=10",
-            timeout=5.0,
         )
         pending_list = pending.get("data") or []
         low_list = low.get("data") or []
@@ -1377,11 +1400,9 @@ async def supply_replenish(
     try:
         low = await _http_get(
             f"{settings.inventory_service_url}/inventory/low-stock?threshold={threshold}",
-            timeout=5.0,
         )
         recs = await _http_get(
             f"{settings.inventory_service_url}/inventory/replenish/records?limit=5",
-            timeout=5.0,
         )
         low_list = low.get("data") or []
         rec_list = recs.get("data") or []
@@ -1401,7 +1422,6 @@ async def supply_replenish(
             resp = await _http_post(
                 f"{settings.inventory_service_url}/inventory/auto-replenish",
                 json_data=body,
-                timeout=5.0,
             )
             done = resp.get("data") or []
             if done:
@@ -1451,7 +1471,6 @@ async def fulfillment_action(
         if not order_ids:
             pending = await _http_get(
                 f"{settings.order_service_url}/order/stats/pending-fulfillment",
-                timeout=5.0,
             )
             pending_list = pending.get("data") or []
             if not pending_list:
@@ -1461,7 +1480,6 @@ async def fulfillment_action(
         resp = await _http_post(
             f"{settings.order_service_url}/order/fulfillment/action",
             json_data=body,
-            timeout=5.0,
         )
         done = resp.get("data") or 0
         label = {"SPLIT": "拆分发货（有货先发、缺货追发）",
@@ -1495,7 +1513,6 @@ async def logistics_delay_alert(
     try:
         alerts = await _http_get(
             f"{settings.logistics_service_url}/logistics/delay-alerts?stagnantHours={stagnant_hours}",
-            timeout=5.0,
         )
         list_data = alerts.get("data") or []
         risk = [a for a in list_data if a.get("stagnant")]
@@ -1512,7 +1529,6 @@ async def logistics_delay_alert(
             d = await _http_post(
                 f"{settings.logistics_service_url}/logistics/dispatch",
                 json_data={"shipmentNo": target, "action": dispatch_action, "reason": reason},
-                timeout=5.0,
             )
             rec = d.get("data") or {}
             label = {"URGE": "催件", "REDELIVER": "重新派送", "SELF_PICKUP": "改自提",
@@ -1547,7 +1563,6 @@ async def after_sale_repair(
         if action == "warranty":
             alerts = await _http_get(
                 f"{settings.aftersale_service_url}/aftersale/warranty/alerts?userId={uid}&days=30",
-                timeout=5.0,
             )
             items = alerts.get("data") or []
             if not items:
@@ -1570,7 +1585,6 @@ async def after_sale_repair(
                 json_data={"orderNo": order_no, "skuId": sku_id, "productName": product_name,
                            "faultDesc": fault_desc, "contactPhone": contact_phone,
                            "appointmentTime": appointment_time},
-                timeout=5.0,
             )
             r = d.get("data") or {}
             if not r.get("appointmentNo"):

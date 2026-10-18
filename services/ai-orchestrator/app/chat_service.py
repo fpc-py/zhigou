@@ -133,7 +133,13 @@ def _guard_result(result_str: str) -> str:
     s = str(result_str or "").strip()
     if not s:
         return "（工具未返回内容）" + _FORGE_GUARD
-    if any(k in s for k in ("暂无", "没有搜到", "没有找到", "未查到", "没有匹配", "暂时没有", "无合适", "搜索为空")):
+    # 覆盖工具层实际产出的「未命中」文案：未搜索到 / 未查询到 / 没搜到 / 不存在 / 查不到 / 无相关 …
+    # （工作流2 回归实测发现：原列表缺少「未搜索到」，search_products 的"未搜索到相关商品。"不触发护栏 → 已补全）
+    _NOT_FOUND_MARKERS = (
+        "暂无", "没有搜到", "没搜到", "没有找到", "未查到", "未搜索到", "未查询到",
+        "没有匹配", "暂时没有", "无合适", "搜索为空", "查不到", "不存在", "没有相关", "无相关",
+    )
+    if any(k in s for k in _NOT_FOUND_MARKERS):
         return s + _FORGE_GUARD
     return s
 

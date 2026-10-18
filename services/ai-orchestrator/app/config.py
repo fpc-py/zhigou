@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-v4"
     embedding_dim: int = 1536
 
+    # ── 工具调用可靠性（工作流2 统一治理：超时 / 重试 / 降级） ──
+    # ai_tool_timeout_s：HTTP 工具默认超时（秒）；ai_tool_retries：只读 GET 重试次数（写操作不重试防重复下单）；
+    # ai_tool_retry_delay_s：重试基础间隔（秒，按尝试次数线性递增）。
+    ai_tool_timeout_s: float = 5.0
+    ai_tool_retries: int = 1
+    ai_tool_retry_delay_s: float = 0.3
+
     # ── RocketMQ ──
     rocketmq_namesrv: str = "localhost:9876"
 
