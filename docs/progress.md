@@ -13,11 +13,12 @@
 - **#128 AI 链路可观测**：_run_agent 全链路 TRACE 日志（llm_req/llm_resp/tool_call[脱敏]/tool_result[ok+guarded+耗时ms]/finish）
 - **#128 测试**：test_tool_reliability.py 7 项全 PASS + test_forge_guard.py 18 项全 PASS（沙箱直测）；test_rag_quality.py / test_sse_e2e.py 交付（需用户环境 pgvector+BFF+JWT 复跑）
 - **#128 提交**：CHANGELOG [0.2.33] / bug #36 / docs/AI可靠性实测报告.md
-- **#128 沙箱补跑（2026-10-18，环境受限下尽量闭环）**：
-  - ✅ **H5 type-check 通过**：沙箱 node22 + npm 装 h5-shop 依赖，`npm run type-check`（vue-tsc --build）0 错误
-  - ✅ **SSE 传输层全链路验证通过**：沙箱起 AI 8095（临时 fallback.yml ai.enabled=false 降级模式）+ BFF 3000 + 自签 HS256 JWT（默认 secret，sub=手机号）→ `POST /chat/sse` 返回 **HTTP 201 + text/event-stream + `event: token`（固定降级文案）+ `event: done`**；验证了 BFF JWT 鉴权、x-user-id 注入、BFF→AI SSE 透传、事件格式与 sse-polyfill 解析器兼容（验证后已恢复 fallback.yml enabled=true）
-  - ⚠️ **仍需用户本机**：① RAG 评测（沙箱无 Docker→无 pgvector，且无 embedding key）；② SSE 完整 token 流（需 LLM key，沙箱仅验证了降级模式传输层）；③ 浏览器断网/杀进程端到端（需完整链路+浏览器会话）
-- ⚠️ 复验待办剩余（用户本机）：RAG 评测、SSE 完整 token 流、浏览器断网/杀进程端到端
+- **#128 本机复验（2026-10-18，环境恢复本地后真跑闭环）**：
+  - ✅ **H5 type-check 通过**：本机 node + h5-shop node_modules，`npm run type-check`（vue-tsc --build）0 错误
+  - ✅ **RAG 评测通过**：本机 pgvector（zhigou-pgvector healthy）+ .env key，`test_rag_quality.py` → **Top-1/Top-3 命中率 100%**（4/4），命中分数 0.7905/0.7095/0.7025/0.785，无关查询（恐龙化石/生鲜水果）被 0.50 阈值滤除返回空
+  - ✅ **SSE 完整 token 流通过**：本机起 AI 8095（ZHIGOU_APP_PORT=8095 venv）+ BFF 3000 + 自签 HS256 JWT → 场景A：`POST /chat/sse` **HTTP 201 + 38 个 token 分片 + tool_call/tool_result 真实触发（analyze_user_context）+ done 收尾（24.16s）**；场景B/C 超时参数（5s/25s）与实际 LLM 延迟（24s）不匹配，脚本未完整走完（非链路缺陷）
+  - ✅ **纯逻辑测试**：test_forge_guard 8 测试 + test_tool_reliability 7 场景全 PASS（本机 venv 直测）
+  - ⚠️ **剩余 1 项**：④ 浏览器断网/杀进程端到端（需 H5 5173 + 浏览器会话 + 登录接管）——待用户配合或专门安排
 ## 2026-10-18 · 工作流1 交易一致性深挖：5 类故障注入实测 + 真实 Bug 修复 [0.2.32]
 
 - **#127 实测环境**：6 交易服务（auth/product/cart/order/inventory/payment）dev 全启动；zhigou-mysql/redis/rocketmq 全 healthy；MySQL 隔离级别核实 REPEATABLE READ
