@@ -18,7 +18,8 @@
   - ✅ **RAG 评测通过**：本机 pgvector（zhigou-pgvector healthy）+ .env key，`test_rag_quality.py` → **Top-1/Top-3 命中率 100%**（4/4），命中分数 0.7905/0.7095/0.7025/0.785，无关查询（恐龙化石/生鲜水果）被 0.50 阈值滤除返回空
   - ✅ **SSE 完整 token 流通过**：本机起 AI 8095（ZHIGOU_APP_PORT=8095 venv）+ BFF 3000 + 自签 HS256 JWT → 场景A：`POST /chat/sse` **HTTP 201 + 38 个 token 分片 + tool_call/tool_result 真实触发（analyze_user_context）+ done 收尾（24.16s）**；场景B/C 超时参数（5s/25s）与实际 LLM 延迟（24s）不匹配，脚本未完整走完（非链路缺陷）
   - ✅ **纯逻辑测试**：test_forge_guard 8 测试 + test_tool_reliability 7 场景全 PASS（本机 venv 直测）
-  - ⚠️ **剩余 1 项**：④ 浏览器断网/杀进程端到端（需 H5 5173 + 浏览器会话 + 登录接管）——待用户配合或专门安排
+  - ✅ **④ 浏览器断网/杀进程端到端（本机实测闭环）**：H5 5174 + BFF 3000 + AI 8095 全链路；浏览器注入自签 JWT 进对话页 → 发消息触发 SSE（工具调用 analyze_user_context→search_products 实时渲染）→ **杀 AI 8095** → 流中断、页面不崩、输入框释放（sse-polyfill 后台 4 次指数退避重连）→ **重启 AI 8095** → 新消息完整 token 流恢复；发现 UI 缺口：sse-polyfill onReconnect/onError 未被 chat.vue 接住（断链无用户可见提示）→ 记 bug #37
+- ✅ **工作流2 复验待办已全部清零**（RAG/SSE/type-check/纯逻辑/浏览器端到端 5 项）
 ## 2026-10-18 · 工作流1 交易一致性深挖：5 类故障注入实测 + 真实 Bug 修复 [0.2.32]
 
 - **#127 实测环境**：6 交易服务（auth/product/cart/order/inventory/payment）dev 全启动；zhigou-mysql/redis/rocketmq 全 healthy；MySQL 隔离级别核实 REPEATABLE READ
