@@ -4,6 +4,16 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# 告警：Alertmanager 地址（见 conf/prometheus/alertmanager.yml）
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# 告警规则（熔断 OPEN / 高错误率 / 高延迟 / 实例掉线）
+rule_files:
+  - '/etc/prometheus/alerts.yml'
+
 scrape_configs:
   - job_name: 'zhigou-services'
     metrics_path: '/actuator/prometheus'

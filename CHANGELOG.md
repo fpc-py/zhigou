@@ -3,6 +3,14 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.37] 工作流3 #8：告警接入（2026-10-18）
+
+- **14 个服务 SecurityConfig 放行 /actuator/prometheus**（修复 403；最小暴露原则，不放行整个 actuator）
+- **Prometheus 告警规则 alerts.yml（5 条）**：CircuitBreakerOpen（OPEN>1min critical）/ CircuitBreakerFlapping（半开反复探活）/ HighErrorRate（5xx>5% 2min）/ HighLatencyP95（P95>2s 2min）/ ServiceDown（掉线 1min）——promtool check SUCCESS
+- **Alertmanager 编排**：alertmanager.yml 分级路由（critical/warning webhook 占位）+ monitoring.yml 集成（compose config EXIT=0）
+- **实测**：4 核心服务 /actuator/prometheus 全部 200（修复前 403），resilience4j_circuitbreaker_state 4 调用点指标齐全
+- 坑：新版 prom/prometheus 镜像入口已非 promtool（需指定 v3.13.3 + --entrypoint）；compose up 本机 Docker Desktop 卡住（配置校验通过，待环境正常执行）
+- 报告 docs/生产级加固实测报告.md 新增 #8 章节；至此**工作流3（#10 traceId + #7 熔断 + #9 压测 + #8 告警）全部闭环**
 ## [0.2.36] 工作流3 #9：全链路压测+瓶颈定位（2026-10-18）
 
 - **自研压测器** scripts/load-test/test_chain_load.py（threading 真并发；踩坑：asyncio+同步 urllib 假并发→重写；**HTTP 201 被误判为错误→"BFF 19% 错误率"假结论→修正 200/201 均成功）**

@@ -25,6 +25,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/auth/**", "/actuator/health", "/actuator/health/**",
+                                "/actuator/prometheus",
                                 "/doc.html", "/swagger-ui.html", "/swagger-ui/**",
                                 "/v3/api-docs/**", "/webjars/**",
                                 "/user/insight" // AI Agent 内网直连只读画像（收藏/浏览写操作仍需鉴权）

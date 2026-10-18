@@ -1,0 +1,38 @@
+From b64d0c67f21a0280ff8f01c20dcb0046a0857943 Mon Sep 17 00:00:00 2001
+From: zhigou-dev <dev@zhigou.local>
+Date: Sun, 18 Oct 2026 19:37:49 +0800
+Subject: [PATCH] =?UTF-8?q?docs(=E5=B7=A5=E4=BD=9C=E6=B5=812):=20progress?=
+ =?UTF-8?q?=20=E8=AE=B0=E5=BD=95=E6=B2=99=E7=AE=B1=E8=A1=A5=E8=B7=91?=
+ =?UTF-8?q?=E7=BB=93=E6=9E=9C=E2=80=94=E2=80=94H5=20type-check=20=E9=80=9A?=
+ =?UTF-8?q?=E8=BF=87=E3=80=81SSE=20=E4=BC=A0=E8=BE=93=E5=B1=82=E5=85=A8?=
+ =?UTF-8?q?=E9=93=BE=E8=B7=AF=E9=AA=8C=E8=AF=81=E9=80=9A=E8=BF=87=EF=BC=88?=
+ =?UTF-8?q?=E9=99=8D=E7=BA=A7=E6=A8=A1=E5=BC=8F=EF=BC=89?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+沙箱闭环 2/4 复验待办；剩余 RAG 评测/SSE 完整 token 流/浏览器端到端需用户本机（Docker/LLM key/完整链路缺失）
+---
+ docs/progress.md | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/docs/progress.md b/docs/progress.md
+index 46c04ad..b12daf0 100644
+--- a/docs/progress.md
++++ b/docs/progress.md
+@@ -13,7 +13,11 @@
+ - **#128 AI 链路可观测**：_run_agent 全链路 TRACE 日志（llm_req/llm_resp/tool_call[脱敏]/tool_result[ok+guarded+耗时ms]/finish）
+ - **#128 测试**：test_tool_reliability.py 7 项全 PASS + test_forge_guard.py 18 项全 PASS（沙箱直测）；test_rag_quality.py / test_sse_e2e.py 交付（需用户环境 pgvector+BFF+JWT 复跑）
+ - **#128 提交**：CHANGELOG [0.2.33] / bug #36 / docs/AI可靠性实测报告.md
+-- ⚠️ 复验待办（用户本机）：RAG 评测、SSE 全链路、H5 type-check、浏览器断网/杀进程端到端
++- **#128 沙箱补跑（2026-10-18，环境受限下尽量闭环）**：
++  - ✅ **H5 type-check 通过**：沙箱 node22 + npm 装 h5-shop 依赖，`npm run type-check`（vue-tsc --build）0 错误
++  - ✅ **SSE 传输层全链路验证通过**：沙箱起 AI 8095（临时 fallback.yml ai.enabled=false 降级模式）+ BFF 3000 + 自签 HS256 JWT（默认 secret，sub=手机号）→ `POST /chat/sse` 返回 **HTTP 201 + text/event-stream + `event: token`（固定降级文案）+ `event: done`**；验证了 BFF JWT 鉴权、x-user-id 注入、BFF→AI SSE 透传、事件格式与 sse-polyfill 解析器兼容（验证后已恢复 fallback.yml enabled=true）
++  - ⚠️ **仍需用户本机**：① RAG 评测（沙箱无 Docker→无 pgvector，且无 embedding key）；② SSE 完整 token 流（需 LLM key，沙箱仅验证了降级模式传输层）；③ 浏览器断网/杀进程端到端（需完整链路+浏览器会话）
++- ⚠️ 复验待办剩余（用户本机）：RAG 评测、SSE 完整 token 流、浏览器断网/杀进程端到端
+ 
+ ## 2026-10-10 · P0 文件服务增强：图片压缩/格式转换/尺寸限制 + 售后凭证接入 [0.2.31]
+ 
+-- 
+2.34.1
+

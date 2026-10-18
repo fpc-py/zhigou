@@ -25,6 +25,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/auth/**", "/actuator/health", "/actuator/health/**",
+                                "/actuator/prometheus",
                                 "/doc.html", "/swagger-ui.html", "/swagger-ui/**",
                                 "/v3/api-docs/**", "/webjars/**",
                                 // 库存读写是内网服务调用（order/aftersale），无用户上下文；生产应加内网白名单

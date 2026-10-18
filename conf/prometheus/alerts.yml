@@ -1,0 +1,66 @@
+# 智购 Prometheus 告警规则
+# 覆盖：熔断器 OPEN（下游故障隔离触发）、高错误率、高延迟
+# 标签约定: severity=critical（立即处理）/ warning（观察升级）
+groups:
+  - name: zhigou-resilience4j
+    rules:
+      # 熔断器处于 OPEN 状态 > 60s → 下游服务故障导致熔断，核心交易走降级
+      - alert: CircuitBreakerOpen
+        expr: resilience4j_circuitbreaker_state{state="open"} > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.application }} 熔断器 {{ $labels.instance }} 已 OPEN"
+          description: "熔断器进入 OPEN 状态超过 1 分钟（失败率/慢调用率超阈值）。下游依赖故障已被隔离，交易走降级路径。关联 traceId 日志定位下游服务。"
+
+      # 熔断器状态反复跳变（OPEN↔HALF_OPEN 循环）→ 半开探活不稳定，需人工介入
+      - alert: CircuitBreakerFlapping
+        expr: changes(resilience4j_circuitbreaker_state{state="half_open"}[15m]) > 3
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.application }} 熔断器半开反复探活失败"
+          description: "15 分钟内熔断器半开状态变化超过 3 次，说明下游服务恢复不稳定，建议排查下游服务健康度。"
+
+  - name: zhigou-error-rate
+    rules:
+      # 5xx 错误率 > 5% 持续 2 分钟
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[2m])) by (application, uri)
+            / clamp_min(sum(rate(http_server_requests_seconds_count[2m])) by (application, uri), 1)
+            * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.application }} 接口错误率过高（{{ $labels.uri }}）"
+          description: "5xx 错误率超过 5% 持续 2 分钟。关联 traceId 日志定位错误堆栈，检查下游依赖与数据库连接。"
+
+  - name: zhigou-latency
+    rules:
+      # P95 延迟 > 2s 持续 2 分钟
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_requests_seconds_bucket[2m])) by (application, uri, le)
+          ) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.application }} 接口 P95 延迟超 2s（{{ $labels.uri }}）"
+          description: "P95 延迟超过 2 秒持续 2 分钟。排查慢 SQL / 下游调用等待 / 线程池饱和（可参考压测报告 BFF 转发层排队效应）。"
+
+  - name: zhigou-down
+    rules:
+      # 服务实例掉线 > 1 分钟
+      - alert: ServiceDown
+        expr: up{job="zhigou-services"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} 服务实例不可达"
+          description: "Prometheus 无法抓取 {{ $labels.instance }}（>1 分钟）。服务可能宕机，检查进程与容器健康。"

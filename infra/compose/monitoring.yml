@@ -14,7 +14,8 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./conf/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./conf/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./conf/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -46,6 +47,22 @@ services:
       timeout: 5s
       retries: 3
 
+  # ==================== Alertmanager ====================
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: zhigou-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./conf/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "-q", "http://localhost:9093/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
   # ==================== Loki ====================
   loki:
     image: grafana/loki:latest
@@ -67,5 +84,6 @@ services:
 # ==================== 卷 ====================
 volumes:
   prometheus-data:
+  alertmanager-data:
   grafana-data:
   loki-data:

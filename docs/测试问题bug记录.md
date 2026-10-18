@@ -1,5 +1,12 @@
 # 测试问题 & Bug 记录
 
+## #41 actuator/prometheus 被安全链 403 拦截，Prometheus 无数据源（工作流3 #8，2026-10-18）
+- **现象**：所有服务 /actuator/prometheus 返回 403，Prometheus 抓取为空；告警规则写了也白写。
+- **根因**：各服务 SecurityConfig 只放行 /actuator/health，anyRequest().authenticated() 拦截指标端点。
+- **修复**：14 个服务 SecurityConfig 显式放行 /actuator/prometheus（最小暴露：不放行整个 actuator，避免 env/beans 泄漏）。
+- **教训**：监控接入的前置条件是安全链放行，顺序颠倒会"规则先写、数据后无"；放行遵循最小暴露原则。
+- 附：新版 prom/prometheus 镜像（v3）入口已非 promtool，需 `--entrypoint promtool` 且指定 v3.x 镜像版本。
+
 ## #40 压测器把 HTTP 201 误判为失败 → "19% 错误率"假结论（工作流3 #9，2026-10-18）
 - **现象**：分层压测首版输出"BFF 错误率 19.46%"，几乎导出"BFF 有 19% 故障"的错误结论；分路径采样后真相是写路径 100% 成功（201）。
 - **根因**：BFF 写路径返回 **201 Created**（Nest 默认 POST 状态码），压测器断言只认 `st == 200`，20% 的写请求全部被误判为错误 → 19.46% ≈ 写路径占比。

@@ -29,6 +29,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         // Actuator
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/prometheus").permitAll()
                         // Swagger / Knife4j
                         .requestMatchers("/doc.html", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/webjars/**").permitAll()

@@ -25,6 +25,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/auth/**", "/actuator/health", "/actuator/health/**",
+                                "/actuator/prometheus",
                                 "/doc.html", "/swagger-ui.html", "/swagger-ui/**",
                                 "/v3/api-docs/**", "/webjars/**",
                                 // 支付沙箱回调与未来真实渠道回调：服务端回调无用户上下文，靠签名验签而非登录态
