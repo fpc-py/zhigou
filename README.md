@@ -61,6 +61,7 @@
 | 发布检查清单 | [docs/release-checklist.md](docs/release-checklist.md) |
 | **简历面试深度叙事（坑 + 实测数据 + 追问应答）** | [docs/面试深度叙事.md](docs/面试深度叙事.md) |
 | 生产级加固实测报告（traceId/熔断/压测/告警） | [docs/生产级加固实测报告.md](docs/生产级加固实测报告.md) |
+| **未完成任务清单（含验收标准）** | [docs/未完成任务清单.md](docs/未完成任务清单.md) |
 
 ## 快速开始
 

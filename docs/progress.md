@@ -286,9 +286,9 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 - [x] 需求拆解（analyze_requirement：预算/品类/场景/偏好结构化，已上 SSE 链路）
 - [x] 跨平台比价（compare_prices：多 SKU 价格/规格/库存横向对比）
 - [x] 差评/避坑（review_analysis：选购提醒 + 评价数据待接入降级）
-- [ ] 真伪测评/水军识别（依赖评价数据，待评价模块）
-- [ ] 个性化推荐升级（推荐引擎，待画像数据积累）
-- [ ] 图片搜款/多模态（待立项）
+- [x] ~~真伪测评/水军识别~~（[0.2.5] review_analysis 规则化识别已交付：疑似刷评/差评比例/口碑）
+- [x] ~~个性化推荐升级~~（[0.2.5] recommend_products + /recommend 可解释推荐已交付）
+- [x] ~~图片搜款/多模态~~（[0.2.6] search_by_image 视觉搜款 + H5 相机入口已交付）
 - [x] ~~AI 凑单优化器（券+满减最优组合）~~（[0.2.4] optimize_cart 工具交付：购物车+SKU 现价+满减引擎+逐券试算）
 - [x] ~~一键代下单（Agent 对接下单 + 用户确认流）~~（[0.2.4] create_order 工具交付：真实下单 + 用户确认流实测）
 - [x] ~~会话记忆持久化（当前 MemorySaver 进程内存）~~（[0.2.4] 本地文件持久化 + DELETE 清空接口 + H5 清空按钮；生产注释换 Redis）
