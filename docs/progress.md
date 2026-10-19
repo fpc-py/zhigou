@@ -4,6 +4,18 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-19 · ⏸ 暂停点（用户指示：停服务，下次接着开发）
+- 已停：order 8085 / marketing 8088 / aftersale 8090 / BFF 3000（payment 8087 本就在 DOWN）
+- 环境阻塞：Docker Desktop 引擎 500 → 3307 Docker MySQL 的 mysqld 无响应（TCP 通、握手超时），新建 DB 连接全拒；3306 本机 MySQL 正常（握手 OK）
+- 修复 Docker Desktop（重启服务/重启 Docker）后，payment 8087 可重启验证 A5 + A4 待补验项
+
+## 2026-10-19 · A5 T+1 对账（代码已落盘，未编译验证，未提交）
+- 已落盘：V20261102__reconcile_log.sql（payment_reconcile_log 按周期幂等）、ReconcileLog 实体 + Mapper
+- reconcile() 已升级：汇总（total/success/pending/refunded）+ 差异清单（UNNOTIFIED / STALE_PENDING / OVER_REFUND）+ 补偿 + 落库，返回报告 Map
+- Controller 已加 GET /payment/reconcile/report
+- **编译卡点**：PaymentServiceImpl.java:109 报「找不到符号」——reconcile 方法内新增的局部变量/语句与旧代码残留冲突，需 Read 109 行附近核对后修复
+- 下次接续：修编译错误 → package → 重启 8087 → GET /payment/reconcile/report 验证 + 三件套 + 提交 [0.2.43]
+
 ## 2026-10-19 · [0.2.42] A4 部分退款 + 部分发货
 - **部分发货**：order_shipment 明细表 + SHIPPING 中间态（PAID→SHIPPING→SHIPPED），分批履约；全 SKU 发完自动 SHIPPED；超量 40052/状态 40050
 - **部分退款**：aftersale 累计退款上限校验；payment 退款幂等 orderNo+amount（坑 #47）
