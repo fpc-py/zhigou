@@ -69,6 +69,15 @@
       <button class="pending-del" @click="pendingImg = ''">×</button>
     </div>
 
+    <!-- 断链/重连状态条（bug #37：断链必须有用户可见提示） -->
+    <div v-if="connState !== 'idle'" class="conn-bar" :class="connState">
+      <template v-if="connState === 'reconnecting'">小智连接中断，正在重连…（第 {{ retryAttempt }} 次）</template>
+      <template v-else>
+        <span>连接已断开，多次重连失败</span>
+        <button class="retry-btn" @click="retrySend">重试</button>
+      </template>
+    </div>
+
     <!-- 底部输入 -->
     <div class="input-bar">
       <button class="mic-btn" title="上传商品图片搜款" @click="pickImage"><Icon name="cam" /></button>
@@ -117,6 +126,10 @@ const msgList = ref<HTMLElement | null>(null);
 const sessionId = ref(Math.random().toString(36).slice(2, 10));
 const fileInput = ref<HTMLInputElement | null>(null);
 const pendingImg = ref('');
+/** SSE 连接状态：idle 正常 / reconnecting 断链重连中 / failed 重连耗尽（bug #37） */
+const connState = ref<'idle' | 'reconnecting' | 'failed'>('idle');
+const retryAttempt = ref(0);
+const lastSend = ref<{ text: string; img: string } | null>(null);
 
 const chips = ['海边度假装备', '帮我送礼', '200 元以内的吹风机'];
 
@@ -212,13 +225,27 @@ async function send() {
   const imgUrl = pendingImg.value;
   inputText.value = '';
   pendingImg.value = '';
+  lastSend.value = { text, img: imgUrl };
+  doSend(text, imgUrl, false);
+}
 
-  messages.value.push({ role: 'user', content: text || '帮我看下这张图的商品', image: imgUrl || undefined });
+/** 断链重连耗尽后手动重试：复用上次输入重发，不再重复 push 用户消息 */
+function retrySend() {
+  if (!lastSend.value || sending.value) return;
+  connState.value = 'idle';
+  doSend(lastSend.value.text, lastSend.value.img, true);
+}
+
+async function doSend(text: string, imgUrl: string, isRetry: boolean) {
+  if (!isRetry) {
+    messages.value.push({ role: 'user', content: text || '帮我看下这张图的商品', image: imgUrl || undefined });
+  }
   const aiMsg: Message = { role: 'ai', tokens: [], typing: true, toolHint: '' };
   messages.value.push(aiMsg);
   scrollBottom();
 
   sending.value = true;
+  connState.value = 'idle';
   let pendingKeyword = '';
 
   try {
@@ -246,16 +273,25 @@ async function send() {
       } else if (event === 'error') {
         aiMsg.tokens = aiMsg.tokens || [];
         aiMsg.tokens.push(data.message || 'AI 助手暂时不可用');
+        // sse-polyfill 重连耗尽时发 onMessage('error', {message:'连接已断开…'})
+        if ((data.message || '').includes('连接已断开')) connState.value = 'failed';
       } else if (event === 'done') {
         aiMsg.typing = false;
         aiMsg.content = (aiMsg.tokens || []).join('');
         aiMsg.toolHint = '';
+        connState.value = 'idle';
       }
       scrollBottom();
+    }, {
+      onReconnect: (attempt: number) => {
+        connState.value = 'reconnecting';
+        retryAttempt.value = attempt;
+      },
     });
   } catch {
     aiMsg.tokens = ['发送失败，请稍后重试'];
     aiMsg.typing = false;
+    connState.value = 'idle';
   } finally {
     sending.value = false;
   }
@@ -470,6 +506,32 @@ onMounted(() => {
   flex: none;
 }
 .mini-add svg { width: 13px; height: 13px; }
+.conn-bar {
+  margin: 0 12px 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.conn-bar.reconnecting {
+  background: #fff7e6;
+  color: #b7791f;
+}
+.conn-bar.failed {
+  background: #fdecea;
+  color: #c0392b;
+}
+.retry-btn {
+  border: none;
+  background: var(--primary, #1a7f5e);
+  color: #fff;
+  border-radius: 8px;
+  padding: 4px 14px;
+  font-size: 13px;
+}
 .input-bar {
   flex: none;
   display: flex;

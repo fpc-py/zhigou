@@ -1,5 +1,5 @@
 import { postSse } from './sse-polyfill';
-import type { SseCallback } from './sse-polyfill';
+import type { SseCallback, SseOptions } from './sse-polyfill';
 
 /**
  * POST SSE 聊天
@@ -7,20 +7,20 @@ import type { SseCallback } from './sse-polyfill';
  * @param sessionId 会话 ID
  * @param imageUrl 图片 URL（图片搜款，可空）
  * @param onMessage 事件回调 (event, data)
- * @param signal 取消信号
+ * @param options 连接管理选项（signal 取消 / onReconnect 断链回调 / maxReconnects 重连次数）
  */
 export function chatSse(
   query: string,
   sessionId: string,
   imageUrl: string,
   onMessage: SseCallback,
-  signal?: AbortSignal,
+  options: SseOptions = {},
 ): Promise<void> {
   return postSse(
     '/api/chat/sse',
     { query, userId: '', sessionId, imageUrl }, // userId 由 BFF 从 JWT 提取
     onMessage,
-    { signal }, // 工作流2：postSse 第 4 参已升级为 SseOptions（断线重连/假死超时释放）
+    options,
   );
 }
 

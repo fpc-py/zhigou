@@ -29,7 +29,11 @@
 - **根因**：公共库 openfeign 依赖声明 `<optional>true</optional>`（为避免强制下游携带），optional 依赖**不传递**给下游；下游无 Feign 类 → 自动配置类含 feign 方法签名 → 类加载即失败。
 - **修复**：拆 TraceFeignAutoConfiguration（独立类 + `@ConditionalOnClass(EnableFeignClients.class)`），仅启用 OpenFeign 的服务装配 Feign 拦截器；TraceAutoConfiguration 只保留无 Feign 引用的 TraceIdFilter。
 - **教训**：公共库可选依赖 + 自动配置 = 必须按条件拆类，任何方法签名引用可选依赖类都会炸。
-## #37 SSE 断链重连 UI 缺口（工作流2，2026-10-18 浏览器端到端实测）
+## #37 SSE 断链重连 UI 缺口（工作流2，2026-10-18 发现 · [0.2.40] A3 修复 2026-10-19 复验通过）
+- **修复（[0.2.40] A3）**：chat.ts 第 5 参升级为 SseOptions 透传 postSse；chat/index.vue 接 onReconnect 显示「小智连接中断，正在重连…（第 N 次）」状态条（reconnecting），onMessage('error') 含「连接已断开」→ failed 状态 +「重试」按钮（retrySend 复用 lastSend 重发不重复 push 用户消息）；done 复位 idle；sending 期间断链不静默置回可输入。
+- **复验（确定性测试 ALL_PASS）**：本地 SSE mock 服务器两场景 —— ① 流中断后恢复：onReconnect(1) 触发 + 重连拿到第 2 个 token + done（PASS）；② 持续中断 maxReconnects=2：onReconnect(1,2) + 耗尽 error「连接已断开，多次重连失败，请稍后重试」+ done（PASS）。UI 状态机由这两个回调驱动，接线经 vue-tsc type-check 通过。
+- **浏览器实测补充**：AI 8095 宕机时发消息 → BFF 502 → 前端显式提示「AI助手暂时不可用」（不再静默）；输入框 sending 期间锁定。注：AI 宕机走 HTTP 错误路径（确定性错误不重连），流中断才走重连状态条——两条路径均已用户可见。
+
 - **现象**：浏览器对话页实测杀 AI 8095 → SSE 流中断，页面仅输入框恢复可用，**无任何「重连中/连接已断开」提示**；重启 AI 后新消息链路恢复正常（完整 token 流）。
 - **根因**：sse-polyfill.ts 已实现 onReconnect（每次重连前回调）+ 重连耗尽发 `onMessage("error", ...)`，但 chat/index.vue **未接这两个回调**，断链/重连状态未映射到 UI。
 - **影响**：用户视角表现为「回复突然停住且无反馈」，等待 15s 重连窗口无感知；可商用性受影响（用户会困惑/重发）。
