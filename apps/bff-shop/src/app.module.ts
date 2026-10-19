@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 import * as http from 'http';
 import * as https from 'https';
-import { HttpModule } from '@nestjs/axios';
+import axios from 'axios';
+import { HttpService } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter.js';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor.js';
 import { AnalyticsInterceptor } from './common/interceptors/analytics.interceptor.js';
+import { GuardedHttpService } from './common/guarded-http.service.js';
 import { HomeController } from './home/home.controller.js';
 import { HomeService } from './home/home.service.js';
 import { ProductController } from './product/product.controller.js';
@@ -45,13 +47,6 @@ import { MerchantService } from './merchant/merchant.service.js';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    HttpModule.register({
-      timeout: 5000,
-      maxRedirects: 0,
-      // P0-D4 压测瓶颈优化：下游连接复用（keep-alive），避免每次透传新建 TCP 连接
-      httpAgent: new http.Agent({ keepAlive: true, maxSockets: 50, maxFreeSockets: 10 }),
-      httpsAgent: new https.Agent({ keepAlive: true, maxSockets: 50, maxFreeSockets: 10 }),
-    }),
   ],
   controllers: [
     HomeController,
@@ -90,6 +85,21 @@ import { MerchantService } from './merchant/merchant.service.js';
     ClosetService,
     WalletService,
     MerchantService,
+    // A1：熔断守护版 HttpService（快失败 + 滑窗 + 半开探活，零侵入所有 service 下游调用）
+    {
+      provide: HttpService,
+      useFactory: () => {
+        const agent = { keepAlive: true, maxSockets: 50, maxFreeSockets: 10 };
+        return new GuardedHttpService(
+          axios.create({
+            timeout: 5000,
+            maxRedirects: 0,
+            httpAgent: new http.Agent(agent),
+            httpsAgent: new https.Agent(agent),
+          }),
+        );
+      },
+    },
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AnalyticsInterceptor },

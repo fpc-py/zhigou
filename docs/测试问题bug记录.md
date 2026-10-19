@@ -29,6 +29,13 @@
 - **根因**：公共库 openfeign 依赖声明 `<optional>true</optional>`（为避免强制下游携带），optional 依赖**不传递**给下游；下游无 Feign 类 → 自动配置类含 feign 方法签名 → 类加载即失败。
 - **修复**：拆 TraceFeignAutoConfiguration（独立类 + `@ConditionalOnClass(EnableFeignClients.class)`），仅启用 OpenFeign 的服务装配 Feign 拦截器；TraceAutoConfiguration 只保留无 Feign 引用的 TraceIdFilter。
 - **教训**：公共库可选依赖 + 自动配置 = 必须按条件拆类，任何方法签名引用可选依赖类都会炸。
+## #43 BFF 透传层无快失败：下游宕机 → BFF 线程堆积（[0.2.40] A1 修复）
+- **现象**：product-service 8083 宕机时，BFF 每个透传请求等满 2s 超时；并发下 Node 事件循环被堆积的连接耗尽。
+- **根因**：BFF(NestJS) HttpService 只有 timeout 无熔断；Java 侧 ResilientHttp 熔断（[0.2.35] 4 调用点）覆盖不到 BFF 透传层。
+- **修复**：common/circuit-breaker.ts 轻量滑动窗口熔断（10s 窗 / 50% 失败率 / minCalls 5 / 打开 10s / 半开探活 1，参数对齐 Java 侧）+ GuardedHttpService extends HttpService 按 URL 解析服务名，熔断拒绝时抛 CircuitOpenError（<1ms），service 原 catchError 降级兜底自动承接 —— **零侵入 15 个 service**。
+- **实测数据**：故障注入（product 8083 + AI 8095 双宕机）→ /home/feed 前 3 请求慢（299ms，keep-alive 死连接探测）后熔断 OPEN → **7ms/3ms/2ms 快速失败**（降级 200）；10s 后半开探活真实请求（ECONNREFUSED → 重开）；状态机单测 6 项 ALL_PASS（CLOSED 触发边界 / OPEN 拒绝 / 半开放行 1 探活 / 成功闭合 / 失败重开 / 窗口滚动）。
+- **教训**：熔断要下沉到 HTTP 客户端层（而非每个 service 手写），按下游 URL 解析服务名即可零侵入全局生效；keep-alive 死连接会让「连接拒绝」变成「等待探测超时」，熔断打开前的首个失败耗时不可作为快失败依据。
+
 ## #37 SSE 断链重连 UI 缺口（工作流2，2026-10-18 发现 · [0.2.40] A3 修复 2026-10-19 复验通过）
 - **修复（[0.2.40] A3）**：chat.ts 第 5 参升级为 SseOptions 透传 postSse；chat/index.vue 接 onReconnect 显示「小智连接中断，正在重连…（第 N 次）」状态条（reconnecting），onMessage('error') 含「连接已断开」→ failed 状态 +「重试」按钮（retrySend 复用 lastSend 重发不重复 push 用户消息）；done 复位 idle；sending 期间断链不静默置回可输入。
 - **复验（确定性测试 ALL_PASS）**：本地 SSE mock 服务器两场景 —— ① 流中断后恢复：onReconnect(1) 触发 + 重连拿到第 2 个 token + done（PASS）；② 持续中断 maxReconnects=2：onReconnect(1,2) + 耗尽 error「连接已断开，多次重连失败，请稍后重试」+ done（PASS）。UI 状态机由这两个回调驱动，接线经 vue-tsc type-check 通过。
