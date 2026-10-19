@@ -7,6 +7,7 @@
 - **A3 fix(h5) bug #37**：chat.ts 透传 SseOptions；chat/index.vue 接 onReconnect/error —— 断链显示「连接恢复中…（第 N 次）」状态条，重连耗尽显示「连接已断开」+ 重试按钮（retrySend 复用 lastSend），done 复位；sending 期间断链不静默置回可输入。确定性测试 ALL_PASS（流中断恢复 / 持续中断耗尽两场景）；浏览器实测：AI 宕机 → 显式「AI 助手暂时不可用」+ 输入框锁定。
 - **A1 feat(bff) BFF 熔断降级**：新增 common/circuit-breaker.ts（滑动窗口 10s / 失败率 50% / minCalls 5 / 打开 10s / 半开探活 1，对齐 Java 侧参数）+ GuardedHttpService 零侵入替换 HttpService —— 所有 service 下游调用自动熔断守护，原有降级兜底自动承接。
 - **实测（故障注入）**：product-service 8083 与 ai-orchestrator 8095 宕机 → 熔断 OPEN → /home/feed 快速失败 **7ms/3ms/2ms**（原 2s 超时）+ 降级返回 200；10s 后半开探活真实发请求（ECONNREFUSED → 重新 OPEN）。状态机单测 6 项 ALL_PASS。
+- **A2 feat(bff) 业务埋点升级**：MetricsRegistry 内存聚合（路由维度 60s 滑动窗口：计数/错误率/avg/p50/p95/max/qps）+ AnalyticsInterceptor 每请求记录 + `GET /metrics` 端点输出。实测：80 并发请求（feed/cart/order 3 路由）→ 指标精确聚合（count 匹配、errorRate、p50/p95、qps 自洽）。
 - 坑 #43：BFF 透传层原只有 timeout 无快失败，下游慢/挂 → BFF 线程堆积；熔断下沉到 HttpService 层零侵入全链路生效。
 
 ## [0.2.39] 工作流3 #9 落地：BFF 横向扩展验证 + 压测数据修正（2026-10-19）

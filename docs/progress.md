@@ -9,6 +9,7 @@
 - ✅ **A3 bug #37 SSE 断链重连 UI 提示**：chat.ts 透传 SseOptions；chat/index.vue 接 onReconnect/error 显示「连接恢复中…（第 N 次）」状态条 / 「连接已断开」+ 重试按钮；确定性测试 ALL_PASS（流中断恢复 / 持续中断耗尽）+ 浏览器实测（AI 宕机显式提示、输入框锁定）
 - ✅ **A1 BFF 熔断降级**：common/circuit-breaker.ts（滑窗 10s / 失败率 50% / minCalls 5 / 打开 10s / 半开探活 1）+ GuardedHttpService 零侵入替换 HttpService；故障注入实测 /home/feed **7ms/3ms/2ms 快速失败**（原 2s 超时）+ 降级 200 + 半开探活自动重开；状态机单测 6 项 ALL_PASS
 - 📋 **docs/未完成任务清单.md**：A/B/C/D/E 五类 + 每项验收标准（规划源）；E 组 3 条滞后项（真伪测评/推荐引擎/图片搜款）勾销
+- ✅ **A2 BFF 业务埋点升级**：MetricsRegistry（路由维度 60s 滑窗：count/errorRate/p50/p95/qps）+ /metrics 端点；实测 80 并发 → 3 路由聚合自洽
 - 剩余 A 组待办：A2 埋点 → A4 部分退款 / A5 T+1 对账 / A6 秒杀+券互斥 / A7 文件鉴权 / A8 Prometheus 实跑（待 Docker Desktop）
 
 ## 2026-10-18 · 工作流2：AI 工程化深挖（可靠性+防编造+RAG+SSE+可观测）[0.2.33]

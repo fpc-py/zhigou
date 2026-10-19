@@ -1,11 +1,13 @@
 /**
  * 埋点/日志拦截器
  *
- * 每个请求结束后异步记录：路径、userId、耗时、状态码
- * 初期只打日志，后续可接埋点服务
+ * 每个请求结束后：
+ * 1. 异步记录：路径、userId、耗时、状态码（日志）
+ * 2. 记录业务指标到 MetricsRegistry（路由维度计数/错误率/耗时分布，见 /metrics 端点）
  */
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Logger } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
+import { metricsRegistry } from './metrics-registry.js';
 
 @Injectable()
 export class AnalyticsInterceptor implements NestInterceptor {
@@ -21,10 +23,12 @@ export class AnalyticsInterceptor implements NestInterceptor {
       tap({
         next: () => {
           const duration = Date.now() - start;
+          metricsRegistry.record(method, path, duration, true);
           this.logger.log(`[${method}] ${path} userId=${userId} ${duration}ms`);
         },
         error: (err) => {
           const duration = Date.now() - start;
+          metricsRegistry.record(method, path, duration, false);
           this.logger.warn(`[${method}] ${path} userId=${userId} ${duration}ms ERROR: ${err.status ?? 500}`);
         },
       }),

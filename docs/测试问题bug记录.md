@@ -29,6 +29,12 @@
 - **根因**：公共库 openfeign 依赖声明 `<optional>true</optional>`（为避免强制下游携带），optional 依赖**不传递**给下游；下游无 Feign 类 → 自动配置类含 feign 方法签名 → 类加载即失败。
 - **修复**：拆 TraceFeignAutoConfiguration（独立类 + `@ConditionalOnClass(EnableFeignClients.class)`），仅启用 OpenFeign 的服务装配 Feign 拦截器；TraceAutoConfiguration 只保留无 Feign 引用的 TraceIdFilter。
 - **教训**：公共库可选依赖 + 自动配置 = 必须按条件拆类，任何方法签名引用可选依赖类都会炸。
+## #44 NestJS 导出方法返回类型引用「未命名」内部类型 → TS4053（[0.2.40] A2 留痕）
+- **现象**：MonitorController.metrics() 返回类型推断为 `{ routes: RouteMetric[] }`，RouteMetric 是模块内未导出的 interface → `TS4053: Return type of public method has or is using name 'RouteMetric' ... but cannot be named`。
+- **根因**：NestJS 对 controller 公共方法做装饰器元数据收集，返回类型必须是可命名的类型；内部类型不导出即不可命名。
+- **修复**：`metrics(): any` 显式返回注解（快且稳），或导出 RouteMetric 类型。
+- **教训**：Nest controller 方法返回类型要「可命名」；模块内类型跨文件被公共 API 引用时应导出。
+
 ## #43 BFF 透传层无快失败：下游宕机 → BFF 线程堆积（[0.2.40] A1 修复）
 - **现象**：product-service 8083 宕机时，BFF 每个透传请求等满 2s 超时；并发下 Node 事件循环被堆积的连接耗尽。
 - **根因**：BFF(NestJS) HttpService 只有 timeout 无熔断；Java 侧 ResilientHttp 熔断（[0.2.35] 4 调用点）覆盖不到 BFF 透传层。

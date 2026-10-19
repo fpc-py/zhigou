@@ -43,6 +43,7 @@ import { WalletController } from './wallet/wallet.controller.js';
 import { WalletService } from './wallet/wallet.service.js';
 import { MerchantController } from './merchant/merchant.controller.js';
 import { MerchantService } from './merchant/merchant.service.js';
+import { MonitorController } from './monitor/monitor.controller.js';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { MerchantService } from './merchant/merchant.service.js';
     ClosetController,
     WalletController,
     MerchantController,
+    MonitorController,
   ],
   providers: [
     HomeService,
