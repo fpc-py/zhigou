@@ -1,5 +1,10 @@
 # 测试问题 & Bug 记录
 
+## #42 压测 token 过期 → 全量 401 → 错误率 100% 假数据（工作流3 #9 落地，2026-10-19）
+- **现象**：横向扩展压测第一轮错误率 100%，RPS 却飙到 315-827（矛盾信号）；curl 冒烟带 token 也 401。
+- **根因**：%TEMP%\zhigou-jwt.txt 是 2h 有效期 token，已过期；所有请求被 BFF 鉴权拦截。
+- **修复**：node jsonwebtoken 重新签发 24h token（同 secret）。
+- **教训**：① 压测前必须验签 token 有效期（过期 token 会制造"高 RPS + 100% 错误"的假数据，比 201 误判更隐蔽）；② 错误率异常时先做最小冒烟（curl 带 token 看 200/401）再归因压测逻辑。
 ## #41 actuator/prometheus 被安全链 403 拦截，Prometheus 无数据源（工作流3 #8，2026-10-18）
 - **现象**：所有服务 /actuator/prometheus 返回 403，Prometheus 抓取为空；告警规则写了也白写。
 - **根因**：各服务 SecurityConfig 只放行 /actuator/health，anyRequest().authenticated() 拦截指标端点。
