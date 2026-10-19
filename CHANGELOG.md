@@ -3,6 +3,27 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.42] — A4 部分退款 + 部分发货（2026-10-19）
+
+### feat: 部分发货（order-service）
+- `order_shipment` 发货明细表（V20261101），订单支持分批发货：`POST /order/{id}/ship-partial` + `GET /order/{id}/shipments`
+- 状态机新增 **SHIPPING** 中间态：PAID → SHIPPING（部分发货）→ SHIPPED（全部发完）
+- 发货校验：仅 PAID/SHIPPING 可发（40050）、数量合法（40051）、按 SKU 累计不超购买量（40052）
+- BFF 透传 + 业务错误显式抛出（unwrapOrThrow，不再吞成 success-null）
+
+### feat: 部分退款（aftersale-service）
+- 累计退款上限校验：同订单已退额 + 本次 ≤ 实付（多次部分退款闭环）
+- payment 退款幂等粒度 orderNo → **orderNo+amount**（坑 #47）
+
+### 实测（本机 Windows 全链路）
+- 部分发货：count=3 分批发 1+2 → SHIPPING→SHIPPED（shipped=3 remain=0），shipments 2 条
+- 超额发货 → 400「当前状态不可发货: SHIPPED」
+- 部分退款：100/300 → refund 成功；再退 200 = 实付成功；再退 201 → 400「累计退款超过实付」
+
+### 环境阻塞待补验
+- payment 幂等修复后重启失败：Docker MySQL(3307) 拒绝新连接（引擎 500），修复未实测
+- 库存回滚：inventory 8086 DOWN → rollback Connection refused → 待人工补偿
+
 ## [0.2.41] A6：秒杀活动 + 券叠加互斥（2026-10-19）
 - **feat(marketing) 秒杀模块**：seckill_activity 活动表（限时/限量/每人限购）；`GET /seckill/activities`（时间窗口过滤）`GET /seckill/activity/{id}` `POST /seckill/buy`（预扣）`POST /seckill/release`（释放）
 - **防超卖核心**：单条原子 UPDATE `sold+n <= total AND start<=NOW() AND end>=NOW()`，MySQL 行锁保证并发不超卖；限购校验（count > perUserLimit 拦截）

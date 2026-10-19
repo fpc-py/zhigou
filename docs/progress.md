@@ -4,6 +4,12 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-19 · [0.2.42] A4 部分退款 + 部分发货
+- **部分发货**：order_shipment 明细表 + SHIPPING 中间态（PAID→SHIPPING→SHIPPED），分批履约；全 SKU 发完自动 SHIPPED；超量 40052/状态 40050
+- **部分退款**：aftersale 累计退款上限校验；payment 退款幂等 orderNo+amount（坑 #47）
+- **实测**：count=3 分批发 1+2 → SHIPPING→SHIPPED；超额发货 400；退款 100/300 成功 + 累计 201 拦截
+- **待补验**：payment 重启被 Docker MySQL 3307 阻塞（引擎 500）；库存回滚待 inventory 8086 启动后复验
+
 ## 2026-10-19 · A6：秒杀活动 + 券叠加互斥 [0.2.41]
 - ✅ 秒杀模块：seckill_activity + 原子防超卖 UPDATE（行锁）+ 时间窗口 + 每人限购；BFF /seckill/* 4 端点透传
 - ✅ 券叠加互斥：calculate 拆分秒杀金额（满减/券基于非秒杀金额），秒杀商品不叠加优惠
