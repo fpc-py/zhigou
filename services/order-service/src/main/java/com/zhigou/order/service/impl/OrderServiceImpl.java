@@ -11,6 +11,7 @@ import com.zhigou.order.dto.OrderResponse;
 import com.zhigou.order.dto.OrderStatsOverview;
 import com.zhigou.order.entity.OrderItem;
 import com.zhigou.order.entity.OrderMain;
+import com.zhigou.order.entity.OrderShipment;
 import com.zhigou.order.entity.Outbox;
 import com.zhigou.order.mapper.OrderItemMapper;
 import com.zhigou.order.mapper.OrderMainMapper;
@@ -44,6 +45,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemMapper itemMapper;
     private final OutboxMapper outboxMapper;
     private final com.zhigou.order.mapper.FulfillmentActionMapper fulfillmentActionMapper;
+    private final com.zhigou.order.mapper.OrderShipmentMapper shipmentMapper;
     private final RestTemplate restTemplate;
     private final com.zhigou.common.resilience.ResilientHttp resilientHttp;
 
@@ -405,6 +407,75 @@ public class OrderServiceImpl implements OrderService {
         return fulfillmentActionMapper.selectList(new LambdaQueryWrapper<com.zhigou.order.entity.FulfillmentAction>()
                 .orderByDesc(com.zhigou.order.entity.FulfillmentAction::getCreateTime)
                 .last("limit " + Math.max(1, Math.min(limit, 100))));
+    }
+
+    @Override @org.springframework.transaction.annotation.Transactional
+    public Map<String, Object> shipPartial(Long orderId, Long skuId, Integer count, String trackingNo) {
+        OrderMain order = requireOrder(orderId);
+        String status = order.getOrderStatus();
+        if (!Set.of("PAID", "SHIPPING").contains(status))
+            throw new BizException(40050, "当前状态不可发货: " + status);
+        if (count == null || count < 1) throw new BizException(40051, "发货数量不合法");
+
+        OrderItem item = itemMapper.selectOne(new LambdaQueryWrapper<OrderItem>()
+                .eq(OrderItem::getOrderId, orderId).eq(OrderItem::getSkuId, skuId));
+        if (item == null) throw new BizException(404, "订单商品不存在: skuId=" + skuId);
+
+        int shippedBefore = shippedCount(orderId, skuId);
+        int remain = item.getCount() - shippedBefore;
+        if (count > remain) throw new BizException(40052, "发货超量: 该SKU剩余可发 " + remain + " 件");
+
+        OrderShipment s = new OrderShipment();
+        s.setOrderId(orderId); s.setSkuId(skuId); s.setCount(count);
+        s.setTrackingNo(trackingNo); s.setShipTime(LocalDateTime.now());
+        shipmentMapper.insert(s);
+
+        // 状态迁移：全部 SKU 发完 → SHIPPED；否则 PAID→SHIPPING
+        String newStatus;
+        if (allShipped(orderId)) {
+            OrderState.validateTransition(OrderState.from(status), OrderState.SHIPPED);
+            newStatus = "SHIPPED";
+        } else {
+            if ("PAID".equals(status)) {
+                OrderState.validateTransition(OrderState.PAID, OrderState.SHIPPING);
+            }
+            newStatus = "SHIPPING";
+        }
+        if (!newStatus.equals(status)) {
+            order.setOrderStatus(newStatus);
+            orderMapper.updateById(order);
+        }
+        log.info("部分发货: orderId={}, skuId={}, count={}, 状态 {}->{}", orderId, skuId, count, status, newStatus);
+
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("orderStatus", newStatus);
+        out.put("skuId", skuId);
+        out.put("shippedCount", shippedBefore + count);
+        out.put("remainingCount", Math.max(0, item.getCount() - shippedBefore - count));
+        out.put("shipments", shipments(orderId));
+        return out;
+    }
+
+    @Override
+    public List<OrderShipment> shipments(Long orderId) {
+        return shipmentMapper.selectList(new LambdaQueryWrapper<OrderShipment>()
+                .eq(OrderShipment::getOrderId, orderId).orderByAsc(OrderShipment::getId));
+    }
+
+    private int shippedCount(Long orderId, Long skuId) {
+        return shipmentMapper.selectList(new LambdaQueryWrapper<OrderShipment>()
+                .eq(OrderShipment::getOrderId, orderId).eq(OrderShipment::getSkuId, skuId))
+                .stream().mapToInt(OrderShipment::getCount).sum();
+    }
+
+    /** 是否所有 SKU 均已全部发完 */
+    private boolean allShipped(Long orderId) {
+        List<OrderItem> items = itemMapper.selectList(new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId));
+        if (items.isEmpty()) return false;
+        for (OrderItem it : items) {
+            if (shippedCount(orderId, it.getSkuId()) < it.getCount()) return false;
+        }
+        return true;
     }
 
     private OrderResponse buildResponse(OrderMain order) {

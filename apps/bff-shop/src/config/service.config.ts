@@ -68,6 +68,8 @@ export const SERVICE_PATHS = {
   orderCancel:       (id: string) => `/order/${id}/cancel`,
   orderDetail:       (id: string) => `/order/${id}`,
   orderMine:         '/order/mine',
+  orderShipPartial:  (id: string) => `/order/${id}/ship-partial`,
+  orderShipments:    (id: string) => `/order/${id}/shipments`,
   orderStatsOverview: '/order/stats/overview',
   orderPendingFulfillment: '/order/stats/pending-fulfillment',
   merchantForecast:      '/product/merchant/forecast',

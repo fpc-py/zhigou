@@ -73,4 +73,18 @@ public class OrderController {
     public Result<List<com.zhigou.order.entity.FulfillmentAction>> fulfillmentActions(@RequestParam(defaultValue = "20") int limit) {
         return Result.ok(orderService.listFulfillmentActions(limit));
     }
+
+    @Operation(summary = "部分发货：PAID→SHIPPING(部分)/SHIPPED(全部发完)，支持分批") @PostMapping("/{id}/ship-partial")
+    public Result<Map<String, Object>> shipPartial(@PathVariable("id") Long id,
+                                                   @RequestBody Map<String, Object> body) {
+        Long skuId = Long.valueOf(String.valueOf(body.get("skuId")));
+        Integer count = body.get("count") == null ? 1 : ((Number) body.get("count")).intValue();
+        String trackingNo = body.get("trackingNo") == null ? null : String.valueOf(body.get("trackingNo"));
+        return Result.ok(orderService.shipPartial(id, skuId, count, trackingNo));
+    }
+
+    @Operation(summary = "订单发货明细") @GetMapping("/{id}/shipments")
+    public Result<List<com.zhigou.order.entity.OrderShipment>> shipments(@PathVariable("id") Long id) {
+        return Result.ok(orderService.shipments(id));
+    }
 }

@@ -53,6 +53,12 @@ public class AftersaleServiceImpl {
         if (!ALLOWED_ORDER_STATUS.contains(order.getOrderStatus()))
             throw new BizException(400, "当前订单状态不允许申请售后");
         if (req.getAmount() > order.getPayAmount()) throw new BizException(400, "退款金额超过实付");
+        // 部分退款闭环：同订单已 REFUNDED 的累计退款 + 本次 <= 实付
+        long refundedSum = mapper.selectList(new LambdaQueryWrapper<AftersaleOrder>()
+                        .eq(AftersaleOrder::getOrderNo, req.getOrderNo()).eq(AftersaleOrder::getStatus, "REFUNDED"))
+                .stream().mapToLong(AftersaleOrder::getAmount).sum();
+        if (refundedSum + req.getAmount() > order.getPayAmount())
+            throw new BizException(400, "累计退款超过实付（已退 " + refundedSum + "，可退 " + (order.getPayAmount() - refundedSum) + "）");
 
         // 3. 创建售后单
         AftersaleOrder ao = new AftersaleOrder();

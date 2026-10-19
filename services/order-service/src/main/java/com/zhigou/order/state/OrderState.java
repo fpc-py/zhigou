@@ -6,13 +6,15 @@ import java.util.Map;
 import java.util.Set;
 
 public enum OrderState {
-    INIT, PAID, SHIPPED, COMPLETED, CLOSED, REFUNDING, REFUNDED;
+    INIT, PAID, SHIPPING, SHIPPED, COMPLETED, CLOSED, REFUNDING, REFUNDED;
 
     private static final Map<OrderState, Set<OrderState>> ALLOWED = new EnumMap<>(OrderState.class);
 
     static {
         ALLOWED.put(INIT,      Set.of(PAID, CLOSED));
-        ALLOWED.put(PAID,      Set.of(SHIPPED, REFUNDING));
+        // 部分发货中间态：PAID → SHIPPING(部分发货) → SHIPPED(全部发完)
+        ALLOWED.put(PAID,      Set.of(SHIPPED, SHIPPING, REFUNDING));
+        ALLOWED.put(SHIPPING,  Set.of(SHIPPED, REFUNDING));
         ALLOWED.put(SHIPPED,   Set.of(COMPLETED));
         ALLOWED.put(COMPLETED, Set.of());
         ALLOWED.put(CLOSED,    Set.of());

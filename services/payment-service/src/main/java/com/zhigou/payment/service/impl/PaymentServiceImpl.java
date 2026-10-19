@@ -74,9 +74,10 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override @Transactional
     public String refund(String orderNo, Long amount, String reason) {
-        // 1. 幂等：同订单已有退款单直接返回（避免重复退款）
+        // 1. 幂等：同订单同金额的退款单直接返回（部分退款多笔金额各异，幂等粒度 = orderNo+amount）
         PaymentRefund existing = refundMapper.selectOne(new LambdaQueryWrapper<PaymentRefund>()
                 .eq(PaymentRefund::getOrderNo, orderNo)
+                .eq(PaymentRefund::getAmount, amount)
                 .eq(PaymentRefund::getStatus, "SUCCESS"));
         if (existing != null) {
             log.info("退款幂等命中: orderNo={}, refundNo={}", orderNo, existing.getRefundNo());

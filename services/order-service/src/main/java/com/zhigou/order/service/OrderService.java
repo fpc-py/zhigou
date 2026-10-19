@@ -22,4 +22,13 @@ public interface OrderService {
     int fulfillmentAction(String action, List<Long> orderIds, String reason);
     /** 最近异常订单处理记录（按时间倒序） */
     List<com.zhigou.order.entity.FulfillmentAction> listFulfillmentActions(int limit);
+
+    /**
+     * 部分发货：PAID → SHIPPING(部分) / 全部发完 → SHIPPED
+     * @return { orderStatus, shippedSkuCount, remainingCount, shipments }
+     */
+    java.util.Map<String, Object> shipPartial(Long orderId, Long skuId, Integer count, String trackingNo);
+
+    /** 订单发货明细 */
+    List<com.zhigou.order.entity.OrderShipment> shipments(Long orderId);
 }
