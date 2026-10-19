@@ -4,6 +4,13 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-19 · A 组技术收尾：SSE 断链 UI 提示 + BFF 熔断降级 [0.2.40]
+
+- ✅ **A3 bug #37 SSE 断链重连 UI 提示**：chat.ts 透传 SseOptions；chat/index.vue 接 onReconnect/error 显示「连接恢复中…（第 N 次）」状态条 / 「连接已断开」+ 重试按钮；确定性测试 ALL_PASS（流中断恢复 / 持续中断耗尽）+ 浏览器实测（AI 宕机显式提示、输入框锁定）
+- ✅ **A1 BFF 熔断降级**：common/circuit-breaker.ts（滑窗 10s / 失败率 50% / minCalls 5 / 打开 10s / 半开探活 1）+ GuardedHttpService 零侵入替换 HttpService；故障注入实测 /home/feed **7ms/3ms/2ms 快速失败**（原 2s 超时）+ 降级 200 + 半开探活自动重开；状态机单测 6 项 ALL_PASS
+- 📋 **docs/未完成任务清单.md**：A/B/C/D/E 五类 + 每项验收标准（规划源）；E 组 3 条滞后项（真伪测评/推荐引擎/图片搜款）勾销
+- 剩余 A 组待办：A2 埋点 → A4 部分退款 / A5 T+1 对账 / A6 秒杀+券互斥 / A7 文件鉴权 / A8 Prometheus 实跑（待 Docker Desktop）
+
 ## 2026-10-18 · 工作流2：AI 工程化深挖（可靠性+防编造+RAG+SSE+可观测）[0.2.33]
 
 - **#128 工具可靠性**：config 新增 ai_tool_timeout_s/retries/retry_delay_s（env 可覆盖）；_http_get 只读幂等重试（5xx/传输错误重试、4xx 不重试、0.3s×attempt 退避）、_http_post 写操作不重试（防重复下单）；清理 27 处散落 timeout，保留 3 特例（比价 8s/下单 8s/vision 60s）
