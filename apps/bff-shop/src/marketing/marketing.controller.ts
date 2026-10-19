@@ -63,4 +63,34 @@ export class MarketingController {
     const data = await this.marketingService.groupBuyDetail(userId, id);
     return ApiResponse.ok(data);
   }
+
+  // ==================== 秒杀 ====================
+
+  @Get('seckill/activities')
+  async seckillActivities(@Req() req: Request) {
+    const userId = (req as any).userId as string;
+    const data = await this.marketingService.seckillActivities(userId);
+    return ApiResponse.ok(data);
+  }
+
+  @Get('seckill/activity/:id')
+  async seckillDetail(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    const data = await this.marketingService.seckillDetail(userId, id);
+    return ApiResponse.ok(data);
+  }
+
+  @Post('seckill/buy')
+  async seckillBuy(@Body() body: { activityId: number; count?: number }, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    const data = await this.marketingService.seckillBuy(userId, body);
+    return ApiResponse.ok(data);
+  }
+
+  @Post('seckill/release')
+  async seckillRelease(@Body() body: { activityId: number; count?: number }, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    const data = await this.marketingService.seckillRelease(userId, body);
+    return ApiResponse.ok(data);
+  }
 }

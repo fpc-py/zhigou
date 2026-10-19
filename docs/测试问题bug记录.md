@@ -29,6 +29,18 @@
 - **根因**：公共库 openfeign 依赖声明 `<optional>true</optional>`（为避免强制下游携带），optional 依赖**不传递**给下游；下游无 Feign 类 → 自动配置类含 feign 方法签名 → 类加载即失败。
 - **修复**：拆 TraceFeignAutoConfiguration（独立类 + `@ConditionalOnClass(EnableFeignClients.class)`），仅启用 OpenFeign 的服务装配 Feign 拦截器；TraceAutoConfiguration 只保留无 Feign 引用的 TraceIdFilter。
 - **教训**：公共库可选依赖 + 自动配置 = 必须按条件拆类，任何方法签名引用可选依赖类都会炸。
+## #45 Flyway 新迁移版本号低于已应用版本 → 静默跳过，表和 seed 未生效（[0.2.41] A6）
+- **现象**：新增 V20261098__seckill.sql 后重启服务，flyway 日志显示 "Schema `zhigou_marketing` is up to date. No migration necessary"，秒杀表/数据不存在，接口返回空。
+- **根因**：已应用最高版本是 V20261099（group_buy），新迁移版本号 20261098 **低于**它；Flyway 迁移按版本号递增应用，落后版本被跳过且**不报错**。
+- **修复**：改名 V20261100__seckill.sql → 重启后 "Migrating schema to version 20261100 - seckill" + "Successfully applied 1 migration"。
+- **教训**：Flyway 静默跳过是典型难排查坑；新迁移版本号必须高于当前 schema 版本（团队规范：用日期+序号且全局单调，勿重排/插入旧号）。
+
+## #46 Map<String,Object> 请求体手动类型转换：BFF 传字符串 userId → ClassCastException 500（[0.2.41] A6）
+- **现象**：`POST /seckill/buy` 经 BFF 调用 500；直测 8088（数字 userId）200。BFF 侧 JWT sub 是字符串，组装进 body。
+- **根因**：`((Number) body.get("userId")).longValue()` —— JSON 反序列化为 Map 后 userId 是 String，String→Number cast 抛 ClassCastException；而 DTO 字段（如 CalculateRequest.userId Long）由 Jackson 自动做字符串→Long 转换。
+- **修复**：`uid instanceof Number n ? n.longValue() : Long.valueOf(String.valueOf(uid))` 兼容两种入参。
+- **教训**：Map 手写解析易踩类型坑，服务间入参应优先 DTO（Jackson 自动类型适配）；跨服务传 userId 统一类型（BFF 应传 Number 或后端用 DTO）。
+
 ## #44 NestJS 导出方法返回类型引用「未命名」内部类型 → TS4053（[0.2.40] A2 留痕）
 - **现象**：MonitorController.metrics() 返回类型推断为 `{ routes: RouteMetric[] }`，RouteMetric 是模块内未导出的 interface → `TS4053: Return type of public method has or is using name 'RouteMetric' ... but cannot be named`。
 - **根因**：NestJS 对 controller 公共方法做装饰器元数据收集，返回类型必须是可命名的类型；内部类型不导出即不可命名。

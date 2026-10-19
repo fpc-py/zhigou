@@ -3,6 +3,14 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.41] A6：秒杀活动 + 券叠加互斥（2026-10-19）
+- **feat(marketing) 秒杀模块**：seckill_activity 活动表（限时/限量/每人限购）；`GET /seckill/activities`（时间窗口过滤）`GET /seckill/activity/{id}` `POST /seckill/buy`（预扣）`POST /seckill/release`（释放）
+- **防超卖核心**：单条原子 UPDATE `sold+n <= total AND start<=NOW() AND end>=NOW()`，MySQL 行锁保证并发不超卖；限购校验（count > perUserLimit 拦截）
+- **券叠加互斥**：CalculateRequest.Item 增 seckill 标记；calculate() 拆分 seckillAmount/normalAmount —— 满减与券基于非秒杀金额计算（阈值+折扣基数），秒杀价商品不叠加任何优惠
+- **BFF 透传**：/seckill/* 4 端点（X-User-Id 注入，营销全量鉴权）
+- **实测**：活动列表 2 个进行中（明日秒杀被窗口过滤）；预扣 sold 20→21 remain 79；超购拦截「超过每人限购 2 件」；互斥对照实验：无秒杀 22000→减3000 / 含秒杀 21900（剔除9900后12000未达门槛）→不减
+- 坑 #45：Flyway 版本号非单调（V20261098 < 已应用 V20261099）→ 静默跳过（"Schema up to date"），表和 seed 未生效难排查；坑 #46：Map body 手动 `(Number)` 转换，BFF 传字符串 userId → ClassCastException 500（DTO 自动转换 vs Map 手动转换差异）
+
 ## [0.2.40] A 组技术收尾：SSE 断链 UI 提示 + BFF 熔断降级（2026-10-19）
 - **A3 fix(h5) bug #37**：chat.ts 透传 SseOptions；chat/index.vue 接 onReconnect/error —— 断链显示「连接恢复中…（第 N 次）」状态条，重连耗尽显示「连接已断开」+ 重试按钮（retrySend 复用 lastSend），done 复位；sending 期间断链不静默置回可输入。确定性测试 ALL_PASS（流中断恢复 / 持续中断耗尽两场景）；浏览器实测：AI 宕机 → 显式「AI 助手暂时不可用」+ 输入框锁定。
 - **A1 feat(bff) BFF 熔断降级**：新增 common/circuit-breaker.ts（滑动窗口 10s / 失败率 50% / minCalls 5 / 打开 10s / 半开探活 1，对齐 Java 侧参数）+ GuardedHttpService 零侵入替换 HttpService —— 所有 service 下游调用自动熔断守护，原有降级兜底自动承接。

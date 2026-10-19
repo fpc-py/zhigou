@@ -142,4 +142,66 @@ export class MarketingService {
     );
     return unwrapOrThrow(resp, this.logger, `group-buy/group/${groupId}`, null);
   }
+
+  // ==================== 秒杀 ====================
+
+  /** 秒杀活动列表 */
+  async seckillActivities(userId: string): Promise<any[]> {
+    const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.seckillActivities}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.marketingSvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`marketing-service /seckill/activities 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: [] } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'seckill/activities', []);
+  }
+
+  /** 秒杀活动详情 */
+  async seckillDetail(userId: string, id: string): Promise<any | null> {
+    const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.seckillDetail(id)}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.marketingSvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`marketing-service /seckill/activity/${id} 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, `seckill/activity/${id}`, null);
+  }
+
+  /** 秒杀预扣（防超卖） */
+  async seckillBuy(userId: string, body: { activityId: number; count?: number }): Promise<any | null> {
+    const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.seckillBuy}`;
+    const resp = await firstValueFrom(
+      this.http.post(url, { userId, ...body }, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.marketingSvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`marketing-service /seckill/buy 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'seckill/buy', null);
+  }
+
+  /** 秒杀预扣释放 */
+  async seckillRelease(userId: string, body: { activityId: number; count?: number }): Promise<null> {
+    const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.seckillRelease}`;
+    await firstValueFrom(
+      this.http.post(url, { ...body }, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.marketingSvc.timeout),
+        catchError((err) => {
+          this.logger.warn(`marketing-service /seckill/release 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return null;
+  }
 }

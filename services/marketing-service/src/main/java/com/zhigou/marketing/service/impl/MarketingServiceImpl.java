@@ -81,12 +81,21 @@ public class MarketingServiceImpl implements CouponService {
     }
 
     public CalculateResponse calculate(CalculateRequest req) {
+        // 券叠加互斥：秒杀价商品不参与满减/券（互斥规则），正常商品金额作为优惠计算基数
         long totalAmount = 0;
-        if (req.getItems() != null)
-            totalAmount = req.getItems().stream().mapToLong(i -> i.getPrice() * i.getCount()).sum();
+        long seckillAmount = 0;
+        List<CalculateRequest.Item> normalItems = new ArrayList<>();
+        if (req.getItems() != null) {
+            for (CalculateRequest.Item it : req.getItems()) {
+                long amount = it.getPrice() * it.getCount();
+                totalAmount += amount;
+                if (Boolean.TRUE.equals(it.getSeckill())) seckillAmount += amount;
+                else normalItems.add(it);
+            }
+        }
+        long ruleBase = totalAmount - seckillAmount; // 满减/规则计算基数（秒杀部分互斥剔除）
 
-        Map<Long, Long> ruleResults = ruleEngine.execute(totalAmount,
-                req.getItems() != null ? req.getItems() : Collections.emptyList());
+        Map<Long, Long> ruleResults = ruleEngine.execute(ruleBase, normalItems);
         long discountAmount = ruleResults.values().stream().mapToLong(Long::longValue).sum();
 
         List<CalculateResponse.Detail> details = new ArrayList<>();
@@ -100,16 +109,18 @@ public class MarketingServiceImpl implements CouponService {
         if (req.getUserId() != null) {
             for (UserCoupon uc : mine(req.getUserId(), "UNUSED")) {
                 CouponTemplate t = templateMapper.selectById(uc.getCouponTemplateId());
-                if (t != null && totalAmount >= t.getThresholdAmount()) {
-                    long save = computeSave(t, totalAmount);
+                // 阈值判定仅用非秒杀金额：秒杀商品不可叠加券
+                if (t != null && ruleBase >= t.getThresholdAmount()) {
+                    long save = computeSave(t, ruleBase);
                     coupons.add(CalculateResponse.AvailableCoupon.builder()
                             .couponId(uc.getId()).saveAmount(save).build());
                 }
             }
         }
 
-        long finalAmount = Math.max(0, totalAmount - discountAmount
-                - (req.getCouponId() != null ? computeCouponDiscount(req.getCouponId(), totalAmount) : 0));
+        long couponDiscount = 0;
+        if (req.getCouponId() != null) couponDiscount = computeCouponDiscount(req.getCouponId(), ruleBase);
+        long finalAmount = Math.max(0, ruleBase - discountAmount - couponDiscount) + seckillAmount;
 
         DiscountSnapshot snap = new DiscountSnapshot();
         snap.setOrderNo("CALC_" + UUID.randomUUID().toString().substring(0, 8));
