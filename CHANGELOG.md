@@ -3,6 +3,23 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.45] — B1 三级缓存 Caffeine（2026-10-20）
+
+### feat: product-service 热点读三级缓存
+- **L1 本地缓存**：Caffeine（TTL 60s / maxSize 10000），`get(key,loader)` 原子加载 = 并发单飞，防缓存击穿（同一 key 仅一个线程查库回填）
+- **L2 Redis**：沿用 5min TTL 详情缓存；L3 MySQL
+- **防穿透**：DB 无数据时 L1 短缓存 `Optional.empty()` 空标记（60s），避免无效 key 反复打库
+- **一致性**：updateSpu/offShelf 同步失效 L1+L2（两处缓存删除点）
+- 坑：脚本批量替换时未感知编译顺序，需先还原误加行再整体应用（改代码必须编译验证）
+
+## [0.2.46] — B3 XSS/CSRF 防护（2026-10-20）
+
+### feat: common 全局安全过滤（auto-config 全服务生效）
+- **XssFilter**：URL query 反射型 XSS 特征（`<script`/`<iframe`/`<svg`/`onerror=`/`onload=`/`onclick=`/`javascript:`/`<img…on`/`expression(`）→ 40010 拦截
+- **安全响应头**：CSP（frame-ancestors none）/ X-Content-Type-Options / X-Frame-Options DENY / Referrer-Policy / X-XSS-Protection
+- CSRF 说明：JWT 无状态 + Authorization 头（无 Cookie 会话）天然免疫传统 CSRF，未引入 token 复杂度
+- **实测**：单元测试 5/5 通过（script 标签/onerror/javascript: 协议/大小写变形 4 类样本被 400 拦截；正常请求放行并携带全部安全头）
+
 ## [0.2.44] — A7 文件访问鉴权（私有读）（2026-10-20）
 
 ### feat: file-service 私有读闭环

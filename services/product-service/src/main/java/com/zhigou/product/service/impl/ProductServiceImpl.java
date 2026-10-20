@@ -18,12 +18,15 @@ import com.zhigou.product.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -42,6 +45,12 @@ public class ProductServiceImpl implements ProductService {
 
     private static final String DETAIL_CACHE_KEY = "product:detail:";
     private static final long CACHE_TTL = 5;
+
+    /** B1 L1 本地缓存：热点 SPU 详情（TTL 60s，max 10000）；get(key,loader) 原子加载 = 并发单飞防击穿 */
+    private final Cache<String, Optional<SpuDetailResponse>> localCache = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .expireAfterWrite(60, TimeUnit.SECONDS)
+            .build();
 
     @Override
     public Page<SpuDetailResponse> page(SpuPageQuery query) {
@@ -65,24 +74,32 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public SpuDetailResponse getDetail(Long spuId) {
         String cacheKey = DETAIL_CACHE_KEY + spuId;
+        // B1 L1 Caffeine：get(key, loader) 同一 key 并发只执行一次 loader（单飞，防击穿）；空值 Optional 短缓存（防穿透）
+        Optional<SpuDetailResponse> local = localCache.get(cacheKey, k -> loadWithRedis(k, spuId));
+        return local.orElse(null);
+    }
+
+    /** L2 Redis → DB 加载（由 Caffeine 单飞保证同一 key 仅一个线程进入） */
+    private Optional<SpuDetailResponse> loadWithRedis(String cacheKey, Long spuId) {
         String cached = redisTemplate.opsForValue().get(cacheKey);
         if (cached != null) {
             try {
-                return objectMapper.readValue(cached, SpuDetailResponse.class);
+                return Optional.ofNullable(objectMapper.readValue(cached, SpuDetailResponse.class));
             } catch (Exception e) {
-                log.warn("缓存反序列化失败: spuId={}", spuId);
+                log.warn("L2 反序列化失败: spuId={}", spuId);
             }
         }
 
         SpuDetailResponse detail = loadDetail(spuId);
-        if (detail == null) return null;
-
+        if (detail == null) {
+            return Optional.empty();
+        }
         try {
             redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(detail), CACHE_TTL, TimeUnit.MINUTES);
         } catch (Exception e) {
-            log.warn("缓存写入失败: spuId={}", spuId);
+            log.warn("L2 写入失败: spuId={}", spuId);
         }
-        return detail;
+        return Optional.of(detail);
     }
 
     @Override
@@ -147,6 +164,7 @@ public class ProductServiceImpl implements ProductService {
 
         // 删缓存
         redisTemplate.delete(DETAIL_CACHE_KEY + spuId);
+        localCache.invalidate(DETAIL_CACHE_KEY + spuId);
 
         // 发送 MQ 消息触发 RAG 向量同步
         try {
@@ -167,6 +185,7 @@ public class ProductServiceImpl implements ProductService {
         spu.setStatus(0);
         spuMapper.updateById(spu);
         redisTemplate.delete(DETAIL_CACHE_KEY + spuId);
+        localCache.invalidate(DETAIL_CACHE_KEY + spuId);
 
         try {
             rocketMQTemplate.convertAndSend("PRODUCT_CHANGED",

@@ -4,6 +4,12 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-20 · [0.2.45] B1 三级缓存 Caffeine（product-service 热点读）
+- L1 Caffeine（60s/max1w，原子加载单飞防击穿）+ L2 Redis（5min）+ L3 MySQL；空值 Optional 短缓存防穿透；更新/下架双级失效
+
+## 2026-10-20 · [0.2.46] B3 XSS/CSRF 防护（common 全局）
+- XssFilter（反射型 XSS 特征 400 拦截）+ 安全响应头（CSP/nosniff/DENY/no-referrer）；单测 5/5 通过
+
 ## 2026-10-20 · [0.2.44] A7 文件访问鉴权（私有读）
 - file-service：bucket 私有化（移除公开读策略）+ GET /file/{id}/content 私有读代理（鉴权+归属403+流式）+ 签名URL 短时效分发
 - BFF：file 模块（upload/url/content 透传），补全前端 /file/* 链路（此前缺失会 404）
