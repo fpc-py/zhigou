@@ -3,6 +3,14 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.48] — B2 消息堆积监控（2026-10-20）
+
+### feat: inventory-service RocketMQ 消费积压探针
+- **RocketMqLagProbe**：每 30s 用 DefaultMQAdminExt 拉取 (topic, consumerGroup) 消费位点，积压 = Σ(brokerOffset - consumerOffset)，暴露 Gauge `rocketmq_consumer_accumulation{topic,group}`
+- **与告警联动**：monitoring-alerting.md 既有 MQBacklog 规则（> 1000 触发 P2）直接生效；broker 不可达降级 warn（指标保留上次值）不阻断业务
+- 配置：`rocketmq.lag.targets`（topic:group，逗号分隔）/ `rocketmq.lag.interval-ms`（默认 30000）
+- 坑 #51：RocketMQ 5.1.4 API 大改——`fetchConsumeStats` 更名 `examineConsumeStats`、返回值 ConsumeStats 挪到 remoting.protocol.admin、OffsetTable 值由 Long 变 OffsetWrapper(brokerOffset/consumerOffset)、`maxOffset` 签名改 MessageQueue；且 4.x 的 ConsumeStats 类在 5.x 已移除，需按 javap 实际签名对齐
+
 ## [0.2.47] — B4 Prompt 注入防护（2026-10-20）
 
 ### feat: ai-orchestrator 输入侧注入检测（prompt_guard.py）

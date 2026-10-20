@@ -4,6 +4,9 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-20 · [0.2.48] B2 消息堆积监控（inventory-service）
+- RocketMqLagProbe：DefaultMQAdminExt 查消费位点 → rocketmq_consumer_accumulation Gauge（与 MQBacklog 告警规则联动）；broker 不可达降级 warn；坑 #51（5.x API 变更）
+
 ## 2026-10-20 · [0.2.47] B4 Prompt 注入防护（ai-orchestrator 输入侧）
 - prompt_guard.py：指令覆盖/系统提示泄露/越权扮演/解除限制/越权访问/编码变体 6 维检测；命中降级隔离（注入文本不透传 LLM）；正常语境白名单防误报；pytest 3/3 通过
 
