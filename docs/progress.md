@@ -4,6 +4,9 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-20 · [0.2.50] B7 故障演练 / Runbook / on-call
+- docs/故障演练与Runbook.md（5 类故障速查 + 值班流程 + 复盘模板）+ scripts/fault-drill/ 3 场景演练脚本（语法已验证）；真实演练待环境恢复执行留痕
+
 ## 2026-10-20 · [0.2.49] B5 金额加密落库（order_main 落点）
 - common AmountEncryptUtil(AES-GCM 随机IV) + AmountTypeHandler 透明加解密 + order 两金额列迁移 VARCHAR + 存量明文兼容；单测 4/4；生产需配 zhigou.crypto.key
 

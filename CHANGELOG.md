@@ -3,6 +3,14 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.50] — B7 故障演练 / Runbook / on-call（2026-10-20）
+
+### docs + scripts: 可运维性核心资产
+- **Runbook 速查表**：下游宕机熔断 / DB 不可用 / MQ 积压 / 缓存击穿雪崩 / AI 超时 5 类核心故障的信号 → 处理步骤
+- **on-call 值班流程**：告警 → 影响面确认 → 定位 → 定级上报 → 处置 → 复盘（与 monitoring-alerting.md 联动）
+- **演练脚本**（scripts/fault-drill/run_drill.py，无第三方依赖）：熔断降级 / Caffeine 单飞防击穿 / MQ 积压探针 3 场景 + 复盘模板
+- 演练记录：脚本就绪，真实执行待服务链（3307 Docker MySQL）恢复后统一补跑并留痕
+
 ## [0.2.49] — B5 金额加密落库（2026-10-20）
 
 ### feat: 金额 AES-GCM 透明加解密（order_main 落点）
