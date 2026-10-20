@@ -254,6 +254,7 @@
 | 2026-10-08 | **.dockerignore 排除 **/target 导致 Dockerfile.runtime 构建报 jar not found**（COPY 宿主 jar 被 context 过滤） | runtime Dockerfile 构建 context 改为服务目录：docker build -f Dockerfile.runtime -t zhigou/<svc>:0.1.0 services/<svc>（COPY target/...） | 构建成功 exit=0 |
 | #47 | 2026-10-19 | payment 退款幂等键为 orderNo（整单级），部分退款第二笔（不同金额）直接返回第一笔 refundNo 且不新增退款记录 | 幂等粒度改为 orderNo+amount（同订单同金额幂等，不同金额独立退款） | 验证脚本两笔退款返回同一 refundNo，对照 payment_refund 表确认只落一笔 | A4 部分退款闭环 |
 | #48 | 2026-10-20 | PaymentService.reconcile() 接口仍声明 void，实现改为返回 Map<String,Object>，编译报「方法不会覆盖或实现父类的方法」 | 接口与实现同步演进（接口改 Map 返回） | mvn compile 通过 | A5 T+1 对账 |
+| #49 | 2026-10-20 | MinIO bucket 被 MinioInitializer 设为公开只读策略（PUBLIC_READ_POLICY），拿到 object key 即可匿名下载，绕过 file-service 鉴权 | bucket 保持私有 + 新增 /file/{id}/content 代理私有读 + presigned 短时效分发 | 编译构建通过；端到端（匿名403/跨用户403）待 3307 恢复补验 | A7 文件访问鉴权 |
 - 2026-10-08（P1）：压测复测 page 通过率在 2000VU 高 VU 段波动（82%↔67%）——缓存命中后 BFF 日志全成功（66ms），k6 侧失败源于单机容量（单 BFF 事件循环 + 写链路重事务排队）；结论：50VU 达标，2000VU 需横向扩展（报告 §6.3）。
 - 2026-10-08（P1）：**ai-orchestrator 日志 15 万行**——detail 每次迭代打 RAG，AI 服务处理不过来且日志爆炸；已加 BFF 内存缓存（同 spu 5min）消除重复调用。
 - 2026-10-08（P1）：**mvn package 假成功坑再现**——进程未杀干净时 Unable to rename ...jar to ...jar.original（BUILD FAILURE），须先杀 8083 占用进程再删 jar 重打包。

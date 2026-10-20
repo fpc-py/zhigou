@@ -1,5 +1,6 @@
 package com.zhigou.file.service;
 
+import com.zhigou.file.dto.FileDownload;
 import com.zhigou.file.dto.UploadResponse;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,6 +21,12 @@ public interface FileService {
                           Integer maxWidth, Integer maxHeight);
 
     String getSignedUrl(Long userId, String fileId);
+
+    /**
+     * 私有读（A7）：鉴权 + 归属校验后从 MinIO 读取文件字节（服务端流式），
+     * 返回 内容字节/Content-Type/原始文件名/大小。
+     */
+    FileDownload download(Long userId, String fileId);
 
     void delete(Long userId, String fileId);
 }

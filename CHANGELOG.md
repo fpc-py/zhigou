@@ -3,6 +3,22 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.44] — A7 文件访问鉴权（私有读）（2026-10-20）
+
+### feat: file-service 私有读闭环
+- **bucket 私有化**：移除 MinIO 公开只读策略（PUBLIC_READ_POLICY），匿名访问直链 → 403（坑 #49）
+- **私有读代理端点**：`GET /file/{fileId}/content` —— JWT/X-User-Id 鉴权 + 归属校验（非本人 403）+ MinIO 服务端流式返回（Content-Disposition inline）
+- 保留 `GET /file/{fileId}/url` 短时效（默认 1h）MinIO 预签名 URL，仅作图片直链分发
+- 新增 `FileDownload` DTO（字节/Content-Type/原始文件名/大小）
+
+### feat: BFF file 模块（补全前端链路）
+- 新增 `/file/upload`（multer 收文件 + FormData 转发）、`/file/:fileId/url`、`/file/:fileId/content`（字节流代理）
+- JWT 守卫 + X-User-Id 头注入，与 file-service 鉴权链路贯通
+
+### 验证状态
+- ✅ file-service / BFF 编译构建通过
+- ⏸ 端到端待补验：3307 Docker MySQL 恢复后启动 file-service 8082 + BFF 3000，造数验证 上传→私有读 200 / 匿名直链 403 / 跨用户 403 / 签名URL 时效
+
 ## [0.2.43] — A5 完整 T+1 对账（2026-10-20）
 
 ### feat: 支付对账闭环（payment-service）

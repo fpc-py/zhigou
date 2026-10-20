@@ -1,12 +1,14 @@
 package com.zhigou.file.controller;
 
 import com.zhigou.common.Result;
+import com.zhigou.file.dto.FileDownload;
 import com.zhigou.file.dto.UploadResponse;
 import com.zhigou.file.interceptor.UserContext;
 import com.zhigou.file.service.FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,6 +34,22 @@ public class FileController {
         Long userId = UserContext.requireUserId();
         UploadResponse resp = fileService.upload(userId, file, compress, convertTo, bizType, maxWidth, maxHeight);
         return Result.ok(resp);
+    }
+
+    @Operation(summary = "私有读（鉴权 + 归属校验，服务端流式）")
+    @GetMapping("/{fileId}/content")
+    public ResponseEntity<byte[]> content(@PathVariable("fileId") String fileId) {
+        Long userId = UserContext.requireUserId();
+        FileDownload d = fileService.download(userId, fileId);
+        String fileName = java.net.URLEncoder.encode(d.fileName() == null ? fileId : d.fileName(),
+                java.nio.charset.StandardCharsets.UTF_8);
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(
+                        d.contentType() == null ? "application/octet-stream" : d.contentType()))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"" + fileName + "\"")
+                .contentLength(d.size() == null ? d.bytes().length : d.size())
+                .body(d.bytes());
     }
 
     @Operation(summary = "获取签名URL")

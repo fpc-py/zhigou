@@ -3,10 +3,13 @@ package com.zhigou.file.service.impl;
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zhigou.common.BizException;
+import com.zhigou.file.dto.FileDownload;
 import com.zhigou.file.dto.UploadResponse;
 import com.zhigou.file.entity.FileMeta;
 import com.zhigou.file.mapper.FileMetaMapper;
 import com.zhigou.file.service.FileService;
+import io.minio.GetObjectArgs;
+import io.minio.GetObjectResponse;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -158,6 +161,22 @@ public class FileServiceImpl implements FileService {
     public String getSignedUrl(Long userId, String fileId) {
         FileMeta meta = requireOwnFile(userId, fileId);
         return generatePresignedUrl(meta.getObjectKey());
+    }
+
+    @Override
+    public FileDownload download(Long userId, String fileId) {
+        FileMeta meta = requireOwnFile(userId, fileId);
+        try (GetObjectResponse obj = minioClient.getObject(GetObjectArgs.builder()
+                .bucket(bucket)
+                .object(meta.getObjectKey())
+                .build())) {
+            byte[] bytes = obj.readAllBytes();
+            log.info("私有读: fileId={}, userId={}, size={}", fileId, userId, bytes.length);
+            return new FileDownload(bytes, meta.getMimeType(), meta.getOriginalName(), meta.getSize());
+        } catch (Exception e) {
+            log.error("MinIO 读取失败: fileId={}", fileId, e);
+            throw new BizException(500, "文件读取失败");
+        }
     }
 
     @Override

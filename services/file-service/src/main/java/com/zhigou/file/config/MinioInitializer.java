@@ -19,24 +19,12 @@ public class MinioInitializer {
     private final MinioConfig minioConfig;
 
     /**
-     * 公开只读策略：允许匿名 GetObject。
-     * 上传接口返回的是对象直链（http://localhost:9000/{bucket}/{key}），
-     * 若 bucket 无公开读权限，前端访问图片会返回 403。
+     * A7 私有读：bucket 保持 MinIO 默认私有（不设公开读策略）。
+     * 文件访问一律走 file-service 鉴权：
+     *   1) GET /file/{fileId}/content —— JWT/X-User-Id 鉴权 + 归属校验（403），服务端流式私有读
+     *   2) GET /file/{fileId}/url    —— 短时效（默认 1h）MinIO 预签名 URL，仅作图片直链分发
+     * 匿名访问 bucket 直链 → MinIO 返回 403（无公开策略）。
      */
-    private static final String PUBLIC_READ_POLICY = """
-            {
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Effect": "Allow",
-                  "Principal": {"AWS": ["*"]},
-                  "Action": ["s3:GetObject"],
-                  "Resource": ["arn:aws:s3:::%s/*"]
-                }
-              ]
-            }
-            """;
-
     @EventListener(ApplicationReadyEvent.class)
     public void ensureBucket() {
         try {
@@ -48,18 +36,6 @@ public class MinioInitializer {
                 log.info("Bucket 已创建: {}", minioConfig.getBucket());
             } else {
                 log.info("Bucket 已存在: {}", minioConfig.getBucket());
-            }
-
-            try {
-                minioClient.setBucketPolicy(
-                        SetBucketPolicyArgs.builder()
-                                .bucket(minioConfig.getBucket())
-                                .config(PUBLIC_READ_POLICY.formatted(minioConfig.getBucket()))
-                                .build());
-                log.info("Bucket 公开只读策略已设置: {}", minioConfig.getBucket());
-            } catch (Exception policyEx) {
-                // 兼容性：s3mock 对 policy PUT 返回 409；生产 MinIO 正常设置。策略缺失仅影响匿名直链，测试场景忽略
-                log.warn("Bucket 公开只读策略设置失败（忽略）: {}，原因: {}", minioConfig.getBucket(), policyEx.getMessage());
             }
         } catch (Exception e) {
             log.error("MinIO bucket 初始化失败", e);
