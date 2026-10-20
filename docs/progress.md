@@ -4,6 +4,11 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-20 · [0.2.43] A5 T+1 对账（代码完成，编译通过；验证待环境）
+- payment_reconcile_log 对账日志表 + reconcile() 升级（汇总/三类差异清单/补偿/落库幂等）+ GET /payment/reconcile/report
+- 坑 #48：接口返回类型未同步（void vs Map）
+- ⏸ 待补验：3307 Docker MySQL 恢复后启动 payment 8087，造数验证差异清单/补偿/落库
+
 ## 2026-10-19 · ⏸ 暂停点（用户指示：停服务，下次接着开发）
 - 已停：order 8085 / marketing 8088 / aftersale 8090 / BFF 3000（payment 8087 本就在 DOWN）
 - 环境阻塞：Docker Desktop 引擎 500 → 3307 Docker MySQL 的 mysqld 无响应（TCP 通、握手超时），新建 DB 连接全拒；3306 本机 MySQL 正常（握手 OK）

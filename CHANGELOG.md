@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.43] — A5 完整 T+1 对账（2026-10-20）
+
+### feat: 支付对账闭环（payment-service）
+- `payment_reconcile_log` 对账日志表（V20261102）：每周期一条，按 reconcile_date 幂等 upsert
+- `reconcile()` 升级：汇总（total/success/pending/refunded）+ 差异清单三类（UNNOTIFIED 支付成功未通知 / STALE_PENDING 超 24h 未支付 / OVER_REFUND 累计退款超实付）+ 补偿动作（UNNOTIFIED 重发订单通知）+ 落库
+- 新增 `GET /payment/reconcile/report` 运维端点：返回对账报告（周期/汇总/差异清单/补偿数）
+- 坑 #48：接口 `PaymentService.reconcile()` 仍声明 void 而实现已返回 Map → 编译「方法不会覆盖父类方法」；接口演进必须同步（实现已改 `Map<String,Object>`）
+
+### 验证状态
+- ✅ 编译通过（`mvn -pl services/payment-service -am compile`）
+- ⏸ 端到端待补验：Docker Desktop 引擎 500 → 3307 Docker MySQL 拒绝连接，payment 8087 无法启动；环境恢复后执行 `GET /payment/reconcile/report` + 造数验证差异清单/补偿/落库幂等
+
 ## [0.2.42] — A4 部分退款 + 部分发货（2026-10-19）
 
 ### feat: 部分发货（order-service）

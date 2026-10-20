@@ -61,6 +61,12 @@ public class PaymentController {
      * 运维触发 T+1 对账补偿（定时任务每日凌晨 1 点自动执行，此端点为手动补跑入口）。
      * 生产环境应增加内网白名单/管理员鉴权，演示环境放行。
      */
+    @GetMapping("/reconcile/report")
+    public Result<Map<String, Object>> reconcileReport(@RequestParam(required = false) String date) {
+        Map<String, Object> report = paymentService.reconcile();
+        return Result.ok(report);
+    }
+
     @PostMapping("/reconcile")
     public Result<Map<String, Object>> reconcile() {
         paymentService.reconcile();

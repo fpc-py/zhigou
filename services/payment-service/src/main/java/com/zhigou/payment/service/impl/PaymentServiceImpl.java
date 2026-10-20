@@ -7,6 +7,7 @@ import com.zhigou.common.BizException;
 import com.zhigou.payment.client.OrderNotifyClient;
 import com.zhigou.payment.entity.Payment;
 import com.zhigou.payment.entity.PaymentRefund;
+import com.zhigou.payment.entity.ReconcileLog;
 import com.zhigou.payment.mapper.PaymentMapper;
 import com.zhigou.payment.mapper.PaymentRefundMapper;
 import com.zhigou.payment.service.PaymentService;
@@ -16,14 +17,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j @Service @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentMapper paymentMapper;
     private final PaymentRefundMapper refundMapper;
+    private final com.zhigou.payment.mapper.ReconcileLogMapper reconcileLogMapper;
     private final OrderNotifyClient orderNotifyClient;
     @Value("${payment.sandbox-secret}") private String sandboxSecret;
 
@@ -104,11 +108,50 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public void reconcile() {
-        // 1) 补偿：SUCCESS 但未通知订单服务的支付单（前 3 次重试失败 → 对账兜底）
-        List<Payment> unnotified = paymentMapper.selectList(new LambdaQueryWrapper<Payment>()
-                .eq(Payment::getStatus, "SUCCESS")
-                .eq(Payment::getNotifyStatus, 0));
+    public Map<String, Object> reconcile() {
+        LocalDate today = LocalDate.now();
+        List<Payment> all = paymentMapper.selectList(null);
+        long success = all.stream().filter(p -> "SUCCESS".equals(p.getStatus())).count();
+        long pending = all.stream().filter(p -> "PENDING".equals(p.getStatus())).count();
+        long refunded = refundMapper.selectCount(new LambdaQueryWrapper<com.zhigou.payment.entity.PaymentRefund>()
+                .eq(com.zhigou.payment.entity.PaymentRefund::getStatus, "SUCCESS"));
+
+        // 差异清单：UNNOTIFIED（SUCCESS 未通知订单）/ STALE_PENDING（超 24h 未支付）/ OVER_REFUND（累计退款超实付）
+        List<Map<String, String>> diffs = new java.util.ArrayList<>();
+        List<Payment> unnotified = all.stream()
+                .filter(p -> "SUCCESS".equals(p.getStatus()) && (p.getNotifyStatus() == null || p.getNotifyStatus() == 0))
+                .collect(java.util.stream.Collectors.toList());
+        for (Payment p : unnotified) {
+            Map<String, String> d = new java.util.HashMap<>();
+            d.put("type", "UNNOTIFIED"); d.put("paymentNo", p.getPaymentNo());
+            d.put("orderNo", p.getOrderNo()); d.put("desc", "支付成功但订单未收到通知");
+            diffs.add(d);
+        }
+        LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
+        for (Payment p : all) {
+            if ("PENDING".equals(p.getStatus()) && p.getCreateTime() != null && p.getCreateTime().isBefore(yesterday)) {
+                Map<String, String> d = new java.util.HashMap<>();
+                d.put("type", "STALE_PENDING"); d.put("paymentNo", p.getPaymentNo());
+                d.put("orderNo", p.getOrderNo()); d.put("desc", "PENDING 超 24h，需联动超时关单");
+                diffs.add(d);
+            }
+        }
+        // 超退核对：每笔支付单累计退款 > 实付金额
+        for (Payment p : all) {
+            long refundedSum = refundMapper.selectList(new LambdaQueryWrapper<com.zhigou.payment.entity.PaymentRefund>()
+                            .eq(com.zhigou.payment.entity.PaymentRefund::getOrderNo, p.getOrderNo())
+                            .eq(com.zhigou.payment.entity.PaymentRefund::getStatus, "SUCCESS"))
+                    .stream().mapToLong(com.zhigou.payment.entity.PaymentRefund::getAmount).sum();
+            if (refundedSum > p.getAmount()) {
+                Map<String, String> d = new java.util.HashMap<>();
+                d.put("type", "OVER_REFUND"); d.put("paymentNo", p.getPaymentNo());
+                d.put("orderNo", p.getOrderNo());
+                d.put("desc", "累计退款 " + refundedSum + " 超实付 " + p.getAmount() + "，需人工核查");
+                diffs.add(d);
+            }
+        }
+
+        // 补偿动作：UNNOTIFIED → 重发订单通知
         int compensated = 0;
         for (Payment p : unnotified) {
             try {
@@ -125,16 +168,35 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
 
-        // 2) 风险告警：PENDING 超过 24h 的支付单（用户未完成支付，可联动超时关单）
-        LocalDateTime yesterday = LocalDateTime.now().minusDays(1);
-        long stale = paymentMapper.selectList(new LambdaQueryWrapper<Payment>()
-                .eq(Payment::getStatus, "PENDING")).stream()
-                .filter(p -> p.getCreateTime() != null && p.getCreateTime().isBefore(yesterday)).count();
-        if (stale > 0) {
-            log.error("对账异常: {} 笔 PENDING 超过 24h，需联动超时关单", stale);
-        } else {
-            log.info("对账正常: 无超时待支付单");
-        }
-        log.info("T+1 对账完成: 补偿 {} 笔订单联动通知", compensated);
+        // 落库对账日志（按周期幂等：存在则更新）
+        Map<String, Object> summary = new java.util.HashMap<>();
+        summary.put("totalCount", all.size());
+        summary.put("successCount", success);
+        summary.put("pendingCount", pending);
+        summary.put("refundedCount", refunded);
+        summary.put("compensated", compensated);
+        ReconcileLog logRow = reconcileLogMapper.selectOne(new LambdaQueryWrapper<ReconcileLog>()
+                .eq(ReconcileLog::getReconcileDate, today));
+        if (logRow == null) logRow = new ReconcileLog();
+        logRow.setReconcileDate(today);
+        logRow.setTotalCount(all.size());
+        logRow.setSuccessCount((int) success);
+        logRow.setPendingCount((int) pending);
+        logRow.setRefundedCount((int) refunded);
+        logRow.setDiffCount(diffs.size());
+        logRow.setSummaryJson(cn.hutool.json.JSONUtil.toJsonStr(summary));
+        logRow.setDiffJson(cn.hutool.json.JSONUtil.toJsonStr(diffs));
+        logRow.setCompensated(compensated);
+        if (logRow.getId() == null) reconcileLogMapper.insert(logRow); else reconcileLogMapper.updateById(logRow);
+
+        log.info("T+1 对账完成: 汇总 total={} success={} pending={} refunded={}, 差异 {} 笔, 补偿 {} 笔",
+                all.size(), success, pending, refunded, diffs.size(), compensated);
+
+        Map<String, Object> report = new java.util.LinkedHashMap<>();
+        report.put("reconcileDate", today.toString());
+        report.put("summary", summary);
+        report.put("diffList", diffs);
+        report.put("compensated", compensated);
+        return report;
     }
 }
