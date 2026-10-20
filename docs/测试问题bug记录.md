@@ -161,6 +161,12 @@
 ## #31 · [0.2.27] AI 工具 f-string 引号/转义坑 + BizException 包路径 + ReviewReply import（已修复）
 ## #50 B4 提示注入防护漏网样本（2026-10-20，已修复）
 ## #51 RocketMQ 5.1.4 管理 API 大改导致编译失败（2026-10-20，已修复）
+## #52 金额加密与 DB 聚合冲突的设计取舍（2026-10-20，已规避）
+- **问题**：金额列加密后 DB 侧无法 SUM/WHERE 金额（密文不可计算），若沿用 SQL 聚合会静默出错
+- **排查**：Grep order-service 全部 SQL/资源，确认金额仅实体读写（totalAmount 在 Java 层累加），无 SQL 聚合/条件
+- **决策**：加密列只做单行读写；所有金额聚合在应用层完成；将来若有按金额统计需求，改为应用层扫描或独立聚合表（不加密）
+- **经验**：加密方案落地前必须先盘点字段的 SQL 用法（索引/唯一/聚合/范围查询），否则加密即埋雷
+
 - **现象**：RocketMqLagProbe 按 4.x 惯例写 `fetchConsumeStats` + `ConsumeStats`(common.admin) + `maxOffset(topic, queueId)`，编译报「找不到符号」
 - **根因**：项目实际解析 rocketmq-client 5.1.4（starter 2.3.0 传递），5.x 管理 API 全面重构：`fetchConsumeStats`→`examineConsumeStats`；ConsumeStats 从 common.admin 移到 remoting.protocol.admin；OffsetTable 值 Long→OffsetWrapper；maxOffset 签名改 MessageQueue；common.admin 包整个移除
 - **修复**：javap 核对 DefaultMQAdminExt/ConsumeStats 实际签名后对齐；补 rocketmq-tools 5.1.4 依赖（本地缺 jar 走在线拉取）

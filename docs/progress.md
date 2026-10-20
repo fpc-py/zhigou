@@ -4,6 +4,9 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-20 · [0.2.49] B5 金额加密落库（order_main 落点）
+- common AmountEncryptUtil(AES-GCM 随机IV) + AmountTypeHandler 透明加解密 + order 两金额列迁移 VARCHAR + 存量明文兼容；单测 4/4；生产需配 zhigou.crypto.key
+
 ## 2026-10-20 · [0.2.48] B2 消息堆积监控（inventory-service）
 - RocketMqLagProbe：DefaultMQAdminExt 查消费位点 → rocketmq_consumer_accumulation Gauge（与 MQBacklog 告警规则联动）；broker 不可达降级 warn；坑 #51（5.x API 变更）
 

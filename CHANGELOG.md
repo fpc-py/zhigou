@@ -3,6 +3,16 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.49] — B5 金额加密落库（2026-10-20）
+
+### feat: 金额 AES-GCM 透明加解密（order_main 落点）
+- **AmountEncryptUtil**（common）：AES/GCM/NoPadding 随机 IV；密文 `ENC:{base64(iv||ct+tag)}`；无 `ENC:` 前缀的存量明文原样返回（灰度兼容：增量加密、存量回填前可读）
+- **AmountTypeHandler**（common）：MyBatis BaseTypeHandler，实体 Long 不变，写库加密/读库解密——业务零感知
+- **落点**：order_main.total_amount / pay_amount 加 `@TableField(typeHandler=…)` + 迁移 SQL（BIGINT→VARCHAR(256)）
+- **密钥**：`zhigou.crypto.key` / ZHIGOU_CRYPTO_KEY（≥16 字节）；未配置降级明文并 warn（本地不阻断，生产必须配）
+- **取舍**：金额不按值查询/不 DB 聚合（聚合在应用层），故选 GCM 随机 IV 而非确定性 ECB；与手机号 AES/ECB（需按号查询）对比鲜明，可深聊
+- **实测**：单测 4/4（GCM 往返 / 随机 IV 同值密文不同 / 存量明文兼容 / 无密钥降级）；order-service+common 编译通过
+
 ## [0.2.48] — B2 消息堆积监控（2026-10-20）
 
 ### feat: inventory-service RocketMQ 消费积压探针

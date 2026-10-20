@@ -1,7 +1,9 @@
 package com.zhigou.order.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.zhigou.common.mybatis.AmountTypeHandler;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 import java.time.LocalDateTime;
 
 @Data @TableName("order_main")
@@ -11,7 +13,9 @@ public class OrderMain {
     private Long userId;
     private String requestId;
     private String orderStatus;
+    @TableField(typeHandler = AmountTypeHandler.class, jdbcType = JdbcType.VARCHAR)
     private Long totalAmount;
+    @TableField(typeHandler = AmountTypeHandler.class, jdbcType = JdbcType.VARCHAR)
     private Long payAmount;
     private Long couponId;
     private String receiverName;
