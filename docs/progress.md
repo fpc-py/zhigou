@@ -4,6 +4,9 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-20 · [0.2.47] B4 Prompt 注入防护（ai-orchestrator 输入侧）
+- prompt_guard.py：指令覆盖/系统提示泄露/越权扮演/解除限制/越权访问/编码变体 6 维检测；命中降级隔离（注入文本不透传 LLM）；正常语境白名单防误报；pytest 3/3 通过
+
 ## 2026-10-20 · [0.2.45] B1 三级缓存 Caffeine（product-service 热点读）
 - L1 Caffeine（60s/max1w，原子加载单飞防击穿）+ L2 Redis（5min）+ L3 MySQL；空值 Optional 短缓存防穿透；更新/下架双级失效
 

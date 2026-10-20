@@ -300,6 +300,13 @@ def _build_messages(query: str, history: Optional[list[dict]] = None, image_url:
 
 # ── SSE 事件生成器 ──
 
+def _sse(event: str, data: object) -> str:
+    """构造一条 SSE 事件（data 以 JSON 序列化）。"""
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+
+
 
 async def chat_stream(
     query: str,
@@ -327,9 +334,15 @@ async def chat_stream(
 
         sid = session_id or "default"
 
+        # B4 输入注入检测：命中则降级隔离（不把注入文本传给 LLM），不中断 SSE 流
+        safe_query, inject_hit = sanitize_query(query)
+        if inject_hit:
+            logger.warning("prompt injection blocked: user_id=%s hit=%s", user_id, inject_hit)
+            yield _sse("notice", {"content": "检测到可疑指令，已安全隔离，请正常描述您的需求。"})
+
         # 注入会话历史（本地持久化），保证多轮长对话跨进程/重启延续
         history = _load_history(sid)
-        input_messages = _build_messages(query, history, image_url)
+        input_messages = _build_messages(safe_query, history, image_url)
 
         # 收集完整回复，对话结束后写回会话存储
         response_text = ""

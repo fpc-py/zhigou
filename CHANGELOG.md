@@ -3,6 +3,14 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.47] — B4 Prompt 注入防护（2026-10-20）
+
+### feat: ai-orchestrator 输入侧注入检测（prompt_guard.py）
+- **检测维度**：指令覆盖（忽略/无视/不要遵守…指令规则）/ 系统提示泄露（输出 system prompt）/ 越权扮演（开发者/管理员/创建者）/ 解除限制 / 越权访问（内部接口/密钥/表结构）/ 编码变体（base64、全角、空格混淆）
+- **降级策略**：命中不把注入文本传给 LLM，替换为安全隔离提示（SSE 先发 notice），不中断对话流
+- **误报控制**：正常问询语境（为什么/什么是/帮我…，短句）白名单放行
+- **实测**：pytest 3/3（11 类注入样本全识别 + 4 类正常样本零误报 + 降级不透传注入原文）
+
 ## [0.2.45] — B1 三级缓存 Caffeine（2026-10-20）
 
 ### feat: product-service 热点读三级缓存
