@@ -1,5 +1,29 @@
 # 测试问题 & Bug 记录
 
+## #58 非 Docker Desktop 引擎：host.docker.internal NXDOMAIN 抓不到宿主机服务（[0.2.52] A8）
+- **现象**：Prometheus 容器内 `getent hosts host.docker.internal` → NXDOMAIN，targets 11 个全 DOWN（宿主机服务实际全活，/actuator/prometheus 200+47KB）。
+- **根因**：host.docker.internal 是 Docker Desktop 注入的域名；本机 Docker 引擎非 Docker Desktop（WSL2 原生），不注入该条目。
+- **修复**：compose 加 `extra_hosts: - "host.docker.internal:host-gateway"`——Docker 20.10+ 的 host-gateway 自动映射宿主机网关 IP，跨引擎通用。
+- **实测**：修复后 targets 11/11 UP（up=1）。
+- **教训**：抓宿主机服务的容器编排，别赌引擎注入的域名；`host-gateway` 是跨 Docker Desktop/WSL2/裸机的统一解。
+
+## #57 容器 healthcheck 用 wget：prom 官方镜像无 wget 全误报 unhealthy（[0.2.52] A8）
+- **现象**：prometheus/grafana/alertmanager 端口全 200（`/-/healthy`、`/api/health` 实测），但 docker 显示 unhealthy。
+- **根因**：healthcheck 的 `wget -q` 命令在 prom/grafana 官方镜像内不存在（基于 distroless/scratch，无 shell/wget/curl）。
+- **修复**：移除容器内 healthcheck，改宿主机 HTTP 探活取证（compose 只管 Up 状态）。
+- **教训**：镜像内健康检查必须用镜像自带二进制（或改用有 shell 的镜像）；`docker ps` 的 healthy 状态依赖容器内命令存在性，别把它当服务探活的唯一证据。
+
+## #56 Loki 镜像漂移：latest=3.x 不兼容 2.x 配置，pin 2.9.10 又连踩两坑（[0.2.52] A8）
+- **现象链**：① `grafana/loki:latest`（3.x）解析 `conf/loki/config.yml`（2.x 格式）报 `shared_store not found in type boltdb.IndexCfg` / `enforce_metric_name not found` 崩溃循环；② pin `2.9.10` 后报 `creating WAL folder at "/wal": permission denied`；③ 加 `user: root` 后报 `mkdir : no such file or directory`（compactor working_directory 为空）。
+- **修复**：pin 2.9.10 + `user: root` + config.yml 显式 `compactor.working_directory: /loki/compactor` + `shared_store: filesystem`。
+- **教训**：`latest` 标签是配置漂移头号来源——生产编排必须 pin 精确版本；Loki 2.9 的 WAL/compactor 目录需要可写路径显式配置。
+
+## #55 compose 相对路径陷阱：./conf/ 按 compose 文件目录解析导致 bind mount 源不存在（[0.2.52] A8）
+- **现象**：`docker compose config --quiet` 通过，但 `up -d` 后容器异常（配置未挂载成功）。
+- **根因**：compose 的 `./conf/...` 相对**compose 文件所在目录**（infra/compose/）解析，而智购监控配置在**仓库根 conf/**——`infra/compose/conf/` 不存在；且 `compose config` 不校验 bind mount 源存在性，语法校验误导。
+- **修复**：volume 源改 `../../conf/...`（infra/compose → 仓库根）。
+- **教训**：compose 相对路径基准是 compose 文件自身目录；`docker compose config` 通过 ≠ 卷挂载有效，需用 `docker inspect` 或容器日志核实配置真的被读。
+
 ## #54 MyBatis 自动映射不读 @TableField(typeHandler)：金额加密后查单/取消 500（[0.2.51] B5）
 - **现象**：写库加密 PASS（`total_amount=ENC:...`）后，`GET /order/{id}`、`POST /order/{id}/cancel` 均 500。
 - **根因**：`BaseMapper.selectOne/selectList(wrapper)` 走 **applyAutomaticMappings（自动映射）**——对 Long 属性用默认 `LongTypeHandler` 直接 `ResultSet.getLong()` 读 `ENC:...` 密文 → `NumberFormatException`；**`@TableField(typeHandler)` 只在显式 ResultMap 生效**（MP 的 selectById 才有）。

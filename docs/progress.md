@@ -391,6 +391,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项） |
 
 ## 变更记录
+* 2026-10-21：**A8 Prometheus 编排实跑全绿（[0.2.52]）**：monitoring.yml 修 4 处坑（compose 相对路径 ../../conf、Loki pin 2.9.10 + user root + compactor working_directory、healthcheck 移除、host-gateway）→ 4 容器全 Up、Prometheus targets 11/11 UP（8080-8090 全量 /actuator/prometheus）、5 规则加载 inactive、Grafana provisioning 生效（2 数据源 + RED 面板）。坑 #55-#58 已留痕。
+
 * 2026-10-21：**统一补验全绿 10/10（[0.2.51]）**：环境恢复（中间件全 healthy + 18/18 端口 UP + token 刷新）后跑 %TEMP%\verify_unified.py 迭代 5 轮：B5 写库加密 PASS → 读路径 MyBatis 自动映射 LongTypeHandler 读 ENC 密文 500（坑 #53，显式 ResultMap 6 方法 + 7 处查询替换）；A7 `{fileId:.+}` 在 PathPattern/Ant 均不匹配（坑 #54，三段式路径变量 `{date}/{userId}/{fileHash}` 治本）；B1 并发 30/30 全 200；B2 积压采样日志实测；A4 取消订单库存回滚 200。三件套已提交。
 
 * 2026-10-10：**P0 商品增量向量更新（[0.2.30]）**：pgvector 维度硬伤修复（表 vector(1536)→1024，对齐 text-embedding-v4 输出，此前 upsert 必失败、表恒 0 行）；backfill_vec.py 整改（URL 8095 / X-User-Id 内网头 / 自动加载 .env / embed_url 死参数清理）并**全量回填 4 条真实商品跑通**；RAG 语义检索 PASS（「跑步运动鞋」→ 运动鞋 0.8127）；增量逻辑直调验证 PASS（模拟 PRODUCT_CHANGED 消息 → 新商品 9000000000000000999 入向量库）；AI 改 venv 启动（曾跑系统 Python 教训 #25③）；⚠️ rocketmq-client-python Windows 不支持 → 本地 MQ 消费者无法激活（生产 Linux/容器可用），已如实留痕。

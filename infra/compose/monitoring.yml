@@ -11,20 +11,17 @@ services:
     image: prom/prometheus:latest
     container_name: zhigou-prometheus
     restart: unless-stopped
+    extra_hosts:
+      - host.docker.internal:host-gateway
     ports:
       - "9090:9090"
     volumes:
-      - ./conf/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./conf/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ../../conf/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../conf/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-    healthcheck:
-      test: ["CMD", "wget", "-q", "http://localhost:9090/-/healthy"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
 
   # ==================== Grafana ====================
   grafana:
@@ -38,14 +35,9 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin123
       GF_INSTALL_PLUGINS: ""
     volumes:
-      - ./conf/grafana/datasources:/etc/grafana/provisioning/datasources
-      - ./conf/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ../../conf/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ../../conf/grafana/dashboards:/etc/grafana/provisioning/dashboards
       - grafana-data:/var/lib/grafana
-    healthcheck:
-      test: ["CMD", "wget", "-q", "http://localhost:3000/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
 
   # ==================== Alertmanager ====================
   alertmanager:
@@ -55,31 +47,22 @@ services:
     ports:
       - "9093:9093"
     volumes:
-      - ./conf/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ../../conf/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager-data:/alertmanager
-    healthcheck:
-      test: ["CMD", "wget", "-q", "http://localhost:9093/-/healthy"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
 
   # ==================== Loki ====================
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:2.9.10
     container_name: zhigou-loki
+    user: root
     restart: unless-stopped
     ports:
       - "3100:3100"
     volumes:
-      - ./conf/loki/config.yml:/etc/loki/config.yml
+      - ../../conf/loki/config.yml:/etc/loki/config.yml
       - loki-data:/loki
     command:
       - '-config.file=/etc/loki/config.yml'
-    healthcheck:
-      test: ["CMD", "wget", "-q", "http://localhost:3100/ready"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
 
 # ==================== 卷 ====================
 volumes:

@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.52] — A8 Prometheus 编排实跑全绿：4 容器 Up + 11/11 抓取 + 5 规则加载（2026-10-21）
+
+### feat: 监控编排落地（infra/compose/monitoring.yml + conf/）
+- **验收全绿**：`docker compose -f infra/compose/monitoring.yml up -d` → prometheus/grafana/alertmanager/loki 4 容器全 Up；Prometheus targets **11/11 UP**（auth→aftersale 8080-8090 全量抓取 `/actuator/prometheus`）；alerts.yml **4 组 5 规则**全部加载（inactive 正常）；Grafana provisioning 生效（Prometheus+Loki 数据源 + RED 面板 uid=zhigou-red）。
+- **坑 #55（面试可深聊）**：compose 相对路径陷阱——`./conf/` 相对 compose 文件目录（infra/compose/）解析，而配置实际在仓库根 `conf/`，bind mount 源不存在但 `compose config` 不校验 → 容器起不来。改 `../../conf/`。
+- **坑 #56（面试可深聊）**：Loki 镜像漂移——`grafana/loki:latest` 已是 3.x，2.x 的 boltdb-shipper 配置字段 `shared_store`/`enforce_metric_name` 被移除 → 崩溃循环。pin `2.9.10` 后连过两关：① `/wal` 目录权限拒绝（非 root 容器）→ `user: root`；② compactor 缺 `working_directory` → `mkdir ""` 失败 → 显式 `/loki/compactor`。
+- **坑 #57（面试可深聊）**：容器 healthcheck 误报——prom 官方镜像无 `wget`，`healthcheck: wget -q` 全失败显示 unhealthy（服务实际 200）；移除 healthcheck 改宿主机 HTTP 探活取证。
+- **坑 #58（面试可深聊）**：非 Docker Desktop 引擎下 `host.docker.internal` NXDOMAIN → Prometheus 抓不到宿主机服务；`extra_hosts: host.docker.internal:host-gateway` 治本（Docker 20.10+ 特性）。
+
+### test: 实测数据
+- targets 11/11 UP（up=1）；4 组规则（zhigou-down/error-rate/latency/resilience4j）5 条全 loaded inactive；Grafana datasources=2、dashboards=1。
+
 ## [0.2.51] — 统一补验全绿 10/10：B5 读路径修复 + A7 三段式路由（2026-10-21）
 
 ### fix: 金额加密读路径（B5 全链路闭环）
