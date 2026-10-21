@@ -1,5 +1,19 @@
 # 测试问题 & Bug 记录
 
+## #54 MyBatis 自动映射不读 @TableField(typeHandler)：金额加密后查单/取消 500（[0.2.51] B5）
+- **现象**：写库加密 PASS（`total_amount=ENC:...`）后，`GET /order/{id}`、`POST /order/{id}/cancel` 均 500。
+- **根因**：`BaseMapper.selectOne/selectList(wrapper)` 走 **applyAutomaticMappings（自动映射）**——对 Long 属性用默认 `LongTypeHandler` 直接 `ResultSet.getLong()` 读 `ENC:...` 密文 → `NumberFormatException`；**`@TableField(typeHandler)` 只在显式 ResultMap 生效**（MP 的 selectById 才有）。
+- **修复**：OrderMainMapper 6 个显式 `@Results` 方法（金额列挂 AmountTypeHandler + jdbcType=VARCHAR），Service 7 处查询替换。
+- **教训**：字段级 TypeHandler 是「写透明」不保证「读透明」；自动映射按 Java 属性类型选 TypeHandler，与注解无关——**金额类敏感列一旦落密文，所有查询点必须走显式 ResultMap**。
+- **实测**：建单→查单 200 金额一致；取消 200；overview 应用层聚合不受影响。
+
+## #53 fileId 含斜杠的路由三段坑：{*}/{{:.+}}/ant 正则全不匹配（[0.2.51] A7）
+- **现象**：`GET /file/{fileId}/content`（fileId=`20261021/{userId}/{hash}.png`）带 token 仍 500，日志 `NoResourceFoundException: No static resource ...`。
+- **根因链**：① `{*fileId}` 在路径中间非法（Spring 启动即报 Invalid mapping pattern）；② `{fileId:.+}` 在 Spring Boot 3.2 默认 PathPatternParser 下**正则不被解析**（等同字面量 → 不匹配）；③ 切 `spring.mvc.pathmatch.matching-strategy: ant_path_matcher` 后 Ant 的 `{var:.+}` 变量正则**不跨路径段**，仍不匹配。
+- **修复（治本）**：路由改三段式普通变量 `/{date}/{userId}/{fileHash}[/content|/url]`，fileId 方法内拼接——不依赖任何正则路由特性，双匹配器兼容。
+- **教训**：含斜杠的路径参数是路由设计反模式；优先把复合 key 拆成多个普通 `{var}` 段，而非赌 PathPattern/Ant 的正则差异。
+- **实测**：私读 200 + PNG 魔数校验通过；匿名直读 403。
+
 ## #42 压测 token 过期 → 全量 401 → 错误率 100% 假数据（工作流3 #9 落地，2026-10-19）
 - **现象**：横向扩展压测第一轮错误率 100%，RPS 却飙到 315-827（矛盾信号）；curl 冒烟带 token 也 401。
 - **根因**：%TEMP%\zhigou-jwt.txt 是 2h 有效期 token，已过期；所有请求被 BFF 鉴权拦截。

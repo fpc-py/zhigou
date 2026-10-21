@@ -102,8 +102,8 @@ services:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: admin123
     ports:
-      - "9000:9000"   # API
-      - "9001:9001"   # Console
+      - "9020:9000"   # API（9000 被本机 simall-gateway 占用；9010/9011 被 WSL2 localhost 转发占用，故用 9020；file-service 起时设 MINIO_ENDPOINT=http://localhost:9020）
+      - "9021:9001"   # Console
     volumes:
       - minio-data:/data
     command: server /data --console-address ":9001"

@@ -20,6 +20,7 @@ spring:
     table: flyway_order_history
     baseline-on-migrate: true
     validate-on-migrate: false
+    out-of-order: true
 mybatis-plus.global-config.db-config:
   logic-delete-field: deleted
   logic-delete-value: 1
@@ -27,6 +28,7 @@ mybatis-plus.global-config.db-config:
 springdoc.swagger-ui.path: /swagger-ui.html
 knife4j.enable: true
 jwt.secret: ${JWT_SECRET:change-me}
+zhigou.crypto.key: ${ZHIGOU_CRYPTO_KEY:zhigou-local-key-2026-1021}
 product-service:
   url: ${PRODUCT_SERVICE_URL:http://localhost:8083}
 inventory-service:

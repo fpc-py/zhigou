@@ -37,10 +37,12 @@ public class FileController {
     }
 
     @Operation(summary = "私有读（鉴权 + 归属校验，服务端流式）")
-    @GetMapping("/{fileId}/content")
-    public ResponseEntity<byte[]> content(@PathVariable("fileId") String fileId) {
-        Long userId = UserContext.requireUserId();
-        FileDownload d = fileService.download(userId, fileId);
+    @GetMapping("/{date}/{userId}/{fileHash}/content")
+    public ResponseEntity<byte[]> content(@PathVariable String date, @PathVariable Long userId,
+                                          @PathVariable String fileHash) {
+        String fileId = date + "/" + userId + "/" + fileHash;
+        Long uid = UserContext.requireUserId();
+        FileDownload d = fileService.download(uid, fileId);
         String fileName = java.net.URLEncoder.encode(d.fileName() == null ? fileId : d.fileName(),
                 java.nio.charset.StandardCharsets.UTF_8);
         return ResponseEntity.ok()
@@ -53,18 +55,22 @@ public class FileController {
     }
 
     @Operation(summary = "获取签名URL")
-    @GetMapping("/{fileId}/url")
-    public Result<Map<String, String>> getUrl(@PathVariable("fileId") String fileId) {
-        Long userId = UserContext.requireUserId();
-        String url = fileService.getSignedUrl(userId, fileId);
+    @GetMapping("/{date}/{userId}/{fileHash}/url")
+    public Result<Map<String, String>> getUrl(@PathVariable String date, @PathVariable Long userId,
+                                              @PathVariable String fileHash) {
+        String fileId = date + "/" + userId + "/" + fileHash;
+        Long uid = UserContext.requireUserId();
+        String url = fileService.getSignedUrl(uid, fileId);
         return Result.ok(Map.of("url", url));
     }
 
     @Operation(summary = "删除文件")
-    @DeleteMapping("/{fileId}")
-    public Result<Void> delete(@PathVariable("fileId") String fileId) {
-        Long userId = UserContext.requireUserId();
-        fileService.delete(userId, fileId);
+    @DeleteMapping("/{date}/{userId}/{fileHash}")
+    public Result<Void> delete(@PathVariable String date, @PathVariable Long userId,
+                               @PathVariable String fileHash) {
+        String fileId = date + "/" + userId + "/" + fileHash;
+        Long uid = UserContext.requireUserId();
+        fileService.delete(uid, fileId);
         return Result.ok();
     }
 }

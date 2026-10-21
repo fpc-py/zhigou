@@ -38,7 +38,7 @@ public class MinioInitializer {
                 log.info("Bucket 已存在: {}", minioConfig.getBucket());
             }
         } catch (Exception e) {
-            log.error("MinIO bucket 初始化失败", e);
+            log.error("MinIO bucket 初始化失败 endpoint={} bucket={} accessKey={}", minioConfig.getEndpoint(), minioConfig.getBucket(), minioConfig.getAccessKey(), e);
             throw new RuntimeException("MinIO bucket 初始化失败", e);
         }
     }

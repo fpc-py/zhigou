@@ -3,6 +3,22 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.51] — 统一补验全绿 10/10：B5 读路径修复 + A7 三段式路由（2026-10-21）
+
+### fix: 金额加密读路径（B5 全链路闭环）
+- **坑 #53（面试可深聊）**：B5 写库加密 PASS（ENC: 前缀）后，查单/取消订单仍 500——MyBatis 自动映射（applyAutomaticMappings）对 Long 属性用默认 `LongTypeHandler`，**不读 `@TableField(typeHandler)` 注解**，直接对 `ENC:...` 调 `getLong()` 抛 NumberFormatException。
+- **修复**：OrderMainMapper 新增 6 个显式 `@Results` 方法（金额列挂 `AmountTypeHandler` + `jdbcType=VARCHAR`），OrderServiceImpl 7 处 wrapper 查询全部替换（幂等/requireOrder/mine/closeExpired/overview/pendingFulfillment）；overview 本就是应用层聚合（与加密策略一致，非 DB SUM）。
+- **实测**：建单→查单金额一致 200；落库 `total_amount=ENC:...`；取消订单 200。
+
+### fix: 文件私读路由（A7 全链路闭环）
+- **坑 #54（面试可深聊）**：fileId 含斜杠（`20261021/{userId}/{hash}.png`），`{*fileId}` 在路径中间非法（启动即报）；`{fileId:.+}` 在 Spring Boot 3.2 默认 PathPatternParser 下等同字面量不匹配（NoResourceFoundException → 500）；切 `ant_path_matcher` 后 Ant 的 `{var:.+}` 仍不匹配（AntPathMatcher 变量正则不跨段）。
+- **修复（治本）**：FileController 三处映射改**三段式路径变量** `/{date}/{userId}/{fileHash}[/content|/url|删除]`，fileId 在方法内拼回——PathPattern/Ant 双兼容，不再依赖正则路由。
+- **实测**：私读 200 + PNG 字节完整；匿名直读 403。
+
+### test: 统一补验（%TEMP%\verify_unified.py）
+- B5 建单→查单一致 / ENC 落库；A4 支付幂等（同 paymentNo）+ 取消订单库存回滚；A5 对账报告；A7 上传/私读 200/匿名 403；B1 并发 30/30 全 200；B2 积压采样日志——**10/10 PASS**。
+- 顺带修复：verify 脚本 raw 响应 bytes/str 两处断言 bug（PNG 魔数比较）。
+
 ## [0.2.50] — B7 故障演练 / Runbook / on-call（2026-10-20）
 
 ### docs + scripts: 可运维性核心资产

@@ -64,8 +64,7 @@ public class OrderServiceImpl implements OrderService {
     @Override @Transactional(isolation = Isolation.READ_COMMITTED)
     public OrderResponse create(Long userId, CreateOrderRequest req) {
         // 1. 幂等检查
-        OrderMain existing = orderMapper.selectOne(new LambdaQueryWrapper<OrderMain>()
-                .eq(OrderMain::getUserId, userId).eq(OrderMain::getRequestId, req.getRequestId()));
+        OrderMain existing = orderMapper.selectFullByRequestId(req.getRequestId());
         if (existing != null) {
             log.info("重复下单: requestId={}", req.getRequestId());
             return buildResponse(existing);
@@ -107,8 +106,7 @@ public class OrderServiceImpl implements OrderService {
             // 撞索引说明请求已被并发线程成功落库，转幂等返回既有订单，避免把 500 抛给用户。
             log.info("重复下单(唯一索引兜底): requestId={}", req.getRequestId());
             // create 事务为 READ COMMITTED，此处普通 SELECT 每语句重建快照，能读到刚提交的并发订单。
-            OrderMain dup = orderMapper.selectOne(new LambdaQueryWrapper<OrderMain>()
-                    .eq(OrderMain::getUserId, userId).eq(OrderMain::getRequestId, req.getRequestId()));
+            OrderMain dup = orderMapper.selectFullByRequestId(req.getRequestId());
             if (dup != null) return buildResponse(dup);
             throw e;
         }
@@ -203,18 +201,14 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public List<OrderResponse> mine(Long userId) {
-        List<OrderMain> orders = orderMapper.selectList(new LambdaQueryWrapper<OrderMain>()
-                .eq(OrderMain::getUserId, userId)
-                .orderByDesc(OrderMain::getCreateTime));
+        List<OrderMain> orders = orderMapper.selectFullByUserId(userId);
         return orders.stream().map(this::buildResponse).collect(Collectors.toList());
     }
 
     @Override @Transactional
     public int closeExpired(int minutes) {
         LocalDateTime deadline = LocalDateTime.now().minusMinutes(minutes);
-        List<OrderMain> expired = orderMapper.selectList(new LambdaQueryWrapper<OrderMain>()
-                .eq(OrderMain::getOrderStatus, OrderState.INIT.name())
-                .lt(OrderMain::getCreateTime, deadline));
+        List<OrderMain> expired = orderMapper.selectFullByStatusBefore(OrderState.INIT.name(), deadline);
         if (expired.isEmpty()) {
             log.info("超时关单: 无超时未支付订单 (threshold={}min)", minutes);
             return 0;
@@ -300,14 +294,14 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private OrderMain requireOrder(Long orderId) {
-        OrderMain o = orderMapper.selectOne(new LambdaQueryWrapper<OrderMain>().eq(OrderMain::getOrderId, orderId));
+        OrderMain o = orderMapper.selectFullByOrderId(orderId);
         if (o == null) throw new BizException(404, "订单不存在");
         return o;
     }
 
     @Override
     public OrderStatsOverview overview() {
-        List<OrderMain> orders = orderMapper.selectList(new LambdaQueryWrapper<OrderMain>().orderByDesc(OrderMain::getCreateTime));
+        List<OrderMain> orders = orderMapper.selectAllFull();
         List<OrderItem> items = itemMapper.selectList(new LambdaQueryWrapper<OrderItem>());
 
         OrderStatsOverview ov = new OrderStatsOverview();
@@ -359,9 +353,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public List<OrderResponse> pendingFulfillment() {
-        List<OrderMain> orders = orderMapper.selectList(new LambdaQueryWrapper<OrderMain>()
-                .eq(OrderMain::getOrderStatus, OrderState.PAID.name())
-                .orderByAsc(OrderMain::getCreateTime));
+        List<OrderMain> orders = orderMapper.selectFullByStatus(OrderState.PAID.name());
         // 已处理订单集合（存在 DONE 处理记录）
         Set<Long> handled = listFulfillmentActions(1000).stream()
                 .map(com.zhigou.order.entity.FulfillmentAction::getOrderId).collect(Collectors.toSet());

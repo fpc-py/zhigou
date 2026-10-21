@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 5174,
     proxy: {
       // 前端 /api/* → BFF（去掉 /api 前缀）
       '/api': {
