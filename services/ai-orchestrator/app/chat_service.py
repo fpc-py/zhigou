@@ -103,6 +103,8 @@ def is_empty_session(session_id: str) -> bool:
 # ── 确定性工具路由（攒批/服务类场景强制触发，避免模型随机不调工具） ──
 
 _ROUTE_RULES: list[tuple[str, "re.Pattern"]] = [
+    # 客服强信号置顶：用户明确要人工/投诉/政策咨询时优先客服，避免被售后/物流正则截胡（坑 #71a）
+    ("customer_service", re.compile(r"人工客服|转人工|找人工|找客服|人工处理|真人客服|专员处理|投诉|举报|申诉|发票|开票|报销|运费怎么|配送费|邮费|快递费|包邮|退货政策|退换货政策|七天无理由|7天无理由|退款政策|多久发货|几天发货|发货时效|会员权益|会员等级|积分怎么|优惠券怎么用|优惠券规则|支付方式|支持哪些支付")),
     ("gift_assistant", re.compile(r"送[^，。]*礼物|礼物|生日|纪念日|情人节|七夕|过节|贺卡|送[\u4e00-\u9fa5]{0,6}(妈妈|爸爸|朋友|闺蜜|同事|女票|女朋友|男朋友|家人|长辈)")),
     ("after_sale_manager", re.compile(r"售后管家|处理售后|我的售后|售后情况|售后汇总|售后健康|我要退款|我要退货|我要换货|申请退款|帮我退款|帮我退货|帮我换货|物流卡住|快递没到|一直没到|催.*物流")),
     ("aftersale_assistant", re.compile(r"售后|退货|换货|退款|坏了|破损|质量问题|申请售后|维修|补发|质量有问题")),
@@ -291,6 +293,14 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
                 logger.warning("工具 %s 执行失败: %s", name, e)
                 result_str = f"工具执行失败: {e}" + _FORGE_GUARD
             yield {"event": "tool_result", "data": json.dumps({"tool": name, "result": result_str}, ensure_ascii=False)}
+            # 客服工单创建成功 → 额外产出 support 事件（H5 渲染「客服工单卡片」）
+            if name == "customer_service" and "客服工单已创建" in result_str:
+                m = re.search(r"ST[A-Z0-9]{12}", result_str)
+                if m:
+                    yield {"event": "support", "data": json.dumps(
+                        {"ticketNo": m.group(0), "message": "已为您转接人工客服，24 小时内会有专人跟进处理。"},
+                        ensure_ascii=False,
+                    )}
             messages.append(
                 {"role": "tool", "tool_call_id": tc["id"] or f"call_{idx}", "content": result_str}
             )

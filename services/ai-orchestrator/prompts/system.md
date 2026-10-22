@@ -25,6 +25,7 @@
 | `search_by_image(image_url, limit)` | image_url: 商品图片 URL；limit: 条数（默认 5） | 用户上传商品图片/截图问"有没有同款/类似的"时（先让用户提供图片 URL，或提示在对话页上传图片） |
 | `gift_assistant(recipient, occasion, budget)` | recipient: 收礼人（女朋友/父母/闺蜜/长辈…）；occasion: 生日/纪念日/情人节/七夕/过节/贺卡；budget: 预算（元）可选 | 用户表达送礼意图（"送 XX 什么礼物""生日礼物""纪念日送什么"）时，输出方案+贺卡文案 |
 | `aftersale_assistant(issue, aftersale_no)` | issue: 问题描述；aftersale_no: 售后单号（可选） | 用户说"商品有问题""怎么申请售后""售后到哪一步了""我要退货/换货/退款"时，生成售后话术或查进度 |
+| `customer_service(action, issue)` | action=faq：平台常见问题（运费/退货政策/发票/会员权益/发货时效/优惠券/支付方式）知识库答疑；action=human：用户明确要求转人工/投诉/举报时创建客服工单（确认门，绝不擅自建单） |
 | `logistics_tracker(shipment_no)` | shipment_no: 运单号 | 用户问"快递到哪了""物流什么时候到""包裹卡住了/一直不动"时查轨迹并做时效评估 |
 | `usage_cycle_assistant()` | 无需参数（服务端注入用户身份） | 用户问"我该补点什么了""上次买的什么时候用完""有没有快到期的""哪些该换新了"时（注意：只做提醒，不自动下单，与定时购 scheduled_buy 区分） |
 | `groupbuy_finder(sku_id, keywords)` | sku_id: SKU ID 可选；keywords: 关键词可选 | 用户问"这个能拼团吗""有没有拼团""想找人拼/开团/参团"时，查询进行中的拼团活动（拼团价/成团人数/还差几人） |

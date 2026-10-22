@@ -3,6 +3,23 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.77] · AI 深水区① AI 在线客服（FAQ 知识库 + 转人工工单 + H5 工单卡片）（2026-10-22）
+### feat: AI 客服接管咨询（TOOLS 33→34）
+- **客服模块** `app/customer_service.py`：结构化 FAQ 知识库 7 类（运费/退货政策/发票/发货时效/会员权益/优惠券规则/支付方式，关键词命中返回确定答案，未命中不硬答=防编造）；工单持久化 `data/support_tickets.json`（原子写，ST+12 位单号，状态机 OPEN→PROCESSING→RESOLVED/CLOSED，粗分类 COMPLAINT/INVOICE/AFTERSALE/LOGISTICS/GENERAL）
+- **工具注册** `app/tools.py`：`customer_service(action=faq|human, issue)`；human 走确认门（内部再验「转人工/投诉/找客服」强信号，无信号绝不建单=错误不骚扰红线，与路由层双保险）
+- **路由与事件** `app/chat_service.py`：客服正则置顶 _ROUTE_RULES（用户明确要人工时不被售后/物流正则截胡，坑 #71）；工具执行检测工单创建成功 → 额外 yield `support` SSE 事件（SSE 契约新增类型，data={ticketNo,message}）
+- **H5 对话页**：Message.support + SSE support 分支 + 客服工单卡片（橙调，工单号/响应提示）；`vue-tsc --build` 通过
+- **提示词** `prompts/system.md`：工具表补 customer_service 描述（34/34 覆盖）
+### test: 客服确定性测试 13 项 + 全仓回归
+- `tests/test_customer_service.py`：FAQ 命中/未命中不硬答/工单创建持久化/分类/转人工确认门/强信号建单/路由命中/售后不误路由/TOOLS 34 schema 全量转换+名称唯一——**13 passed**
+- 全仓 pytest **57 passed, 2 warnings**（fastapi on_event 为既有噪音）
+- **SSE 端到端实测（真实 LLM）**：场景1「我要转人工，投诉快递一直没到」→ tool_call customer_service(human) → 工单 ST295D81E94DC1 → **support 事件** → token 流 → done；场景2「你们的运费怎么算？」→ tool_call customer_service(faq) → 「运费规则/满 ¥99 包邮」命中、无建单
+### fix: 块1 四坑（详见 bug 记录 #71-#74）
+- #71 路由优先级（转人工+物流词被 after_sale_manager 截胡，SSE 实测无 tool_call）→ 客服路由置顶
+- #72 BaseTool 直接 await 不兼容（LangChainDeprecationWarning/TypeError，首轮 4 失败）→ 统一 `.ainvoke({...})`
+- #73 convert_to_openai_tool 返回 `{type,function:{name,...}}` 结构（schema 断言取 function.name）
+- #74 AI 服务端口谜题（旧会话残留进程占 8095 跑旧代码 + pydantic env_prefix=ZHIGOU_ 须 ZHIGOU_APP_PORT）
+
 ## [0.2.76] · 全仓文档对齐（以功能文档/技术方案为准绳）+ AI 三处代码修复（2026-10-22）
 ### docs: 系统性对齐 17 份文档
 - 修复 AI 工具数口径 29→33（README 核心特性/数据流、services-README、技术方案 M2、功能实现全景清单）

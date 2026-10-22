@@ -1964,6 +1964,44 @@ async def merchant_after_sale(status: str = "") -> str:
         return "商家售后工作台暂时不可用，请稍后再试。"
 
 
+@tool
+async def customer_service(action: str = "faq", issue: str = "") -> str:
+    """
+    AI 在线客服。两类处理：
+    1) action=faq（默认）：回答平台常见问题——运费规则 / 退货政策 / 发票 / 会员权益 / 发货时效 / 优惠券规则 / 支付方式；
+       知识库关键词命中即返回确定答案，绝不编造；未命中如实说明，交由主对话继续；
+    2) action=human：用户明确要求人工客服 / 投诉 / 举报 / 复杂问题升级——创建客服工单并返回工单号与预计响应。
+       仅当用户明确表达「转人工 / 找人工客服 / 投诉 / 举报 / 人工处理」时才调用，绝不擅自建单（错误不骚扰红线）。
+
+    用户问「运费怎么算」「退货政策」「发票怎么开」「会员有什么权益」「多久发货」「转人工」「投诉」「我要找客服」时调用。
+
+    Args:
+        action: 处理方式，faq=知识库答疑（默认），human=转人工创建工单
+        issue: 用户的问题描述
+    """
+    try:
+        from .customer_service import _classify, _match_faq, create_ticket, format_faq_answer, format_ticket
+
+        text = issue or ""
+        if action == "human":
+            # 确认门复核：缺少强信号不建单（路由层已按强信号触发，这里双保险）
+            _HUMAN_SIGNALS = ("人工", "转人工", "找客服", "投诉", "举报", "人工处理", "真人", "专员", "升级", "申诉")
+            if not any(s in text for s in _HUMAN_SIGNALS):
+                return "如需转人工客服，请明确说『转人工』或『找人工客服』；一般咨询我可以直接为您解答。"
+            uid = _get_current_user()
+            ticket = create_ticket(uid, _classify(text), text)
+            return format_ticket(ticket)
+        # action=faq 默认：知识库命中即返回确定答案
+        hit = _match_faq(text)
+        if hit:
+            topic, lines = hit
+            return format_faq_answer(topic, lines)
+        return "（知识库未命中该问题，可进一步描述；或明确说『转人工』由人工客服跟进。）"
+    except Exception as e:
+        logger.warning("customer_service 调用失败: %s", e)
+        return "客服服务暂时不可用，请稍后再试，或到『我的-帮助中心』反馈。"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1998,4 +2036,5 @@ TOOLS = [
     merchant_after_sale,
     after_sale_manager,
     scheduled_buy,
+    customer_service,
 ]

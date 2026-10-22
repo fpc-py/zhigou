@@ -5,6 +5,29 @@
 - **② H5 token 走 Pinia userStore**：localStorage 注入 token 后，Pinia store 初始化早于注入则读不到（store 只在启动时读一次 localStorage）→ 页面停留旧态。修复：注入后整页刷新 / 登录页跳转前显式初始化 store。
 - **③ Windows `Out-File` 写 JWT 带 BOM**：PowerShell `Out-File` 默认 UTF-16/带 BOM → Python urllib 直接请求带 BOM 的 Bearer token → 服务端 500。修复：读取时 `encoding='utf-8-sig'` 清洗 BOM。
 
+## #74 AI 服务端口谜题：旧进程残留 + pydantic env_prefix（[0.2.77]）
+- **现象**：SSE 实测「转人工」一直无 tool_call（仅 token 流）；重启服务反复绑 8000 失败 `[Errno 10048]`。
+- **根因（双确认）**：① 旧会话启动的 AI 进程（系统 Python312 + main.py）**未被「停所有服务」清掉**，占着 8095 跑旧代码——探活 8095 UP 打到的全是旧代码（无客服路由）；② `config.py` 用 `env_prefix="ZHIGOU_"`，启动端口须设 `ZHIGOU_APP_PORT=8095`（设 `APP_PORT` 无效，默认 8000）。
+- **修复**：按命令行匹配 `main.py` 杀净残留进程 → 释放 8000/8095 → `ZHIGOU_APP_PORT=8095` 干净启动。
+- **实证**：修复后 SSE 端到端两场景通过（转人工 → 工单 ST295D81E94DC1 + support 事件；FAQ 运费命中）。
+
+## #73 convert_to_openai_tool 返回结构误解：顶层无 name（[0.2.77]）
+- **现象**：全量 schema 断言失败——`schema.get("name")` 恒为 None。
+- **根因**：langchain `convert_to_openai_tool(tool)` 返回 `{"type":"function","function":{name,description,parameters}}`，name/parameters 在 `function.*` 嵌套层，不在顶层。
+- **修复**：断言改为取 `schema["function"]["name"]` / `schema["type"]=="function"` / `schema["function"]["parameters"]["type"]=="object"`；TOOLS 34 全量转换通过。
+
+## #72 LangChain BaseTool 调用契约：直接 await 不兼容（[0.2.77]）
+- **现象**：测试里 `await T.customer_service(...)` 报 `TypeError`（`BaseTool.__call__` 不支持关键字参数）+ `LangChainDeprecationWarning`，首轮 4 用例失败。
+- **根因**：BaseTool 是 `Runnable`，直接 `__call__` 走废弃路径且不认 Pydantic 关键字；正确姿势是 `tool.ainvoke({...})`。
+- **修复**：测试统一改 `.ainvoke({"action": ..., "issue": ...})` → 13/13 全绿。
+- **实证**：chat_service 的 `_dispatch_tool` 一直用 `.ainvoke`（与工具层一致）；本轮暴露的是测试侧契约盲区。
+
+## #71 路由优先级缺陷：转人工被售后/物流正则截胡（[0.2.77]）
+- **现象**：SSE 实测「我要转人工，投诉快递一直没到」**无 tool_call**（仅 token 流）——强制路由没生效。
+- **根因**：`_ROUTE_RULES` 中 `after_sale_manager` 正则含「快递没到|一直没到」，先于客服匹配 → 强制路由售后管家；LLM 未按预期调用客服，转人工需求丢失。
+- **修复**：`customer_service` 正则**置顶**（用户明确要人工/投诉/政策咨询时优先级最高），售后/送礼保持其后；补回归测试 2 条（转人工+物流词 → customer_service）。
+- **实证**：修复前 SSE 无 tool_call；修复后 SSE 场景1 强制 customer_service(human) → 工单 + support 事件 ✅；场景2 FAQ 命中 ✅；13 项测试全绿。
+
 ## #69 RocketMQ 消费者启动失败：connect to null（[0.2.74]）
 - **现象**：inventory-service 集成测试启动时 orderClosedListener 连接 RocketMQ 失败 `RemotingConnectException: connect to null failed`。
 - **根因（双确认）**：① `ROCKETMQ_NAME_SERVER` 环境变量为空串——`${VAR:default}` 语法在变量**存在但为空**时不触发默认值，spring 配置注入空地址；② 本地 namesrv 容器未运行。

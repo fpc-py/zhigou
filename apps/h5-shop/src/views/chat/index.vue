@@ -47,6 +47,13 @@
             {{ msg.toolHint }}
           </div>
 
+          <!-- 客服工单卡片（AI 客服转人工成功，块1） -->
+          <div v-if="msg.support" class="support-card">
+            <p class="support-title">🤝 客服工单已创建</p>
+            <p class="support-no">工单号：{{ msg.support.ticketNo }}</p>
+            <p class="support-msg">{{ msg.support.message }}</p>
+          </div>
+
           <!-- 推荐商品 mini-list -->
           <div v-if="msg.products && msg.products.length" class="mini-list">
             <div v-for="p in msg.products" :key="p.spuId" class="mini-item" @click="goProduct(p.spuId)">
@@ -115,6 +122,8 @@ interface Message {
   typing?: boolean;
   toolHint?: string;
   products?: ProductPageItem[];
+  /** AI 客服转人工成功：工单卡片（块1 AI 客服） */
+  support?: { ticketNo: string; message: string };
 }
 
 const route = useRoute();
@@ -260,6 +269,9 @@ async function doSend(text: string, imgUrl: string, isRetry: boolean) {
         aiMsg.toolHint = pendingKeyword
           ? `小智正在全网检索「${pendingKeyword}」…`
           : '小智正在为您查询…';
+      } else if (event === 'support') {
+        // AI 客服转人工成功（块1）：渲染工单卡片
+        aiMsg.support = data as { ticketNo: string; message: string };
       } else if (event === 'tool_result') {
         aiMsg.toolHint = '';
         // 用关键词拉真实商品渲染 mini-list（失败则静默降级）
@@ -593,4 +605,17 @@ onMounted(() => {
   flex: none;
 }
 .send-btn:disabled { opacity: 0.45; }
+<style scoped>
+.support-card {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff8f0;
+  border: 1px solid #f0d9b8;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.support-card .support-title { font-weight: 600; color: #a05a2c; margin: 0 0 2px; }
+.support-card .support-no { color: #6b7280; margin: 0; }
+.support-card .support-msg { color: #4b5563; margin: 2px 0 0; }
 </style>
