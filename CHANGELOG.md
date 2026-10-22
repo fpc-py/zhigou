@@ -3,6 +3,17 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.75] · C 组 P1 商家侧 AI 售后管家落地（merchant/pending + approve/reject + H5 售后工作台）（2026-10-22）
+
+### feat: 商家售后闭环（商家中心可直接处理售后单）
+- **后端**（aftersale-service）：`merchantPending(status)` 待审核列表 + `counts` 全状态统计；`GET /aftersale/merchant/pending`
+- **AI 工具**（ai-orchestrator）：`merchant_after_sale(status)` 只读盘点+处理建议（确认门：AI 不擅自处理）；system.md 商家工具表登记
+- **BFF 透传**：`GET merchant/pending`（须在 `@Get(':no')` 之前声明）+ `POST :no/approve` + `POST :no/reject`（rawBody 透传 reason，坑 #63 同款）
+- **H5 商家中心**：新增「售后工作台」区块——状态统计（待审核/待退款/退款中/已完结）+ 状态筛选 tabs + 待处理列表（单号/类型/金额/原因）+ 同意退款/拒绝按钮
+- **实测**：直连 8090 `merchant/pending` 200（counts APPLYING:2 SELLER_APPROVED:12 REFUNDED:6）；BFF 自签 JWT `merchant/pending` 200 全量透传；**approve 闭环**：POST approve MOCK_AS_002 → APPLYING 2→1、SELLER_APPROVED 12→13、详情 status=SELLER_APPROVED；H5 `vue-tsc --build` 通过 + 浏览器端到端：区块渲染真实数据、点击流转后 UI 联动
+- **坑**：①BFF 新路由必须在 `@Get(':no')` 之前声明（Nest 路由匹配顺序）②H5 token 走 Pinia userStore（localStorage 注入后须整页刷新才被 store 初始化读到）③Windows `Out-File` 写 JWT 带 BOM → urllib 请求 500（UTF-8-sig 读取清洗）
+- **清单**：C 组 P1 商家侧售后管家 ✅；块 2 全部完成
+
 ## [0.2.74] — B7 故障演练 3.2/3.3 真实执行（缓存单飞 + MQ 积压）+ 坑 #69（2026-10-22）
 ### drill: B7 剩余场景真实演练闭环
 - **3.2 缓存击穿 → Caffeine 单飞**：FLUSHDB + 并发 100 打真实 SPU → 100/100 全 200、0.21s，无回源风暴

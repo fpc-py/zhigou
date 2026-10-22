@@ -1914,6 +1914,56 @@ async def price_alert(action: str, sku_id: str, target_price: Optional[str] = No
         return "降价提醒操作暂时没成功，稍后再试试？"
 
 
+@tool
+async def merchant_after_sale(status: str = "") -> str:
+    """商家售后工作台：查看待处理售后列表与全状态统计，给出处理建议（只读，不擅自执行任何售后操作）。
+    用于商家问「售后待办」「待审核的退款申请」「谁申请了退款/退货」「售后处理到哪一步」时调用。
+    处理动作（同意退款/拒绝）请在商家中心人工确认后执行。"""
+    try:
+        uid = _get_current_user()
+        url = f"{settings.aftersale_service_url}/aftersale/merchant/pending"
+        if status:
+            url += f"?status={status}"
+        d = await _http_get(url, headers={"x-user-id": uid})
+        data = d.get("data") or {}
+        counts = data.get("counts") or {}
+        items = data.get("list") or []
+        lines = ["商家售后工作台："]
+        if counts:
+            lines.append(
+                "· 在途统计：待审核 APPLYING "
+                + str(counts.get("APPLYING", 0))
+                + "｜待退款 SELLER_APPROVED "
+                + str(counts.get("SELLER_APPROVED", 0))
+                + "｜退款中 REFUNDING "
+                + str(counts.get("REFUNDING", 0))
+                + "｜已完结 REFUNDED "
+                + str(counts.get("REFUNDED", 0))
+            )
+        if items:
+            lines.append("· 当前列表（" + str(data.get("status") or "APPLYING") + "）" + str(len(items)) + " 单：")
+            for x in items[:5]:
+                lines.append(
+                    "  - "
+                    + str(x.get("aftersaleNo"))
+                    + "｜"
+                    + AFTERSALE_TYPE_HINT.get(x.get("type") or "", x.get("type") or "")
+                    + "｜¥"
+                    + f"{x.get('amount', 0) / 100:.2f}"
+                    + "｜"
+                    + str(x.get("status"))
+                    + "｜"
+                    + str(x.get("reason") or "无原因")
+                )
+        else:
+            lines.append("· 当前筛选下无待处理单 ✅")
+        lines.append("下一步：商家中心可查详情并人工处理（同意退款/拒绝并填写理由），AI 只读不擅自处理售后。")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("merchant_after_sale 调用失败: %s", e)
+        return "商家售后工作台暂时不可用，请稍后再试。"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1945,4 +1995,5 @@ TOOLS = [
     marketing_plan,
     review_assistant,
     price_alert,
+    merchant_after_sale,
 ]

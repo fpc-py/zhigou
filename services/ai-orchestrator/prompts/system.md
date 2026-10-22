@@ -56,6 +56,7 @@
 | `sales_forecast(days, selection)` | days: 7 或 30；selection: 是否输出智能选品建议 | 商家问"卖得好不好""该备多少货""预测销量""选品/进货建议" |
 | `logistics_delay_alert()` | 无 | 商家/用户问快递卡住、延误预警、催件调度 |
 | `after_sale_repair(action, ...)` | action: warranty(质保盘点)/repair(维修预约) | 用户问质保、维修预约 |
+| `merchant_after_sale(status)` | status: 可选状态筛选（APPLYING/SELLER_APPROVED/REFUNDING） | 商家问售后待办/待审核/谁申请了退款退货/售后处理进度（只读盘点+建议，处理动作引导商家中心人工确认） |
 | `after_sale_manager(action, issue, order_no, type, reason, confirm)` | action: overview(售后健康度聚合)/apply(确认后发起售后，confirm=true 才提交) | 用户问售后汇总、处理售后、退款/退货/换货、物流卡单、质保到期 |
 | `scheduled_buy(action, sku_id, count, frequency, run_at, weekday, task_id, confirm)` | action: list(查看)/create(创建定时购，confirm=true 生效)/cancel(取消)；frequency: once/daily/weekly | 用户说"定时买""自动买""每周五 10:00 自动买 XX"（注意与"补货提醒/该买了"的 usage_cycle_assistant 区分：本工具到点真实下单生成订单） |
 | `dynamic_pricing()` | 无 | 商家问"该涨价还是降价""定价建议""价格调整" |

@@ -227,6 +227,55 @@
       <div class="brain-note">演示口径：情感由星级规则映射，AI 建议话术模板生成 · 正式版接入情感模型与商家审核流</div>
     </div>
 
+    <!-- 售后工作台（商家侧 AI 售后管家） -->
+    <div class="section as-sec">
+      <div class="sec-title">售后工作台 <span class="warn-badge">{{ asTotal }}</span></div>
+      <div class="warn-label">状态统计 · 商家看板口径</div>
+      <div class="as-stats" v-if="asCounts && Object.keys(asCounts).length">
+        <div class="as-stat" :class="{ hot: (asCounts?.['APPLYING'] ?? 0) > 0 }">
+          <div class="as-num">{{ asCounts['APPLYING'] ?? 0 }}</div>
+          <div class="as-label">待审核</div>
+        </div>
+        <div class="as-stat">
+          <div class="as-num">{{ asCounts['SELLER_APPROVED'] ?? 0 }}</div>
+          <div class="as-label">待退款</div>
+        </div>
+        <div class="as-stat">
+          <div class="as-num">{{ asCounts['REFUNDING'] ?? 0 }}</div>
+          <div class="as-label">退款中</div>
+        </div>
+        <div class="as-stat">
+          <div class="as-num">{{ asCounts['REFUNDED'] ?? 0 }}</div>
+          <div class="as-label">已完结</div>
+        </div>
+      </div>
+      <div v-else class="empty">暂无售后数据</div>
+
+      <div class="as-tabs">
+        <span class="as-tab" :class="{ on: asStatus === '' }" @click="switchAs('')">待审核</span>
+        <span class="as-tab" :class="{ on: asStatus === 'SELLER_APPROVED' }" @click="switchAs('SELLER_APPROVED')">待退款</span>
+        <span class="as-tab" :class="{ on: asStatus === 'REFUNDING' }" @click="switchAs('REFUNDING')">退款中</span>
+      </div>
+      <div class="warn-label" style="margin-top:8px;">{{ asStatus === '' ? '待审核售后单' : asStatus === 'SELLER_APPROVED' ? '待退款售后单' : '退款中售后单' }} · {{ asItems.length }} 单</div>
+      <div v-if="asItems.length" class="warn-group">
+        <div v-for="a in asItems" :key="a.aftersaleNo" class="warn-row">
+          <span class="warn-dot" :class="a.status === 'APPLYING' ? 'neg' : 'fulf'" />
+          <div class="warn-main">
+            <div class="warn-name">{{ a.aftersaleNo }}</div>
+            <div class="warn-sub">{{ asTypeLabel(a.type) }} · ¥{{ (a.amount / 100).toFixed(2) }} · {{ a.reason || '无原因' }} · 申请 {{ (a.applyAt || '').slice(0, 10) }}</div>
+          </div>
+          <div class="as-ops" v-if="a.status === 'APPLYING'">
+            <button class="as-btn ok" :disabled="asLoading" @click="doApprove(a.aftersaleNo)">同意退款</button>
+            <button class="as-btn no" :disabled="asLoading" @click="doReject(a.aftersaleNo)">拒绝</button>
+          </div>
+          <span class="warn-tag" :class="a.status === 'APPLYING' ? 'neg' : 'fulf'">{{ asStatusLabel(a.status) }}</span>
+        </div>
+      </div>
+      <div v-else class="empty">当前筛选下无售后单 ✅</div>
+      <div v-if="asMsg" class="supply-msg">{{ asMsg }}</div>
+      <div class="as-note">可问 AI 助手：「售后待办」「谁申请了退款」——AI 只读盘点并给处理建议，同意/拒绝在本页人工确认</div>
+    </div>
+
     <!-- 热销榜 -->
     <div class="section">
       <div class="sec-title">热销商品 Top{{ hotList.length }}</div>
@@ -259,6 +308,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { getMerchantPending, approveAftersale, rejectAftersale, type AftersaleOrder } from '@/api/aftersale'
 import {
   getMerchantOverview,
   getMerchantWarnings,
@@ -452,6 +502,63 @@ function goChat() {
   router.push({ path: '/chat', query: { q: '帮我看看今天的经营情况：订单、销售额和热销商品' } })
 }
 
+const asItems = ref<AftersaleOrder[]>([])
+const asCounts = ref<Record<string, number> | null>(null)
+const asStatus = ref('')
+const asTotal = ref(0)
+const asLoading = ref(false)
+const asMsg = ref('')
+const asStatusLabel = (s: string) => ({ APPLYING: '待审核', SELLER_APPROVED: '待退款', REFUNDING: '退款中', REFUNDED: '已完结' } as Record<string, string>)[s] ?? s
+const asTypeLabel = (t: string) => ({ refund: '仅退款', return_refund: '退货退款', exchange: '换货', repair: '维修', RETURN_GOODS: '退货退款', REFUND_ONLY: '仅退款' } as Record<string, string>)[t] ?? t
+
+async function loadAfterSale() {
+  try {
+    const d = await getMerchantPending(asStatus.value || undefined)
+    if (d) {
+      asItems.value = d.list || []
+      asCounts.value = d.counts || null
+      asTotal.value = Object.values(d.counts || {}).reduce((a: number, b: unknown) => a + (Number(b) || 0), 0)
+    }
+  } catch (e) {
+    // 保持空态
+  }
+}
+
+function switchAs(status: string) {
+  asStatus.value = status
+  loadAfterSale()
+}
+
+async function doApprove(no: string) {
+  asLoading.value = true
+  asMsg.value = ''
+  try {
+    await approveAftersale(no)
+    asMsg.value = `已同意退款 ${no}（转入待退款）`
+    await loadAfterSale()
+  } catch (e) {
+    asMsg.value = '操作失败，请稍后再试'
+  } finally {
+    asLoading.value = false
+  }
+}
+
+async function doReject(no: string) {
+  const reason = window.prompt(`拒绝售后单 ${no}，请输入拒绝理由（必填）：`, '商品情况与描述不符')
+  if (!reason) return
+  asLoading.value = true
+  asMsg.value = ''
+  try {
+    await rejectAftersale(no, reason)
+    asMsg.value = `已拒绝 ${no}`
+    await loadAfterSale()
+  } catch (e) {
+    asMsg.value = '操作失败，请稍后再试'
+  } finally {
+    asLoading.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     const data = await getMerchantOverview()
@@ -463,6 +570,7 @@ onMounted(async () => {
   await loadFulfill()
   await loadSupply()
   await loadBrain()
+  await loadAfterSale()
 })
 
 async function loadWarnings() {

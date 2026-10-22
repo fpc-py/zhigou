@@ -48,6 +48,26 @@ export async function cancelAftersale(no: string): Promise<void> {
   await http.post(`/aftersale/${no}/cancel`, {});
 }
 
+/** 商家同意退款（售后单 -> SELLER_APPROVED） */
+export async function approveAftersale(no: string): Promise<void> {
+  await http.post(`/aftersale/${no}/approve`, {});
+}
+
+/** 商家拒绝售后（需理由） */
+export async function rejectAftersale(no: string, reason: string): Promise<void> {
+  await http.post(`/aftersale/${no}/reject`, { reason });
+}
+
+
+/** 商家售后工作台：待处理列表 + 全状态统计（商家中心；status 可选，默认 APPLYING） */
+export async function getMerchantPending(status?: string) {
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  const res = await http.get<{
+    code: number;
+    data: { list: AftersaleOrder[]; counts: Record<string, number>; status: string };
+  }>(`/aftersale/merchant/pending${q}`);
+  return res.data.data;
+}
 
 /** 质保提醒：30 天内到期 / 已过期 / 正常（售后助手） */
 export async function getWarrantyAlerts(days = 30) {

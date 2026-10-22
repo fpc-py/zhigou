@@ -27,6 +27,13 @@ public class AftersaleController {
         return Result.ok(service.mine(userId));
     }
 
+    /** 商家售后工作台：待处理列表 + 全状态统计（商家中心/AI 商家侧工具共用）。status 默认 APPLYING。 */
+    @GetMapping("/merchant/pending")
+    public Result<Map<String, Object>> merchantPending(
+            @RequestParam(required = false) String status) {
+        return Result.ok(service.merchantPending(status));
+    }
+
     @GetMapping("/{no}")
     public Result<AftersaleOrder> detail(@PathVariable String no) { return Result.ok(service.detail(no)); }
 

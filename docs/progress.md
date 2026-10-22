@@ -4,6 +4,15 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.75] C 组 P1 商家侧 AI 售后管家（后端 + 工具 + BFF + H5 全闭环）
+- **后端**：`AftersaleServiceImpl.merchantPending(status)` + `GET /aftersale/merchant/pending`（待审核列表 + counts 全状态统计）
+- **AI 工具**：`merchant_after_sale(status)` 只读盘点+建议（AI 不擅自处理，人工确认门）；system.md 登记
+- **BFF**：`GET merchant/pending`（置于 `@Get(':no')` 之前）+ `POST :no/approve` + `POST :no/reject`（rawBody 透传 reason）
+- **H5**：商家中心「售后工作台」区块——状态统计卡 + tabs 筛选 + 待处理列表 + 同意退款/拒绝按钮
+- **实测**：8090 直连 200（APPLYING:2）；BFF 自签 JWT 200；**approve 闭环** MOCK_AS_002 → APPLYING 2→1 / SELLER_APPROVED 12→13；H5 `vue-tsc --build` 通过 + 浏览器端到端渲染真实数据 + 点击流转 UI 联动
+- **坑**：#70a BFF 路由顺序（`:no` 会吞掉 merchant/pending）；#70b H5 Pinia store 初始化时机（localStorage 注入需刷新）；#70c Windows JWT 文件 BOM 污染请求头
+- 清单 C 组 P1 商家侧 ✅
+
 ## 2026-10-22 · [0.2.74] B 组残余补验 · B7 故障演练 3.2/3.3 真实执行
 - 3.2 缓存单飞：FLUSHDB + 并发100 打真实 SPU → 100/100 全200、0.21s
 - 3.3 MQ 积压：停消费者 → 真实关单 → 重启后采样 lag=150 + 批量拉平

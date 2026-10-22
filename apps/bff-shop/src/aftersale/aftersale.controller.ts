@@ -52,11 +52,36 @@ export class AftersaleController {
     return ApiResponse.ok(data);
   }
 
+  /** 商家售后工作台：待处理列表 + 全状态统计（商家中心/AI 商家侧共用） */
+  @Get('merchant/pending')
+  async merchantPending(@Req() req: Request, @Query('status') status?: string) {
+    const userId = (req as any).userId as string;
+    const data = await this.aftersaleService.merchantPending(userId, status);
+    return ApiResponse.ok(data);
+  }
+
   @Get(':no')
   async detail(@Param('no') no: string, @Req() req: Request) {
     const userId = (req as any).userId as string;
     const data = await this.aftersaleService.detail(userId, no);
     return ApiResponse.ok(data);
+  }
+
+  /** 商家同意退款 */
+  @Post(':no/approve')
+  async approve(@Param('no') no: string, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    await this.aftersaleService.approve(userId, no);
+    return ApiResponse.ok(null);
+  }
+
+  /** 商家拒绝售后：rawBody 透传 reason */
+  @Post(':no/reject')
+  async reject(@Param('no') no: string, @Req() req: RawBodyRequest<Request>) {
+    const userId = (req as any).userId as string;
+    const raw = req.rawBody?.toString() ?? '{}';
+    await this.aftersaleService.reject(userId, no, raw);
+    return ApiResponse.ok(null);
   }
 
   @Post(':no/cancel')

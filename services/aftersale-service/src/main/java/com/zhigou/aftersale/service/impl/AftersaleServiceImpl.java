@@ -138,6 +138,25 @@ public class AftersaleServiceImpl {
         return mapper.selectList(new LambdaQueryWrapper<AftersaleOrder>().eq(AftersaleOrder::getUserId, userId));
     }
 
+    /** 商家售后工作台：待处理列表（默认 APPLYING 待审核）+ 全状态统计。status 为空返回待审核列表。 */
+    public Map<String, Object> merchantPending(String status) {
+        String eff = (status == null || status.isBlank()) ? "APPLYING" : status;
+        List<AftersaleOrder> list = mapper.selectList(new LambdaQueryWrapper<AftersaleOrder>()
+                .eq(AftersaleOrder::getStatus, eff)
+                .orderByAsc(AftersaleOrder::getApplyAt));
+        // 全状态统计（商家看板口径：各状态在途单量）
+        Map<String, Long> counts = mapper.selectList(new LambdaQueryWrapper<AftersaleOrder>()
+                        .select(AftersaleOrder::getStatus))
+                .stream()
+                .collect(java.util.stream.Collectors.groupingBy(AftersaleOrder::getStatus,
+                        java.util.stream.Collectors.counting()));
+        Map<String, Object> ret = new java.util.HashMap<>();
+        ret.put("list", list);
+        ret.put("counts", counts);
+        ret.put("status", eff);
+        return ret;
+    }
+
     public AftersaleOrder detail(String no) { return mapper.selectOne(new LambdaQueryWrapper<AftersaleOrder>().eq(AftersaleOrder::getAftersaleNo, no)); }
 
     @Transactional
