@@ -3,6 +3,17 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.64] — AI 省钱助手 B 块：降价关注与提醒（2026-10-22）
+
+### feat: price_alert 关注 + price_notice 站内信 + 每日检测（product-service）
+- **背景**：A 块历史价格底座之上，补齐「用户主动关注 → 降价命中 → 站内信提醒」闭环（省钱助手 P0 核心）。
+- **实现**：
+  - `price_alert` / `price_notice` 表（Flyway V20261095）+ Entity/Mapper/Service
+  - POST `/price/alert` 关注（幂等 upsert，targetPrice 可空=任意降价）｜DELETE 取消（软删 OFF）｜GET `/price/alert/mine`（含当前价/是否已降/降幅）｜GET `/price/notice/mine?unreadOnly=`｜POST `/notice/read/{id}`
+  - 每日 03:10 检测任务（PriceAlertCheckTask）：比对最新快照 vs watch_price，命中写站内信并推进 watch_price
+- **实测（关注制全链路）**：关注 sku …024 @4900 → 造降价 4900→4500 → check hits=1 → notice「4900→4500 降 ¥4.00」→ watch_price 推进 4500（同一价格只提醒一次）
+- **面试叙事**：① 关注制触达由数据模型保证（无 price_alert 记录=检测扫不到=零推送，不是开关是约束）；② 提醒去重=命中后基准价推进（继续盯更低，不重复骚扰）；③ 目标价语义（≤targetPrice 或 <watchPrice 双触发）
+
 ## [0.2.63] — AI 省钱助手 A 块：历史价格底座（2026-10-22）
 
 ### feat: price_history 快照 + 趋势查询（product-service）

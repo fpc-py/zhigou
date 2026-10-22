@@ -4,6 +4,11 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.64] C 组 P0 AI 省钱助手 B 块：降价关注与提醒
+- price_alert 关注表 + price_notice 站内信 + 关注/取消/列表/已读接口 + 每日 03:10 检测任务（命中推进基准价防重复提醒）
+- 实测：关注→造降价 4900→4500→check hits=1→提醒「降 ¥4.00」→watch 推进 4500
+- 下一块：C 块省钱汇总 + BFF 透传 + H5 /cost-saver 页
+
 ## 2026-10-22 · [0.2.59] 读路径 id 字符串化根治（坑 #63 闭环）
 - **范围**：响应 DTO/Entity 19 位 id 统一 `@JsonSerialize(ToStringSerializer)`——批量脚本 43 文件 55 字段（product/order/marketing/aftersale/cart/inventory/user/auth/file）
 - **验证**：product spuId/skuId [String]；拼团 id/skuId/spuId [String]；H5 全链路字符串 skuId 加购→下单 201 金额 4900→落库 19 位无损
