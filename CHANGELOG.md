@@ -3,6 +3,19 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.80] · AI 深水区④ AI 评测回归集（离线确定性断言进 CI）（2026-10-22）
+### feat: scripts/ai-eval 三脚本 + CI job
+- `scripts/ai-eval/test_tool_schema.py`：TOOLS 全量 convert_to_openai_tool + 名称唯一 + 参数 properties 完整（防 #144 漏注册重演）
+- `scripts/ai-eval/test_tool_routing.py`：确定性路由 14 工具 × ≥2 正向样例 + 5 负样例（固化 #71 客服优先、#76 降价≠商家定价）
+- `scripts/ai-eval/test_injection_regression.py`：收纳 #68a/b 注入主集 + 变体（空格混淆/数据侧间接/英文/括号伪装）
+- `run_eval.ps1` 本地统一入口 + `.github/workflows/ci.yml` 新增 ai-eval job（python 3.12 + pip cache + 三脚本，失败即红）
+### test: 全绿 + 变异自证
+- 本地实测：schema 35/35、routing 44 断言、injection 19 断言全部 PASS；全仓 pytest **70 passed** 无回归
+- **变异自证**：注释掉 reminders 工具 → schema 必红（exit 1）→ git 恢复 → 全绿（回归集有效性自证，面试叙事：评测集会自己红）
+### fix: 评测集首跑即抓 2 类真实缺陷
+- #78：客服路由漏「会员有什么权益」口语（仅配「会员权益」连续匹配）→ 补 `会员.{0,8}权益|权益.{0,6}(是什么|有哪些|怎么用)`
+- #79：prompt_guard 漏「忘记你是助手」角色覆盖式注入 + 「ignore previous / reveal your prompt」英文注入 → 补 3 条规则 + 越权访问补「报」
+
 ## [0.2.79] · AI 深水区③ 主动式智能提醒（从被动问答到主动服务）（2026-10-22）
 ### feat: 提醒引擎 + 端点 + 工具 + H5 提醒中心
 - **`app/reminders.py`**：聚合引擎（复用现有三源，不造轮子）——降价（product-service /price/notice/mine 已产出通知）、复购（order /order/mine 品类聚合 + 复用 CYCLE_RULES 周期规则）、换季穿搭（closet /closet/items 按当前季节覆盖检查）；`data/reminders.json`（tmp+replace 原子写），按 (userId,type,targetKey) 幂等去重；状态机 ACTIVE→READ/DISMISSED；调度每小时整点扫描（复用 scheduled_buy 60s 循环模式），只扫活跃用户（touch_user 登记，默认零推送）

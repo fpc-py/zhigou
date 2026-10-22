@@ -4,6 +4,12 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.80] AI 深水区④ AI 评测回归集（离线确定性断言进 CI）
+- **scripts/ai-eval/**：test_tool_schema（35 工具 schema 全量转换/名称唯一/参数完整）+ test_tool_routing（14 路由 × 正负样例，固化 #71/#76）+ test_injection_regression（#68 主集 + 4 类变体）
+- **CI**：.github/workflows/ci.yml 新增 ai-eval job（python 3.12 + pip cache），失败即红
+- **实测**：3 脚本全绿（schema 35 / routing 44 / injection 19）+ 全仓 pytest 70 passed；变异自证：注释 reminders → schema 必红 → 恢复全绿
+- **首跑即抓 2 类真实缺陷**：#78 客服路由漏「会员有什么权益」口语；#79 注入防护漏「忘记你是助手」角色覆盖 + 英文注入——均已修并纳入回归
+
 ## 2026-10-22 · [0.2.79] AI 深水区③ 主动式智能提醒（从被动问答到主动服务）
 - **引擎**：reminders.py 聚合三类提醒（降价=消费省钱助手 B 块现成通知 / 复购=订单品类周期 / 换季=衣橱季节覆盖）+ data/reminders.json 幂等去重 + ACTIVE→READ 状态机 + 每小时整点调度（只扫活跃用户，零推送）
 - **端点/工具**：/reminders/mine + /scan + /read/{id}；reminders 工具（TOOLS 34→35）；路由命中「有什么提醒/该补货/换季」
@@ -496,7 +502,9 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | ~~压测仅覆盖 BFF 层~~（已闭环） | P1 | ~~50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项）~~ → [0.2.56] M3 容量模型：BFF 横扩 1.83x（290→531 RPS）+ 读层 1263 RPS + 5000 QPS 集群形态决策，唯一 P1 未闭环项已销 |
 
 ## 变更记录
-* 2026-10-22：**AI 深水区③ 主动式智能提醒（[0.2.79]）**：reminders 聚合引擎（降价/复购/换季三类，复用现成数据源）+ /reminders/mine+scan+read 端点 + reminders 工具（TOOLS 35）+ BFF 透传 + H5 提醒中心；5 项测试 + 全仓 70 无回归 + SSE/端点端到端；坑 #76（路由优先级：降价提醒被商家定价截胡）、#77。
+* 2026-10-22：**AI 深水区④ AI 评测回归集（[0.2.80]）**：scripts/ai-eval 三脚本（schema/routing/injection）+ CI job；全绿 + 变异自证（删工具必红）；首跑抓 #78（客服路由口语缺口）、#79（注入两变体漏检）已修。
+* 2026-10-22：**AI 深水区③ 主动式智能提醒（[0.2.79]）**
+：reminders 聚合引擎（降价/复购/换季三类，复用现成数据源）+ /reminders/mine+scan+read 端点 + reminders 工具（TOOLS 35）+ BFF 透传 + H5 提醒中心；5 项测试 + 全仓 70 无回归 + SSE/端点端到端；坑 #76（路由优先级：降价提醒被商家定价截胡）、#77。
 * 2026-10-22：**AI 深水区② AI 链路可观测（[0.2.78]）**
 ：/metrics Prometheus 文本格式 + 全链路埋点（工具调用/失败/耗时、LLM outcome 六类、SSE 连接/事件、chat/token/uptime）；7 项确定性测试 + 全仓 65 无回归 + SSE 端到端实测（转人工对话后 chat 0→1/sse 0→95/llm 0→2/customer_service 1）；坑 #75（进程内单例 vs 多 worker）。
 * 2026-10-22：**AI 深水区① AI 客服（[0.2.77]）**

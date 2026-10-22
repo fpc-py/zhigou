@@ -72,7 +72,42 @@ jobs:
             **/target/surefire-reports/
           retention-days: 7
 
-  # ---------- Job 2：构建并推送镜像（GHCR）----------
+  # ---------- Job 2：AI 评测回归集（离线确定性断言，零 LLM key）----------
+  ai-eval:
+    name: AI Eval (schema / routing / injection)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/ai-orchestrator
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/ai-orchestrator/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run AI eval suite
+        run: |
+          python ../../scripts/ai-eval/test_tool_schema.py
+          python ../../scripts/ai-eval/test_tool_routing.py
+          python ../../scripts/ai-eval/test_injection_regression.py
+
+      - name: Upload ai-eval logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-eval-logs
+          path: services/ai-orchestrator
+          retention-days: 7
+
+  # ---------- Job 3：构建并推送镜像（GHCR）----------
   build-images:
     name: Build & push images (GHCR)
     needs: build-test
@@ -140,7 +175,7 @@ jobs:
   # ---------- Job 3：部署状态汇总 ----------
   summary:
     name: Pipeline summary
-    needs: [build-test, build-images]
+    needs: [build-test, ai-eval, build-images]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -148,5 +183,6 @@ jobs:
         run: |
           echo "## CI Pipeline Result" >> $GITHUB_STEP_SUMMARY
           echo "- Build & Test: ${{ needs.build-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- AI Eval (schema/routing/injection): ${{ needs.ai-eval.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Images (11 services): ${{ needs.build-images.result }}" >> $GITHUB_STEP_SUMMARY
           echo "> 部署请手动触发 deploy.yml（SSH + docker compose pull && up）" >> $GITHUB_STEP_SUMMARY
