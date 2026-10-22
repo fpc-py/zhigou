@@ -70,6 +70,13 @@ async def startup():
     except Exception as e:
         logger.warning("MQ 消费者启动失败: %s", e)
 
+    try:
+        from app.scheduled_buy import start_scheduler
+        start_scheduler()
+        logger.info("Agent 定时购调度器已启动（每 60s 扫描到期任务）")
+    except Exception as e:
+        logger.warning("定时购调度器启动失败: %s", e)
+
 
 @app.get("/health")
 async def health():

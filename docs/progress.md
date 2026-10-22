@@ -4,6 +4,12 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.70] C 组 P1 二期 · Agent 定时购（确认门 + 后台调度）
+- **工具** `scheduled_buy`（list/create/cancel）：确认门前置（未确认零落库）+ `data/scheduled_buys.json` 持久化 + 后台 asyncio 调度（60s 扫描，main.py startup 挂载）到点复用 `create_order` 真实下单；一次性 DONE、周期滚动 ACTIVE、**失败不轰炸**
+- **路由**：触发词（定时购/自动买/每周买…）置 usage_cycle 之前；system.md 登记
+- **坑**：#66a LangChain BaseTool 须 `.ainvoke`（直接 await 报 `__call__ 不认关键字参数`）；#66b once 完整日期被 HH:MM 解析炸（fromisoformat 优先）
+- **测试**：7 用例（确认门/缺参/持久化/空列表/取消/一次性 DONE/周期滚动+失败不轰炸）——**pytest 45 passed**；真实链路：确认创建 → 到期真实下单（订单 2113231400802684928 ¥99.00）→ DONE → 取消
+
 ## 2026-10-22 · [0.2.69] C 组 P1 · AI 售后管家（overview 聚合 + apply 确认门）
 - **A1 工具** `after_sale_manager(action=overview|apply, issue, order_no, type, reason, confirm)`：
   - overview 三路聚合售后健康度：`/aftersale/mine`（处理中单）＋ `/logistics/delay-alerts`（延误预警）＋ `/aftersale/warranty/alerts`（质保到期）

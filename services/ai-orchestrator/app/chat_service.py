@@ -107,6 +107,7 @@ _ROUTE_RULES: list[tuple[str, "re.Pattern"]] = [
     ("after_sale_manager", re.compile(r"售后管家|处理售后|我的售后|售后情况|售后汇总|售后健康|我要退款|我要退货|我要换货|申请退款|帮我退款|帮我退货|帮我换货|物流卡住|快递没到|一直没到|催.*物流")),
     ("aftersale_assistant", re.compile(r"售后|退货|换货|退款|坏了|破损|质量问题|申请售后|维修|补发|质量有问题")),
     ("logistics_tracker", re.compile(r"物流|快递|运单|发货|配送|包裹|签收|到货|到哪了|送到")),
+    ("scheduled_buy", re.compile(r"定时购|定时买|自动买|每周买|每天买|定期买|每月买|每\d+天买|帮我定时下单|到点自动买")),
     ("usage_cycle_assistant", re.compile(r"补货|囤货|保质期|快用完|用完|换新|复购|该买|提醒我|还剩多少")),
     ("groupbuy_finder", re.compile(r"拼团|拼单|开团|参团|成团|团购")),
     ("sales_forecast", re.compile(r"我是商家|我是店主|我是运营|商家|店主|销量预测|智能选品|备货|选品建议|该备多少货|预测.{0,6}(销量|卖得好|卖得)|进货建议|经营大脑")),

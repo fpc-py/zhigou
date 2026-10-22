@@ -3,6 +3,19 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.70] — C 组 P1 二期：Agent 定时购（确认门 + 后台调度 + 复用一键代下单）（2026-10-22）
+### feat: ai-orchestrator 定时购工具 scheduled_buy + 调度执行
+- **工具** `scheduled_buy(action=list|create|cancel, sku_id, count, frequency, run_at, weekday, confirm)`：创建/查看/取消定时自动下单任务；**确认门前置**——create 必须 confirm=true（向用户复述商品/频率/时刻），未确认零落库
+- **调度执行** `app/scheduled_buy.py`：`data/scheduled_buys.json` 持久化（与会话记忆同风格，生产可换 Redis）；后台 asyncio 调度（main.py startup 挂载，60s 扫描）到点复用 `create_order`（幂等 requestId + X-User-Id 注入）真实下单；一次性任务成功 → DONE，周期任务（daily/weekly）成功滚动 nextRunAt 保持 ACTIVE；**失败不轰炸**——周期任务失败保持活跃等下周期，一次性失败标记 FAILED
+- **路由**：`_ROUTE_RULES` 定时购触发词（定时购/自动买/每周买…置于 usage_cycle_assistant 之前）；system.md 工具表登记（与「补货提醒/该买了」语义区分：本工具到点真实下单）
+### fix: 两个实现坑
+- **bug #66a**：`run_due_tasks` 直接 `await create_order_fn(...)` → LangChain `BaseTool.__call__` 不认 `sku_items` 关键字参数（`TypeError`）——StructuredTool 必须 `.ainvoke({params})`；改为检测 `ainvoke` 属性兼容普通函数
+- **bug #66b**：`_next_run` 对 once 完整日期 `2026-10-21 09:00` 按 `split(":")` 解析 HH:MM → `int('2026-10-21 09')` ValueError——once 分支优先 `datetime.fromisoformat` 完整解析，失败再回退 HH:MM
+### test: 定时购用例 7 条
+- 确认门零落库 / 缺参提示 / 创建持久化（tmp 隔离存储）/ 空列表 / 取消 / 一次性到期 DONE + lastResult / 周期任务失败不轰炸 + 成功滚动——**pytest 45 passed**（38 基线 + 7 新增）
+### 真实链路实测（本机 order 8085 UP）
+- 未确认零落库 → 确认创建 `SB55949748FE84`（SKU 9000000000000000020 x1，once）→ 到期 `run_due_tasks` 真实下单 **订单 2113231400802684928 ¥99.00** → 任务 DONE → 取消清理
+
 ## [0.2.69] — C 组 P1：AI 售后管家（overview 聚合诊断 + apply 确认门）（2026-10-22）
 ### feat: ai-orchestrator 售后管家工具 after_sale_manager
 - **overview（默认）**：三路聚合「售后健康度」——`GET /aftersale/mine`（处理中售后单）＋ `GET /logistics/delay-alerts`（物流延误预警）＋ `GET /aftersale/warranty/alerts`（质保 30 天内到期），一次问答闭环查清售后全景 + 可执行下一步建议

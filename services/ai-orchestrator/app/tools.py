@@ -1192,6 +1192,64 @@ async def gift_assistant(recipient: str, occasion: str, budget: float = 0) -> st
         lines.append("当前候选均超出预算，已按最低价排序供参考，建议调低预算或选择更小规格。")
     return "\n".join(lines)
 
+
+
+@tool
+async def scheduled_buy(action: str = "list", sku_id: str | None = None, count: int = 1,
+                        frequency: str = "weekly", run_at: str | None = None,
+                        weekday: str | None = None, task_id: str | None = None,
+                        confirm: bool = False) -> str:
+    """
+    Agent 定时购：创建 / 查看 / 取消「定时自动下单」任务。
+    用户说"定时买""自动买""每周买""每天买""定期买""帮我定时下单"时调用；
+    创建必须由用户明确确认（confirm=true），到点后自动复用下单链路创建订单（待用户支付）。
+    注意：与"补货提醒/该买了"（usage_cycle_assistant）区分——本工具执行实际下单，后者只做使用周期提醒。
+
+    Args:
+        action: list（查看我的定时购，默认）/ create（创建）/ cancel（取消）
+        sku_id: 商品 SKU ID（create 必填）
+        count: 每次购买数量，默认 1
+        frequency: once（一次性）/ daily（每天）/ weekly（每周，默认）
+        run_at: 执行时刻 HH:MM，如 "10:00"；once 可传完整日期时间 "2026-10-25 10:00"
+        weekday: weekly 时的星期，如 "周一"…"周日"（默认当天）
+        task_id: cancel 时的任务 ID
+        confirm: create 时必须为 true（用户确认购买意向与频率）
+    """
+    from app import scheduled_buy as sb
+    try:
+        uid = _get_current_user()
+        if action == "create":
+            if not sku_id:
+                return "创建定时购需要商品 SKU ID（可先调用商品搜索确认商品后给出）。"
+            if not run_at:
+                return "创建定时购需要执行时刻 run_at（如 10:00；一次性可传 2026-10-25 10:00）。"
+            if not confirm:
+                freq_hint = {"once": "一次性", "daily": "每天", "weekly": "每周"}.get(frequency, frequency)
+                when = f"{weekday} {run_at}" if frequency == "weekly" and weekday else run_at
+                return (f"创建定时购（待你确认）：SKU {sku_id} x{count}｜{freq_hint} {when}"
+                        f"｜到点后自动下单生成订单（待支付，不会自动扣款）。回复『确认』后生效。")
+            task = sb.create_task(uid, sku_id, count, frequency, run_at, weekday)
+            return (f"定时购已创建 ✅：{sb.format_task(task)}"
+                    f"｜到点自动下单（复用一键代下单链路，生成订单后提醒你支付，不会自动扣款）。")
+        if action == "cancel":
+            if not task_id:
+                return "取消定时购需要任务 ID（可先查看列表获取）。"
+            t = sb.cancel_task(uid, task_id)
+            if not t:
+                return f"未找到任务 {task_id}（不属于你或不存在）。"
+            return f"定时购已取消 ✅：{sb.format_task(t)}"
+        # action=list
+        tasks = sb.list_tasks(uid)
+        if not tasks:
+            return "你还没有定时购任务。可以说『每周五 10:00 自动买 XX』，我帮你创建（需你确认）。"
+        lines = ["你的定时购任务："]
+        for t in tasks:
+            lines.append(sb.format_task(t))
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("scheduled_buy 调用失败: %s", e)
+        return "定时购服务暂时不可用，请稍后再试。"
+
 # ── 工具注册表 ──
 
 @tool
