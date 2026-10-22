@@ -3,6 +3,15 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.56] — M3 生产化路径容量模型（2026-10-22）
+
+### perf: 全链路压测 + 瓶颈定位 + 目标决策（差距报告 D 组 M3）
+- **BFF 横向扩展实证**：80VU 单实例 290 RPS 零错误 → 双实例 531 RPS（**1.83x**），BFF 单进程不再是瓶颈。
+- **读层服务上限**：product-service 单实例直连 100VU **1263 RPS 零错误**（非瓶颈）。
+- **核心发现（坑 #62）**：混合读写错误率根因 = **order-service 创建订单同步调用 product 级联超时**（`Read timed out` → 回退占用价 → 订单金额口径静默漂移）——比直接 5xx 更危险的分布式同步调用脆弱点。
+- **目标决策**：5000 QPS 定义为集群形态目标（K8s 多副本 + BFF HPA）；单机验收口径 = 可解释容量 + 线性扩展 + 瓶颈定位，全部实证。
+- 产出：`docs/load-test/M3生产化路径容量模型.md` + `scripts/load-test/test_m3_scale.py`。
+
 ## [0.2.55] — M4 上线收尾：回滚演练 + release-checklist 签核（2026-10-22）
 
 ### drill: 灰度/回滚演练（release-checklist §五 触发条件实走一遍）
