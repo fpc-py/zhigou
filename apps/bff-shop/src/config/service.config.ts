@@ -133,4 +133,12 @@ export const SERVICE_PATHS = {
   userBrowse:         '/user/browse',
   userBrowseRecent:   (limit: number) => `/user/browse/recent?limit=${limit}`,
   userInsight:        '/user/insight',
+  // AI 省钱助手 C 块（product-service）
+  costSaverOverview:  '/cost-saver/overview',
+  priceHistory:       (skuId: string, days: number) => `/price/history?skuId=${skuId}&days=${days}`,
+  priceAlertCreate:   '/price/alert',
+  priceAlertDelete:   (skuId: string) => `/price/alert/${skuId}`,
+  priceAlertMine:     '/price/alert/mine',
+  priceNoticeMine:    (unreadOnly: boolean) => `/price/notice/mine?unreadOnly=${unreadOnly}`,
+  priceNoticeRead:    (noticeId: string) => `/price/notice/read/${noticeId}`,
 };

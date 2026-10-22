@@ -83,6 +83,7 @@ const orderStats = [
 const aiTags = ['通勤穿搭', '数码性价比', '礼物场景', '百元好物'];
 
 const menus = [
+  { icon: 'wallet', label: '省钱助手', hint: '比价 · 凑单 · 降价', bg: '#FFF0E8', color: '#FF2D55', action: () => router.push('/cost-saver') },
   { icon: 'wallet', label: '我的钱包', hint: '', bg: '#FFF3DF', color: '#FFA62B', action: () => router.push('/wallet') },
   { icon: 'heart', label: '我的收藏', hint: '', bg: '#FFEDF2', color: '#FF4D6D', action: () => router.push('/favorites') },
   { icon: 'eye', label: '浏览历史', hint: '', bg: '#EAF5FF', color: '#2F80ED', action: () => router.push('/history') },

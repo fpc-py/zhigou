@@ -3,6 +3,17 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.65] — AI 省钱助手 C 块：省钱汇总 + BFF 透传 + H5 页（2026-10-22）
+
+### feat: /cost-saver/overview 汇总 + BFF 透传 + H5 /cost-saver（product-service + bff-shop + h5-shop）
+- **背景**：A/B 块数据底座就绪，本块打通「第一屏可感知」——用户打开省钱助手第一眼看到已省金额。
+- **实现**：
+  - product：GET `/cost-saver/overview`（RestTemplate 聚合 cart/mine + marketing discount/calculate + coupon/mine + 本服务 price/compare + price_notice/alert）；口径独立合并：totalSaving = 满减实省 + 比价最优差 + 降价已省，最优券单列预估不重复计入
+  - BFF：cost-saver 模块 7 路由透传（overview/history/alert CRUD/notice），rawBody 字符串保真（19 位 id）
+  - H5：`/cost-saver` 页（总节省 hero 卡 + 降价提醒未读 + 关注表单 + 我的关注 + 历史价格展开）+ profile 入口
+- **实测**：BFF overview total=23120「已帮你省 ¥231.2（比价）」；history 19 位 skuId 无损；浏览器实测 hero 卡渲染 ✓ 用户隔离（token 用户 231.2 / 10001 提醒互不可见）
+- **面试叙事**：省钱口径防重复（三口径独立合并 vs 券预估单列）——「同一笔钱不算两次」是数据口径层的正确性设计
+
 ## [0.2.64] — AI 省钱助手 B 块：降价关注与提醒（2026-10-22）
 
 ### feat: price_alert 关注 + price_notice 站内信 + 每日检测（product-service）

@@ -46,6 +46,8 @@ import { MerchantService } from './merchant/merchant.service.js';
 import { MonitorController } from './monitor/monitor.controller.js';
 import { FileController } from './file/file.controller.js';
 import { FileService } from './file/file.service.js';
+import { CostSaverController } from './cost-saver/cost-saver.controller.js';
+import { CostSaverService } from './cost-saver/cost-saver.service.js';
 
 @Module({
   imports: [
@@ -71,6 +73,7 @@ import { FileService } from './file/file.service.js';
     MerchantController,
     MonitorController,
     FileController,
+    CostSaverController,
   ],
   providers: [
     HomeService,
@@ -91,6 +94,7 @@ import { FileService } from './file/file.service.js';
     WalletService,
     MerchantService,
     FileService,
+    CostSaverService,
     // A1：熔断守护版 HttpService（快失败 + 滑窗 + 半开探活，零侵入所有 service 下游调用）
     {
       provide: HttpService,

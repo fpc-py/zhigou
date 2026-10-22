@@ -46,6 +46,9 @@ const router = createRouter({
     // ── 用户画像底座：我的收藏 / 浏览历史 ──
     { path: '/favorites', name: 'favorites', component: () => import('@/views/user/favorites.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/history', name: 'history', component: () => import('@/views/user/history.vue'), meta: { requiresAuth: true, tabbar: false } },
+
+    // ── C 组 P0：AI 省钱助手 ──
+    { path: '/cost-saver', name: 'cost-saver', component: () => import('@/views/cost-saver/index.vue'), meta: { requiresAuth: true, tabbar: false } },
   ],
 });
 

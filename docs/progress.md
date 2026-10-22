@@ -4,6 +4,12 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.65] C 组 P0 AI 省钱助手 C 块：省钱汇总 + BFF + H5
+- product /cost-saver/overview 四口径聚合（满减实省/券预估/比价差/降价已省，独立合并防重复）
+- BFF 7 路由透传（rawBody 保真）+ H5 /cost-saver 页（hero 总节省 + 提醒 + 关注）+ profile 入口
+- 实测：BFF total=23120「已帮你省 ¥231.2」；浏览器 hero 卡渲染 ✓
+- 下一块：D 块 ai-orchestrator price_alert 工具 + system.md + pytest
+
 ## 2026-10-22 · [0.2.64] C 组 P0 AI 省钱助手 B 块：降价关注与提醒
 - price_alert 关注表 + price_notice 站内信 + 关注/取消/列表/已读接口 + 每日 03:10 检测任务（命中推进基准价防重复提醒）
 - 实测：关注→造降价 4900→4500→check hits=1→提醒「降 ¥4.00」→watch 推进 4500

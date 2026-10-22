@@ -34,6 +34,12 @@ product:
   cache:
     ttl-seconds: 300
 
+# AI 省钱助手 C 块：省钱汇总跨服务调用
+cart-service:
+  url: ${CART_SERVICE_URL:http://localhost:8084}
+marketing-service:
+  url: ${MARKETING_SERVICE_URL:http://localhost:8088}
+
 mybatis-plus:
   global-config:
     db-config:
