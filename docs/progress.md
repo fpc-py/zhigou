@@ -4,6 +4,12 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.68] SSE 在线对话链路修复（回归 + 测试补强）
+- **根因**：①chat_service 漏 import `sanitize_query`（NameError）②.env `/anthropic` 路径 404 + 思考模型不支持 tool_choice ③deepseek-chat 静默忽略强制 → 谎报执行
+- **修复**：补 import；base_url `/v1`、model `deepseek-chat`；新增 `ZHIGOU_AI_SPECIFIC_TOOL_CHOICE=false` 配置开关（auto + 指令注入）+ 运行时 BadRequestError 降级兜底
+- **实测**：SSE 关注降价闭环 `tool_call×2/tool_result×2/token×127/done`，「已关注 黑色 的降价，降到 ¥45 提醒你，当前价 ¥44.00」落库；pytest 31 passed（测试随实现演进：dict 事件契约 + mock 签名）
+- **坑 #64 闭环**：LLM 链路三层坑（漏 import / 端点路径 / 模型能力差异致谎报）
+- 下一步：C 组 P1 候选拍板（Agent 定时购 / AI 售后管家）
 ## 2026-10-22 · [0.2.67] C 组 P0 AI 省钱助手 E 块：全链路冒烟闭环
 - 冒烟断言 6/6 通过（关注 upsert→造降价→check→提醒→历史→overview）
 - 口径核对：noticeSaving 只统计真实降幅（dropAmount>0），零降幅目标价命中不计省钱——防虚增 ✓

@@ -1,5 +1,8 @@
 """
 测试：对话 SSE 流式输出 + 系统提示词加载（原生 OpenAI 工具循环实现）
+
+事件契约：chat_stream / _run_agent 以 dict 形式 yield（{"event": ..., "data": ...}），
+由 sse_starlette 序列化为 `event: xxx\ndata: {...}` 标准 SSE 格式（见 fallback_handler 模块说明）。
 """
 
 import json
@@ -37,27 +40,26 @@ class TestChatStream:
 
         sid = "test-normal"
 
-        async def mock_run_agent(messages, timeout_s):
-            yield {"event": "token", "data": json.dumps({"content": "你好！我是小智"})}
+        async def mock_run_agent(messages, timeout_s, forced_tool=None):
+            yield {"event": "token", "data": json.dumps({"content": "你好！我是小智"}, ensure_ascii=False)}
 
         monkeypatch.setattr(cs, "_run_agent", mock_run_agent)
         cs._system_prompt = cs._load_system_prompt()
 
         try:
             events = []
-            async for event_str in chat_stream("你好", "u1001", sid):
-                events.append(event_str)
+            async for event in chat_stream("你好", "u1001", sid):
+                events.append(event)
 
             assert len(events) >= 2, "至少应有 2 个事件"
 
             first = events[0]
-            assert first.startswith("event: token"), f"首个事件应为 token，实际是: {first}"
-            payload = first.split("\ndata: ", 1)[1].strip()
-            data = json.loads(payload)
+            assert first["event"] == "token", f"首个事件应为 token，实际是: {first}"
+            data = json.loads(first["data"])
             assert "content" in data and len(data["content"]) > 0
 
             last = events[-1]
-            assert last.startswith("event: done"), f"最后事件应为 done，实际是: {last}"
+            assert last["event"] == "done", f"最后事件应为 done，实际是: {last}"
 
             # 会话历史应被写回
             path = _session_file(sid)
@@ -76,26 +78,26 @@ class TestChatStream:
 
         sid = "test-tool"
 
-        async def mock_run_agent(messages, timeout_s):
-            yield {"event": "tool_call", "data": json.dumps({"tool": "search_products", "args": {"keyword": "手机", "limit": 10}})}
-            yield {"event": "tool_result", "data": json.dumps({"tool": "search_products", "result": "· 智能手机X | ¥3999.00 | 有货"})}
-            yield {"event": "token", "data": json.dumps({"content": "找到以下商品："})}
+        async def mock_run_agent(messages, timeout_s, forced_tool=None):
+            yield {"event": "tool_call", "data": json.dumps({"tool": "search_products", "args": {"keyword": "手机", "limit": 10}}, ensure_ascii=False)}
+            yield {"event": "tool_result", "data": json.dumps({"tool": "search_products", "result": "· 智能手机X | ¥3999.00 | 有货"}, ensure_ascii=False)}
+            yield {"event": "token", "data": json.dumps({"content": "找到以下商品："}, ensure_ascii=False)}
 
         monkeypatch.setattr(cs, "_run_agent", mock_run_agent)
         cs._system_prompt = "你是小智"
 
         try:
             events = []
-            async for event_str in chat_stream("帮我找手机", "u1001", sid):
-                events.append(event_str)
+            async for event in chat_stream("帮我找手机", "u1001", sid):
+                events.append(event)
 
-            tool_calls = [e for e in events if e.startswith("event: tool_call")]
+            tool_calls = [e for e in events if e["event"] == "tool_call"]
             assert len(tool_calls) >= 1, "应有 tool_call 事件"
 
-            tool_results = [e for e in events if e.startswith("event: tool_result")]
+            tool_results = [e for e in events if e["event"] == "tool_result"]
             assert len(tool_results) >= 1, "应有 tool_result 事件"
 
-            done = [e for e in events if e.startswith("event: done")]
+            done = [e for e in events if e["event"] == "done"]
             assert len(done) >= 1, "应有 done 事件"
         finally:
             cs._system_prompt = ""

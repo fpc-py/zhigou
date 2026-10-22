@@ -3,6 +3,16 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.68] — SSE 在线对话链路修复：LLM 三个坑 + 工具路由适配（2026-10-22）
+### fix: ai-orchestrator 对话链路回归修复 + 测试补强
+- **根因①**：chat_service.py 漏 `from .prompt_guard import sanitize_query` → SSE 全量「对话处理异常」（NameError）——prompt 注入防护函数从未真正接入对话流
+- **根因②**：.env `ZHIGOU_LLM_BASE_URL` 带 `/anthropic` 路径 → 404（deepseek OpenAI 兼容端点为 `/v1`）；`deepseek-v4-flash` 为思考模式模型，不支持强制 tool_choice → 400「Thinking mode does not support this tool_choice」
+- **根因③**：`deepseek-chat` 静默忽略 specific function tool_choice → **模型谎报执行**（未调工具却回复「已帮你设置」）——AI 可靠性真实问题
+- **修复**：① 补 import；② .env base_url → `/v1`、model → `deepseek-chat`；③ 新增配置开关 `ZHIGOU_AI_SPECIFIC_TOOL_CHOICE=false`（config.py `ai_specific_tool_choice`）——开关关闭时强制路由降级为 `auto` + 注入「必须先调用工具」指令（实测 deepseek-chat 在指令下可靠调用）；另保留运行时 `BadRequestError` 降级兜底（对付会抛 400 的思考模型）
+- **测试补强**：test_chat/test_fallback 随实现演进（SSE 事件 dict 契约 + mock `forced_tool` 签名 + 环境无关断言，替换过时的 langgraph `_get_graph` mock）→ **pytest 31 passed**
+- **实测**：SSE 简单对话真实 token；「关注降价」完整闭环 `tool_call×2 + tool_result×2 + token×127 + done`——工具真实执行「已关注 黑色 的降价，降到 ¥45 提醒你，当前价 ¥44.00」（product 8083 落库）
+- **面试叙事**：LLM 链路三层坑——①漏 import 直接崩（静态检查盲区）②端点路径错误（404 而非 5xx，误判「key 不通」）③模型能力差异（思考模式不支持 tool_choice / 静默忽略致谎报执行）→ 适配层三招：配置化能力开关 + 运行时降级 + 指令注入，且把「类型标注 string ≠ 运行时保真」的教训延伸到模型行为层
+
 ## [0.2.67] — AI 省钱助手 E 块：全链路冒烟闭环（采集→关注→降价→提醒→overview）（2026-10-22）
 
 ### feat: C 组 P0 收尾——E 块端到端验证

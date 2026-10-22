@@ -19,11 +19,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncGenerator, Optional
 
-from openai import APIError, APIConnectionError, AuthenticationError, RateLimitError, AsyncOpenAI
+from openai import APIError, APIConnectionError, AuthenticationError, BadRequestError, RateLimitError, AsyncOpenAI
 
 from .config import settings
 from .fallback_config import llm_timeout_ms
 from .fallback_handler import timeout_fallback_stream
+from .prompt_guard import sanitize_query
 from .tools import TOOLS, _current_user_id
 
 logger = logging.getLogger(__name__)
@@ -184,15 +185,30 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
     client = AsyncOpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key)
 
     first_round = True
+    injected_forced = False
     while True:
         # 仅第一轮支持确定性路由（tool_choice 强制）；后续轮走 auto 把工具结果转自然语言
-        tool_choice: Any = (
-            {"type": "function", "function": {"name": forced_tool}}
-            if first_round and forced_tool
-            else "auto"
-        )
+        if first_round and forced_tool:
+            if settings.ai_specific_tool_choice:
+                # OpenAI 兼容模型：API 级强制，最可靠
+                tool_choice: Any = {"type": "function", "function": {"name": forced_tool}}
+            else:
+                # 部分模型（deepseek 等）仅支持 auto/none 且静默忽略 specific tool_choice：
+                # 改用 auto + 注入「必须先调用工具」指令（实测 deepseek-chat 在指令下可靠调用）
+                tool_choice = "auto"
+                if not injected_forced:
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            f"【系统强制】针对当前问题，你必须先调用 `{forced_tool}` 工具获取真实数据，"
+                            "收到工具结果后再给出最终回答；禁止在未调用工具的情况下直接作答或谎称已执行。"
+                        ),
+                    })
+                    injected_forced = True
+        else:
+            tool_choice = "auto"
         first_round = False
-        stream = await client.chat.completions.create(
+        stream_kwargs = dict(
             model=settings.llm_model,
             messages=messages,
             tools=_tool_schemas(),
@@ -200,6 +216,23 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
             stream=True,
             tool_choice=tool_choice,
         )
+        try:
+            stream = await client.chat.completions.create(**stream_kwargs)
+        except BadRequestError as e:
+            # 部分模型（如 deepseek）不支持 specific function tool_choice，
+            # 强制路由会 400 或静默忽略 → 降级 auto + 注入「必须先调用工具」指令
+            if not (forced_tool and first_round and "tool_choice" in str(e)):
+                raise
+            logger.warning("模型 %s 不支持 specific tool_choice，降级为 auto+指令强制", settings.llm_model)
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"【系统强制】针对当前问题，你必须先调用 `{forced_tool}` 工具获取真实数据，"
+                    "收到工具结果后再给出最终回答；禁止在未调用工具的情况下直接作答或谎称已执行。"
+                ),
+            })
+            stream_kwargs["tool_choice"] = "auto"
+            stream = await client.chat.completions.create(**stream_kwargs)
 
         content_buf = ""
         tool_calls: dict[int, dict] = {}

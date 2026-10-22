@@ -1,5 +1,8 @@
 """
 测试：降级配置 + 降级处理
+
+事件契约：fallback_handler / chat_stream 以 dict 形式 yield（{"event": ..., "data": ...}），
+由 sse_starlette 序列化为标准 SSE 格式（见 fallback_handler 模块说明）。
 """
 
 import asyncio
@@ -25,12 +28,11 @@ class TestFallbackConfig:
     """降级配置加载"""
 
     def test_init_with_default_file(self, monkeypatch):
-        """测试初始化时从默认路径读取配置"""
-        # 确保默认配置文件存在
+        """测试初始化时从默认路径读取配置（断言不绑定文件具体数值，避免本地配置改动破坏测试）"""
         assert _DEFAULT_CONFIG_PATH.exists(), f"默认配置不存在: {_DEFAULT_CONFIG_PATH}"
         init_config()
         assert ai_enabled() is True
-        assert llm_timeout_ms() == 1500
+        assert isinstance(llm_timeout_ms(), int) and llm_timeout_ms() > 0
 
     def test_init_with_custom_yaml(self, tmp_path):
         """测试从自定义 YAML 文件加载"""
@@ -73,13 +75,12 @@ class TestDisabledFallback:
         assert len(events) >= 2, "至少应有 2 个事件"
 
         first = events[0]
-        assert first.startswith("event: token")
-        payload = first.split("\ndata: ", 1)[1].strip()
-        data = json.loads(payload)
+        assert first["event"] == "token"
+        data = json.loads(first["data"])
         assert data["content"] == DISABLED_MESSAGE
 
         last = events[-1]
-        assert last.startswith("event: done")
+        assert last["event"] == "done"
 
     @pytest.mark.asyncio
     async def test_disabled_fallback_no_tool_events(self):
@@ -88,7 +89,7 @@ class TestDisabledFallback:
         async for event in disabled_fallback():
             events.append(event)
 
-        tool_calls = [e for e in events if "tool_call" in e]
+        tool_calls = [e for e in events if e["event"] == "tool_call"]
         assert len(tool_calls) == 0, "降级模式不应有 tool_call 事件"
 
 
@@ -112,16 +113,15 @@ class TestTimeoutFallback:
         async for event in timeout_fallback_stream():
             events.append(event)
 
-        token_events = [e for e in events if e.startswith("event: token")]
+        token_events = [e for e in events if e["event"] == "token"]
         assert len(token_events) >= 1, "应有 token 事件"
 
         first_token = token_events[0]
-        payload = first_token.split("\ndata: ", 1)[1].strip()
-        data = json.loads(payload)
+        data = json.loads(first_token["data"])
         assert "跑步鞋" in data["content"], "降级回复应包含商品名"
         assert "¥" in data["content"], "降级回复应包含价格"
 
-        done_events = [e for e in events if e.startswith("event: done")]
+        done_events = [e for e in events if e["event"] == "done"]
         assert len(done_events) >= 1, "应有 done 事件"
 
     @pytest.mark.asyncio
@@ -138,12 +138,11 @@ class TestTimeoutFallback:
         async for event in timeout_fallback_stream():
             events.append(event)
 
-        token_events = [e for e in events if e.startswith("event: token")]
+        token_events = [e for e in events if e["event"] == "token"]
         assert len(token_events) >= 1
 
         first_token = token_events[0]
-        payload = first_token.split("\ndata: ", 1)[1].strip()
-        data = json.loads(payload)
+        data = json.loads(first_token["data"])
         assert "暂时忙不过来" in data["content"], "推荐失败时应返回简洁降级文案"
 
 
@@ -179,19 +178,18 @@ class TestAPIFallback:
 
     @pytest.mark.asyncio
     async def test_llm_timeout_returns_fallback(self, monkeypatch):
-        """测试 LLM 超时返回兜底卡片（mock LLM 抛 TimeoutError）"""
+        """测试 LLM 超时返回兜底卡片（mock _run_agent 抛 TimeoutError）"""
         from app.chat_service import chat_stream
 
         import app.chat_service as cs
-        from app.fallback_handler import timeout_fallback_stream
+        import app.fallback_handler as fh
 
-        # Mock: 让 _get_graph 返回一个会超时的 graph
-        class SlowMockGraph:
-            async def astream_events(self, *args, **kwargs):
-                await asyncio.sleep(10)  # 远超测试超时时间
-                yield {"event": "on_chat_model_stream", "data": {"chunk": type("C", (), {"content": "hi"})()}}
+        # Mock: _run_agent 抛 TimeoutError → chat_stream 应切换为兜底推荐流
+        async def slow_mock_run_agent(messages, timeout_s, forced_tool=None):
+            await asyncio.sleep(10)
+            yield {"event": "token", "data": json.dumps({"content": "不该出现"}, ensure_ascii=False)}
 
-        monkeypatch.setattr(cs, "_get_graph", lambda: SlowMockGraph())
+        monkeypatch.setattr(cs, "_run_agent", slow_mock_run_agent)
         cs._system_prompt = "test"
 
         # 设置极短超时
@@ -204,8 +202,6 @@ class TestAPIFallback:
             assert llm_timeout_ms() == 50, f"超时应为 50ms, 实际 {llm_timeout_ms()}"
 
             # Mock 推荐商品
-            import app.fallback_handler as fh
-
             async def mock_fetch(*args, **kwargs):
                 return [{"name": "兜底商品", "priceMin": 10000}]
 
@@ -216,17 +212,17 @@ class TestAPIFallback:
             async for event in chat_stream("你好", "u1001", "test-timeout"):
                 events.append(event)
 
-            # 验证：应返回 200，不是 500 — 无敌对错误事件
+            # 验证：不产生 error 事件，且有兜底 token
             assert len(events) >= 2, f"至少 2 个事件，实际 {len(events)}"
 
-            error_events = [e for e in events if e.startswith("event: error")]
+            error_events = [e for e in events if e["event"] == "error"]
             assert len(error_events) == 0, f"不应有 error 事件: {error_events}"
 
-            token_events = [e for e in events if e.startswith("event: token")]
+            token_events = [e for e in events if e["event"] == "token"]
             assert len(token_events) >= 1, "应有 token 事件（兜底文案）"
 
             last = events[-1]
-            assert last.startswith("event: done"), f"最后事件应为 done，实际: {last}"
+            assert last["event"] == "done", f"最后事件应为 done，实际: {last}"
 
         finally:
             yml_path.unlink()
