@@ -95,13 +95,11 @@ export class OrderService {
     return resp.data?.data ?? [];
   }
 
-  /** 部分发货：透传 body {skuId,count,trackingNo}，返回 {orderStatus,shippedCount,remainingCount,shipments} */
-  async shipPartial(userId: string, orderId: string, body: {
-    skuId: number; count: number; trackingNo?: string;
-  }): Promise<Record<string, any> | null> {
+  /** 部分发货：坑 #63 精度修复——rawBody 字符串透传（skuId 19 位防 JS 精度丢失） */
+  async shipPartial(userId: string, orderId: string, rawBody: string): Promise<Record<string, any> | null> {
     const url = `${SERVICES.orderService.url}${SERVICE_PATHS.orderShipPartial(orderId)}`;
     const resp = await firstValueFrom(
-      this.http.post(url, body, { headers: { 'x-user-id': userId } }).pipe(
+      this.http.post(url, rawBody, { headers: { 'x-user-id': userId, 'content-type': 'application/json' } }).pipe(
         timeout(SERVICES.orderService.timeout),
         catchError((err) => {
           this.logger.warn(`order-service /order/${orderId}/ship-partial 失败: ${err.message}`);

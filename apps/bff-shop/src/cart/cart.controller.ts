@@ -1,12 +1,12 @@
 /**
  * Cart Controller — 购物车（BFF 聚合）
  */
-import { Controller, Get, Post, Delete, Param, Body, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Req, UseGuards } from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { CartService } from './cart.service.js';
 import { ApiResponse } from '../common/dto/api-response.js';
 import type { Request } from 'express';
-import type { CartAddBody, CartUpdateBody } from './cart.types.js';
 
 @Controller('cart')
 @UseGuards(JwtAuthGuard)
@@ -20,17 +20,21 @@ export class CartController {
     return ApiResponse.ok(data);
   }
 
+  /** 加购：坑 #63 精度修复——rawBody 字符串透传（skuId 19 位防 JS 精度丢失） */
   @Post('add')
-  async add(@Body() body: CartAddBody, @Req() req: Request) {
+  async add(@Req() req: RawBodyRequest<Request>) {
     const userId = (req as any).userId as string;
-    await this.cartService.add(userId, body);
+    const raw = req.rawBody?.toString() ?? '{}';
+    await this.cartService.add(userId, raw);
     return ApiResponse.ok(null);
   }
 
+  /** 更新购物车项：坑 #63 精度修复——rawBody 字符串透传 */
   @Post('update')
-  async update(@Body() body: CartUpdateBody, @Req() req: Request) {
+  async update(@Req() req: RawBodyRequest<Request>) {
     const userId = (req as any).userId as string;
-    await this.cartService.update(userId, body);
+    const raw = req.rawBody?.toString() ?? '{}';
+    await this.cartService.update(userId, raw);
     return ApiResponse.ok(null);
   }
 

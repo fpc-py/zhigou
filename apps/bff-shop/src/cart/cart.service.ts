@@ -42,22 +42,21 @@ export class CartService {
     });
   }
 
-  async add(userId: string, body: { skuId: string; count?: number }): Promise<void> {
+  /** 加购：坑 #63 精度修复——rawBody 字符串透传（skuId 19 位防 JS 精度丢失） */
+  async add(userId: string, rawBody: string): Promise<void> {
     const url = `${SERVICES.cartService.url}${SERVICE_PATHS.cartAdd}`;
-    await this.post(url, userId, { skuId: body.skuId, count: body.count ?? 1 });
+    await this.post(url, userId, rawBody);
   }
 
-  async update(userId: string, body: { skuId: string; count?: number; selected?: boolean }): Promise<void> {
+  /** 更新购物车项：坑 #63 精度修复——rawBody 字符串透传 */
+  async update(userId: string, rawBody: string): Promise<void> {
     const url = `${SERVICES.cartService.url}${SERVICE_PATHS.cartUpdate}`;
-    const payload: Record<string, unknown> = { skuId: body.skuId };
-    if (body.count != null) payload.count = body.count;
-    if (body.selected != null) payload.selected = body.selected;
-    await this.post(url, userId, payload);
+    await this.post(url, userId, rawBody);
   }
 
   async clear(userId: string): Promise<void> {
     const url = `${SERVICES.cartService.url}${SERVICE_PATHS.cartClear}`;
-    await this.post(url, userId, {});
+    await this.post(url, userId, '{}');
   }
 
   async remove(userId: string, skuId: string): Promise<void> {
@@ -141,9 +140,9 @@ export class CartService {
     }
   }
 
-  private async post(url: string, userId: string, body: unknown): Promise<void> {
+  private async post(url: string, userId: string, rawBody: string): Promise<void> {
     await firstValueFrom(
-      this.http.post(url, body, { headers: { 'x-user-id': userId } }).pipe(
+      this.http.post(url, rawBody, { headers: { 'x-user-id': userId, 'content-type': 'application/json' } }).pipe(
         timeout(SERVICES.cartService.timeout),
         catchError((err) => {
           if (err instanceof TimeoutError) {

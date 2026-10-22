@@ -391,6 +391,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项） |
 
 ## 变更记录
+* 2026-10-22：**坑 #63 精度修复铺开（[0.2.58]）**：含 19 位 id 的透传接口统一字符串透传——ship-partial/aftersale/cart 走 rawBody 原样转发，marketing 拼团/秒杀 id 字段字符串化（Java Jackson 字符串→Long）。实证：下单落库 sku_id=9000000000000000020 保真；cart/aftersale 透传无损。
+
 * 2026-10-22：**坑 #62/#63 修复（[0.2.57]）**：①order-service 下单写链路解耦（SKU 本地缓存 TTL 30s + 缓存兜底，杜绝回退占位价静默漂移）；②BFF rawBody 字符串透传（19 位 Snowflake skuId 超 JS 安全整数精度丢失——根因 bug）。复测：80VU 双实例混合读写错误率 40.61%→0.00%。
 
 * 2026-10-22：**M3 生产化路径容量模型（[0.2.56]）**：BFF 横扩 1.83x（单 290 → 双 531 RPS 零错误区）+ 读层 1263 RPS 实证；瓶颈定位=order→product 同步调用级联超时（坑 #62，回退占用价静默漂移）；目标决策=5000 QPS 集群形态 + 单机可解释容量验收。产出容量模型报告 + test_m3_scale.py。

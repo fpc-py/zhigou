@@ -13,7 +13,8 @@ export interface UserCoupon {
 
 export interface DiscountCalculateBody {
   items: Array<{ skuId: string; count: number; price: number }>;
-  couponId?: number | null;
+  /** 坑 #63：couponId 19 位超 JS 安全整数——统一字符串透传 */
+  couponId?: string | null;
 }
 
 export interface DiscountDetail {

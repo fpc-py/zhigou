@@ -7,6 +7,8 @@
 - **实证**：修复前 `sku_id=9000000000000000000 price=100`；修复后 `sku_id=9000000000000000020 price=9900`，订单金额 9900 正确。
 - **遗留**：ship-partial 等其余含 19 位 id 的 body 透传接口未改（订单内 skuId 与外部一致，暂无影响）；生产建议 BFF 网关层统一「大整数字段按字符串透传」或约定后端 id 一律字符串序列化。
 
+- **增补（[0.2.58]）**：修复铺开到 8 个透传接口——ship-partial/aftersale apply+repair-appointment/cart add+update 改 rawBody 字符串透传；marketing group-buy open+join、seckill buy+release 改 id 字符串字段；DiscountCalculateBody.couponId number→string。遗留：读路径响应 19 位 id 字符串化（下一块评估）。
+
 ## #62 压测发现：order→product 同步调用级联超时，回退占用价静默漂移（[0.2.56] M3）
 - **现象**：混合读写压测（读 90%/写 10%）80VU 双 BFF 实例时错误率 40.61%——错误率与读层/BFF 均无关。
 - **根因（日志实证）**：order-service 创建订单时**同步 GET product-service /product/page** 拉取商品信息；product-service 被读压测打满后，order 的同步调用 `Read timed out` → **回退占用价** → 订单照常创建但金额口径漂移（接口返回 200/201，数据不对）。

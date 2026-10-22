@@ -3,6 +3,23 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.58] — 坑 #63 精度修复全量铺开：含 19 位 id 的透传接口统一字符串透传（2026-10-22）
+
+### fix: BFF 透传接口精度统一（坑 #63 铺开到 8 接口）
+- **背景**：[0.2.57] 已修 order/create（rawBody 字符串透传）；本轮把同型风险铺到全部含 19 位 id 的 body 透传接口，闭环彻底。
+- **rawBody 字符串透传（body 原样转发）**：
+  - `order/:orderId/ship-partial`（body.skuId 19 位）
+  - `aftersale/apply`（orderNo/skuId 19 位）+ `aftersale/repair/appointment`（可含 skuId）
+  - `cart/add`、`cart/update`（skuId 19 位——调用方即使传数字 JSON 也保真）
+- **id 字段字符串化（Java Jackson 兼容字符串→Long，已实证）**：
+  - `marketing/group-buy/open`（activityId）、`group-buy/join`（groupId）、`seckill/buy`+`seckill/release`（activityId）
+  - `DiscountCalculateBody.couponId` 类型 number→string
+- **实证**：下单落库 sku_id=9000000000000000020（保真）；cart/add 201、aftersale/apply 201（业务校验正常拦截=透传无损）；秒杀活动为空未测（逻辑与拼团同构）。
+
+### 遗留（记录，非本轮）
+- **读路径 id 字符串化**（product/order 响应 19 位 id 目前为 number → H5 JS 侧失真）——根治需 BFF 响应序列化统一 id 为字符串，下一块评估。
+- aftersale 落库端到端验证依赖「订单 PAID」链路（支付回调异步未变，既有链路问题非本轮）。
+
 ## [0.2.57] — 坑 #62/#63 修复：写链路解耦 + BFF 精度透传（2026-10-22）
 
 ### fix: order-service 下单写链路去同步依赖（坑 #62）

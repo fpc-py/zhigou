@@ -6,7 +6,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, catchError, timeout } from 'rxjs';
 import { SERVICES } from '../config/service.config.js';
-import type { AftersaleOrder, ApplyBody } from './aftersale.types.js';
+import type { AftersaleOrder } from './aftersale.types.js';
 
 @Injectable()
 export class AftersaleService {
@@ -20,9 +20,10 @@ export class AftersaleService {
     return { 'x-user-id': userId };
   }
 
-  async apply(userId: string, body: ApplyBody): Promise<AftersaleOrder | null> {
+  /** 申请售后：坑 #63 精度修复——rawBody 字符串透传（orderId/skuId 19 位防 JS 精度丢失） */
+  async apply(userId: string, rawBody: string): Promise<AftersaleOrder | null> {
     const resp = await firstValueFrom(
-      this.http.post(`${this.base}/aftersale/apply`, body, { headers: this.authHeader(userId) }).pipe(
+      this.http.post(`${this.base}/aftersale/apply`, rawBody, { headers: { 'x-user-id': userId, 'content-type': 'application/json' } }).pipe(
         timeout(this.t),
         catchError((err) => {
           this.logger.warn(`aftersale-service /aftersale/apply 失败: ${err.message}`);
@@ -93,11 +94,11 @@ export class AftersaleService {
     return resp.data?.data ?? null;
   }
 
-  /** 创建维修预约（演示口径 PENDING，正式版需商家确认排期） */
-  async createRepairAppointment(userId: string, body: Record<string, any>): Promise<any | null> {
+  /** 创建维修预约（演示口径 PENDING，正式版需商家确认排期）——rawBody 字符串透传 */
+  async createRepairAppointment(userId: string, rawBody: string): Promise<any | null> {
     const resp = await firstValueFrom(
-      this.http.post(`${this.base}/aftersale/repair/appointment?userId=${encodeURIComponent(userId)}`, body, {
-        headers: this.authHeader(userId),
+      this.http.post(`${this.base}/aftersale/repair/appointment?userId=${encodeURIComponent(userId)}`, rawBody, {
+        headers: { 'x-user-id': userId, 'content-type': 'application/json' },
       }).pipe(
         timeout(this.t),
         catchError((err) => {

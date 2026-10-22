@@ -83,8 +83,8 @@ export class MarketingService {
     return unwrapOrThrow(resp, this.logger, 'group-buy/activities', []);
   }
 
-  /** 开团 */
-  async groupBuyOpen(userId: string, activityId: number): Promise<any | null> {
+  /** 开团：坑 #63 精度修复——activityId 19 位统一字符串透传（防 JS 精度丢失） */
+  async groupBuyOpen(userId: string, activityId: string): Promise<any | null> {
     const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.groupBuyOpen}`;
     const resp = await firstValueFrom(
       this.http.post(url, { userId, activityId }, { headers: this.authHeader(userId) }).pipe(
@@ -98,8 +98,8 @@ export class MarketingService {
     return unwrapOrThrow(resp, this.logger, 'group-buy/open', null);
   }
 
-  /** 参团 */
-  async groupBuyJoin(userId: string, groupId: number): Promise<any | null> {
+  /** 参团：坑 #63 精度修复——groupId 19 位统一字符串透传 */
+  async groupBuyJoin(userId: string, groupId: string): Promise<any | null> {
     const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.groupBuyJoin}`;
     const resp = await firstValueFrom(
       this.http.post(url, { userId, groupId }, { headers: this.authHeader(userId) }).pipe(
@@ -175,8 +175,8 @@ export class MarketingService {
     return unwrapOrThrow(resp, this.logger, `seckill/activity/${id}`, null);
   }
 
-  /** 秒杀预扣（防超卖） */
-  async seckillBuy(userId: string, body: { activityId: number; count?: number }): Promise<any | null> {
+  /** 秒杀预扣（防超卖）：坑 #63 精度修复——activityId 19 位统一字符串透传 */
+  async seckillBuy(userId: string, body: { activityId: string; count?: number }): Promise<any | null> {
     const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.seckillBuy}`;
     const resp = await firstValueFrom(
       this.http.post(url, { userId, ...body }, { headers: this.authHeader(userId) }).pipe(
@@ -190,8 +190,8 @@ export class MarketingService {
     return unwrapOrThrow(resp, this.logger, 'seckill/buy', null);
   }
 
-  /** 秒杀预扣释放 */
-  async seckillRelease(userId: string, body: { activityId: number; count?: number }): Promise<null> {
+  /** 秒杀预扣释放：坑 #63 精度修复——activityId 19 位统一字符串透传 */
+  async seckillRelease(userId: string, body: { activityId: string; count?: number }): Promise<null> {
     const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.seckillRelease}`;
     await firstValueFrom(
       this.http.post(url, { ...body }, { headers: this.authHeader(userId) }).pipe(

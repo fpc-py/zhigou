@@ -36,17 +36,19 @@ export class MarketingController {
     return ApiResponse.ok(data);
   }
 
+  /** 开团：坑 #63 精度修复——activityId 19 位统一字符串透传（防 JS 精度丢失） */
   @Post('group-buy/open')
-  async groupBuyOpen(@Body('activityId') activityId: number, @Req() req: Request) {
+  async groupBuyOpen(@Body('activityId') activityId: string, @Req() req: Request) {
     const userId = (req as any).userId as string;
-    const data = await this.marketingService.groupBuyOpen(userId, Number(activityId));
+    const data = await this.marketingService.groupBuyOpen(userId, activityId);
     return ApiResponse.ok(data);
   }
 
+  /** 参团：坑 #63 精度修复——groupId 19 位统一字符串透传 */
   @Post('group-buy/join')
-  async groupBuyJoin(@Body('groupId') groupId: number, @Req() req: Request) {
+  async groupBuyJoin(@Body('groupId') groupId: string, @Req() req: Request) {
     const userId = (req as any).userId as string;
-    const data = await this.marketingService.groupBuyJoin(userId, Number(groupId));
+    const data = await this.marketingService.groupBuyJoin(userId, groupId);
     return ApiResponse.ok(data);
   }
 
@@ -80,15 +82,17 @@ export class MarketingController {
     return ApiResponse.ok(data);
   }
 
+  /** 秒杀预扣（防超卖）：坑 #63 精度修复——activityId 19 位统一字符串透传 */
   @Post('seckill/buy')
-  async seckillBuy(@Body() body: { activityId: number; count?: number }, @Req() req: Request) {
+  async seckillBuy(@Body() body: { activityId: string; count?: number }, @Req() req: Request) {
     const userId = (req as any).userId as string;
     const data = await this.marketingService.seckillBuy(userId, body);
     return ApiResponse.ok(data);
   }
 
+  /** 秒杀预扣释放：坑 #63 精度修复——activityId 19 位统一字符串透传 */
   @Post('seckill/release')
-  async seckillRelease(@Body() body: { activityId: number; count?: number }, @Req() req: Request) {
+  async seckillRelease(@Body() body: { activityId: string; count?: number }, @Req() req: Request) {
     const userId = (req as any).userId as string;
     const data = await this.marketingService.seckillRelease(userId, body);
     return ApiResponse.ok(data);

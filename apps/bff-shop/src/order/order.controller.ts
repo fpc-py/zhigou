@@ -48,11 +48,12 @@ export class OrderController {
     return ApiResponse.ok(data);
   }
 
-  /** 部分发货（A4）：PAID→SHIPPING/SHIPPED 状态迁移 + 发货明细落库 */
+  /** 部分发货（A4）：坑 #63 精度修复——rawBody 字符串透传（skuId 19 位防 JS 精度丢失） */
   @Post(':orderId/ship-partial')
-  async shipPartial(@Param('orderId') orderId: string, @Body() body: { skuId: number; count: number; trackingNo?: string }, @Req() req: Request) {
+  async shipPartial(@Param('orderId') orderId: string, @Req() req: RawBodyRequest<Request>) {
     const userId = (req as any).userId as string;
-    const data = await this.orderService.shipPartial(userId, orderId, body);
+    const raw = req.rawBody?.toString() ?? '{}';
+    const data = await this.orderService.shipPartial(userId, orderId, raw);
     return ApiResponse.ok(data);
   }
 

@@ -2,21 +2,23 @@
  * Aftersale Controller — 售后（BFF 透传，JWT 保护）
  */
 import { Controller, Get, Post, Param, Body, Req, Query, UseGuards } from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { AftersaleService } from './aftersale.service.js';
 import { ApiResponse } from '../common/dto/api-response.js';
 import type { Request } from 'express';
-import type { ApplyBody } from './aftersale.types.js';
 
 @Controller('aftersale')
 @UseGuards(JwtAuthGuard)
 export class AftersaleController {
   constructor(private readonly aftersaleService: AftersaleService) {}
 
+  /** 申请售后：坑 #63 精度修复——rawBody 字符串透传（orderId/skuId 19 位防 JS 精度丢失） */
   @Post('apply')
-  async apply(@Body() body: ApplyBody, @Req() req: Request) {
+  async apply(@Req() req: RawBodyRequest<Request>) {
     const userId = (req as any).userId as string;
-    const data = await this.aftersaleService.apply(userId, body);
+    const raw = req.rawBody?.toString() ?? '{}';
+    const data = await this.aftersaleService.apply(userId, raw);
     return ApiResponse.ok(data);
   }
 
@@ -27,10 +29,12 @@ export class AftersaleController {
     return ApiResponse.ok(data);
   }
 
+  /** 创建维修预约：坑 #63 精度修复——rawBody 字符串透传（含 19 位 skuId 防失真） */
   @Post('repair/appointment')
-  async createRepairAppointment(@Body() body: Record<string, any>, @Req() req: Request) {
+  async createRepairAppointment(@Req() req: RawBodyRequest<Request>) {
     const userId = (req as any).userId as string;
-    const data = await this.aftersaleService.createRepairAppointment(userId, body);
+    const raw = req.rawBody?.toString() ?? '{}';
+    const data = await this.aftersaleService.createRepairAppointment(userId, raw);
     return ApiResponse.ok(data);
   }
 
