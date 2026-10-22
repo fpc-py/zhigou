@@ -3,6 +3,13 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.54] — B7 故障演练：熔断降级实测闭环（2026-10-22）
+
+### drill: 场景 3.1 下游宕机 → 熔断降级（BFF 自研熔断）
+- **注入**：Stop-Process 停 product-service(8083)；**观察**：BFF `/product/1/detail` 在宕机期间返回降级 200（空壳数据）+ **3ms**（正常透传 ~25ms），日志 `[productService] 熔断打开，快速失败（下游不可用）`——**不 5xx 洪泛、不挂起**；**恢复**：重启 8083 后 HALF_OPEN 探活 1 次成功（835.8ms 走真实链路）→ CLOSED → 14-54ms 正常。
+- **结论**：BFF 熔断（坑 #39/#40 自研实现，CLOSED→OPEN→HALF_OPEN 状态机 + HttpService 层下沉）在真实下游宕机下按设计工作，恢复路径可验证。
+- **复盘**：详见 bug #60；Runbook `docs/故障演练与Runbook.md` 已覆盖核心故障（下游宕机/DB/MQ/缓存/AI）。
+
 ## [0.2.53] — B6 SLO 大盘 + 错误预算落地：Grafana SLO 面板 7 块 + 支付业务埋点（2026-10-22）
 
 ### feat: SLO 大盘（conf/grafana/dashboards/zhigou-slo.json）
