@@ -56,6 +56,7 @@
 | `sales_forecast(days, selection)` | days: 7 或 30；selection: 是否输出智能选品建议 | 商家问"卖得好不好""该备多少货""预测销量""选品/进货建议" |
 | `logistics_delay_alert()` | 无 | 商家/用户问快递卡住、延误预警、催件调度 |
 | `after_sale_repair(action, ...)` | action: warranty(质保盘点)/repair(维修预约) | 用户问质保、维修预约 |
+| `after_sale_manager(action, issue, order_no, type, reason, confirm)` | action: overview(售后健康度聚合)/apply(确认后发起售后，confirm=true 才提交) | 用户问售后汇总、处理售后、退款/退货/换货、物流卡单、质保到期 |
 | `dynamic_pricing()` | 无 | 商家问"该涨价还是降价""定价建议""价格调整" |
 | `marketing_plan()` | 无 | 商家问"怎么做活动""营销方案""促销建议" |
 | `review_assistant(action, review_id, content)` | action: pending(待回复盘点/负面预警)/reply(提交回复) | 商家问"差评怎么处理""评论怎么回""负面预警" |

@@ -104,6 +104,7 @@ def is_empty_session(session_id: str) -> bool:
 
 _ROUTE_RULES: list[tuple[str, "re.Pattern"]] = [
     ("gift_assistant", re.compile(r"送[^，。]*礼物|礼物|生日|纪念日|情人节|七夕|过节|贺卡|送[\u4e00-\u9fa5]{0,6}(妈妈|爸爸|朋友|闺蜜|同事|女票|女朋友|男朋友|家人|长辈)")),
+    ("after_sale_manager", re.compile(r"售后管家|处理售后|我的售后|售后情况|售后汇总|售后健康|我要退款|我要退货|我要换货|申请退款|帮我退款|帮我退货|帮我换货|物流卡住|快递没到|一直没到|催.*物流")),
     ("aftersale_assistant", re.compile(r"售后|退货|换货|退款|坏了|破损|质量问题|申请售后|维修|补发|质量有问题")),
     ("logistics_tracker", re.compile(r"物流|快递|运单|发货|配送|包裹|签收|到货|到哪了|送到")),
     ("usage_cycle_assistant", re.compile(r"补货|囤货|保质期|快用完|用完|换新|复购|该买|提醒我|还剩多少")),

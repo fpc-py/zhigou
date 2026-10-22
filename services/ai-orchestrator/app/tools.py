@@ -831,6 +831,10 @@ AFTERSALE_STATUS_HINT = {
     "REFUNDED": "已退款（款项将按原路退回）",
     "REJECTED": "已驳回",
     "CANCELLED": "已取消",
+    # 真实状态枚举（AftersaleState，与 aftersale-service 对齐）
+    "APPLYING": "待审核（商家将在 24 小时内处理）",
+    "SELLER_APPROVED": "已通过（等待退款/换货执行）",
+    "CANCELED": "已取消",
 }
 
 AFTERSALE_TYPE_HINT = {
@@ -1595,6 +1599,82 @@ async def after_sale_repair(
     except Exception as e:
         logger.warning("after_sale_repair 调用失败: %s", e)
         return "售后助手暂时不可用，请稍后再试。"
+
+
+@tool
+async def after_sale_manager(
+    action: str = "overview",
+    issue: str = "",
+    order_no: str = "",
+    type: str = "",
+    reason: str = "",
+    confirm: bool = False,
+) -> str:
+    """
+    AI 售后管家。
+    action=overview（默认）：聚合诊断售后健康度——处理中售后单 + 物流延误预警 + 质保临近/过期，给出下一步建议；
+    action=apply：一键发起售后——必须先给出订单号 order_no 与售后类型 type（refund 仅退款 / return_refund 退货退款 / exchange 换货 / repair 维修），
+    且仅当用户明确确认（confirm=true）后才真正提交；未确认时只返回申请摘要请用户确认，绝不擅自执行（错误不骚扰红线）。
+
+    用户问"我的售后情况""帮我处理售后""我要退款/退货/换货/申请售后""物流卡住/快递没到/一直没到""质保快到期"时调用。
+    """
+    try:
+        uid = _get_current_user()
+        if action == "apply":
+            if not order_no or not type:
+                return "发起售后需要：订单号 order_no 与售后类型 type（refund 仅退款 / return_refund 退货退款 / exchange 换货 / repair 维修）。"
+            if not confirm:
+                return (f"发起售后申请单（待你确认）：订单 {order_no}｜类型 {AFTERSALE_TYPE_HINT.get(type, type)}"
+                        f"｜原因 {reason or issue or '未填写'}。回复『确认申请』后我再提交，不会擅自执行。")
+            # 防编造金额：取 order-service 真实订单金额，不信任模型自报
+            order = await _http_get(f"{settings.order_service_url}/order/{order_no}", headers={"x-user-id": uid})
+            o = order.get("data") or {}
+            amount = o.get("payAmount") or o.get("amount")
+            if not amount:
+                return f"未查到订单 {order_no} 的金额，无法发起售后；请核对订单号。"
+            d = await _http_post(
+                f"{settings.aftersale_service_url}/aftersale/apply",
+                json_data={"orderNo": order_no, "type": type, "reason": reason or issue, "amount": amount},
+                headers={"x-user-id": uid},
+            )
+            r = d.get("data") or {}
+            if not r.get("aftersaleNo"):
+                return "售后申请提交失败：" + (d.get("message") or "未知原因")
+            return (f"售后申请已提交 ✅：单号 {r.get('aftersaleNo')}｜类型 {AFTERSALE_TYPE_HINT.get(type, type)}"
+                    f"｜金额 ¥{amount / 100:.2f}｜状态 {r.get('status')}（待商家审核，24 小时内处理）。")
+        # action=overview：三路聚合诊断（写/读均带内网透传头，服务端 JWT 过滤器依赖 X-User-Id）
+        headers = {"x-user-id": uid}
+        aftersales = await _http_get(f"{settings.aftersale_service_url}/aftersale/mine?userId={uid}", headers=headers)
+        delays = await _http_get(f"{settings.logistics_service_url}/logistics/delay-alerts?userId={uid}", headers=headers)
+        warranties = await _http_get(f"{settings.aftersale_service_url}/aftersale/warranty/alerts?userId={uid}&days=30", headers=headers)
+        items = aftersales.get("data") or []
+        d_items = delays.get("data") or []
+        w_items = warranties.get("data") or []
+        if not items and not d_items and not w_items:
+            return "售后健康度诊断：暂无售后单、物流延误或质保风险 ✅。有商品问题可描述，我帮你生成售后话术或发起售后。"
+        processing = [x for x in items if x.get("status") in ("APPLYING", "SELLER_APPROVED", "REFUNDING", "PENDING", "APPROVED")]
+        risk_w = [x for x in w_items if x.get("status") in ("EXPIRING_SOON", "EXPIRED")]
+        lines = ["售后健康度诊断："]
+        if processing:
+            lines.append("· 处理中售后 " + str(len(processing)) + " 单：" +
+                         "；".join(f"{x.get('aftersaleNo')}（{AFTERSALE_TYPE_HINT.get(x.get('type') or '', x.get('type') or '')}）{x.get('status')}" for x in processing[:3]))
+        else:
+            lines.append("· 暂无处理中的售后单 ✅")
+        if d_items:
+            lines.append("· 物流延误预警 " + str(len(d_items)) + " 单：" +
+                         "；".join(f"{x.get('shipmentNo')}（{x.get('reason') or '运输停滞'}）" for x in d_items[:3]))
+        else:
+            lines.append("· 暂无物流延误 ✅")
+        if risk_w:
+            lines.append("· 质保临近/过期 " + str(len(risk_w)) + " 件：" +
+                         "；".join(f"{x.get('productName')}（剩 {x.get('daysLeft')} 天）" for x in risk_w[:3]))
+        else:
+            lines.append("· 质保均在期内 ✅")
+        lines.append("下一步：回复售后单号查详情、『帮我处理售后』一键发起、或『物流管家/质保』分别查看。")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning("after_sale_manager 调用失败: %s", e)
+        return "售后管家暂时不可用，请稍后再试。"
 
 
 

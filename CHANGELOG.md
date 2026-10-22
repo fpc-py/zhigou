@@ -3,6 +3,21 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.69] — C 组 P1：AI 售后管家（overview 聚合诊断 + apply 确认门）（2026-10-22）
+### feat: ai-orchestrator 售后管家工具 after_sale_manager
+- **overview（默认）**：三路聚合「售后健康度」——`GET /aftersale/mine`（处理中售后单）＋ `GET /logistics/delay-alerts`（物流延误预警）＋ `GET /aftersale/warranty/alerts`（质保 30 天内到期），一次问答闭环查清售后全景 + 可执行下一步建议
+- **apply（一键发起售后）**：模型级确认门——`confirm=false` 只返回申请摘要（「回复『确认申请』后我再提交」），**绝不擅自执行写操作**；`confirm=true` 时先 `GET /order/{no}` 取**真实订单金额**（防模型编造金额），再 `POST /aftersale/apply`（写操作无重试防重复）
+- **路由**：`_ROUTE_RULES` 新增售后管家触发词（售后管家/处理售后/我要退款/物流卡住等，置于 aftersale_assistant 之前聚合优先）；system.md 工具表登记
+### fix: 工具调 Java 服务内网透传头缺失 + 状态枚举对齐
+- **bug #65a**：`_http_post` 与部分 `_http_get` 未带 `X-User-Id` 内网透传头 → aftersale-service `SecurityConfig`（JwtAuthFilter 优先认 X-User-Id）403——GET 放行路径侥幸通过、写接口暴露；overview 三路/apply 均补 `headers={"x-user-id": uid}`
+- **bug #65b**：`AFTERSALE_STATUS_HINT` 与 overview 处理中过滤对齐 aftersale-service 真实状态枚举（`APPLYING / SELLER_APPROVED / CANCELED`，原为假设的 PENDING/APPROVED/CANCELLED）——状态解读不再「未知」
+### test: 售后管家用例（mock _http_get/_http_post）
+- overview 三路聚合 / 全空降级 / 下游异常降级 / apply 未确认零写调用 / 确认后金额取订单服务 / 缺参提示 / 订单查无金额拒绝——**pytest 38 passed**
+### 真实链路实测（本机 order 8085 / logistics 8089 / aftersale 8090 + MySQL）
+- overview：处理中售后 1 单（ASAB19A3BCFE614691 APPLYING）＋ 物流延误 10 单（MOCK_SHIP_001 等）＋ 质保健康
+- apply 确认：订单 `2111700848769372160`（¥99.00，PAID）→ 真实创建售后单 `ASAB19A3BCFE614691`（金额取自订单服务 ¥99.00）
+- **幂等防重复**：重复提交被业务层拒绝「该订单已有进行中的售后单」（服务端 activeCount 校验）；CLOSED 订单申请被拒「当前订单状态不允许申请售后」（状态机校验）
+
 ## [0.2.68] — SSE 在线对话链路修复：LLM 三个坑 + 工具路由适配（2026-10-22）
 ### fix: ai-orchestrator 对话链路回归修复 + 测试补强
 - **根因①**：chat_service.py 漏 `from .prompt_guard import sanitize_query` → SSE 全量「对话处理异常」（NameError）——prompt 注入防护函数从未真正接入对话流

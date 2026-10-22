@@ -4,6 +4,14 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.69] C 组 P1 · AI 售后管家（overview 聚合 + apply 确认门）
+- **A1 工具** `after_sale_manager(action=overview|apply, issue, order_no, type, reason, confirm)`：
+  - overview 三路聚合售后健康度：`/aftersale/mine`（处理中单）＋ `/logistics/delay-alerts`（延误预警）＋ `/aftersale/warranty/alerts`（质保到期）
+  - apply 确认门：`confirm=false` 只出摘要零写库；`confirm=true` 先取订单服务**真实金额**（防编造）再 POST `/aftersale/apply`（无重试防重复）
+- **A2 路由**：`_ROUTE_RULES` 售后管家触发词（售后管家/处理售后/我要退款/物流卡住…置 aftersale_assistant 之前）；system.md 工具表登记
+- **A3 测试**：mock 用例 7 条（聚合/空降级/异常降级/未确认零写/确认金额取订单/缺参/查无金额拒绝）＋ 真实链路：overview 命中处理中 1 单 + 延误 10 单；apply 真实创建 `ASAB19A3BCFE614691`（¥99.00）；幂等拒绝重复、CLOSED 拒绝售后 —— **pytest 38 passed**
+- **坑记录**：#65a 工具调 Java 写接口漏 `X-User-Id` 透传头 → 403（JwtAuthFilter 优先认 X-User-Id，GET 侥幸放行写接口暴露）；#65b 状态字典与真实枚举（APPLYING/SELLER_APPROVED/CANCELED）对齐
+
 ## 2026-10-22 · [0.2.68] SSE 在线对话链路修复（回归 + 测试补强）
 - **根因**：①chat_service 漏 import `sanitize_query`（NameError）②.env `/anthropic` 路径 404 + 思考模型不支持 tool_choice ③deepseek-chat 静默忽略强制 → 谎报执行
 - **修复**：补 import；base_url `/v1`、model `deepseek-chat`；新增 `ZHIGOU_AI_SPECIFIC_TOOL_CHOICE=false` 配置开关（auto + 指令注入）+ 运行时 BadRequestError 降级兜底
