@@ -3,6 +3,21 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.53] — B6 SLO 大盘 + 错误预算落地：Grafana SLO 面板 7 块 + 支付业务埋点（2026-10-22）
+
+### feat: SLO 大盘（conf/grafana/dashboards/zhigou-slo.json）
+- 7 面板：错误预算剩余（30d 可用性 99.9%）、可用性 30d/7d、错误率趋势（SLO <0.5% 阈值线）、P95 延迟（SLO <1s）、各服务 30d 可用性、支付成功率（SLO ≥99.5%）。
+- Prometheus retention **60d**（30d 滚动查询前提，flags 实测生效）。
+- Grafana provisioning 自动加载，2 大盘（RED + SLO）实测。
+- **坑 #59（面试可深聊）**：错误预算 PromQL 优先级 bug——`100 - (1-ratio)/0.001*100` 在 ratio=0 时得 **-99900**（`(1-ratio)/0.001*100` 先算 = 100000）；正确 `100*(1-ratio/0.001)`，修正后返回 **100**（预算剩余 100%）。
+
+### feat: 支付业务指标埋点（payment-service）
+- Micrometer Counter：`payment_success_total`（mockPay 成功）/ `payment_failed_total`（验签失败/单不存在，reason 标签）/ `payment_refund_total`（退款成功）——支付成功率 SLO 数据源。
+- **实测**：create 200 → mock-pay 200 → Prometheus `payment_success_total = 1`（15s 抓取周期内出现）；payment_failed_total 未注册（0 失败，符合预期）。
+
+### test: 验证
+- SLO 大盘 7 面板 uid=zhigou-slo 加载；30d/7d 可用性、错误预算、支付成功率 PromQL 全语法通过（30d 查询 TSDB 冷启动暂无数据属正常，大盘曲线随运行积累）。
+
 ## [0.2.52] — A8 Prometheus 编排实跑全绿：4 容器 Up + 11/11 抓取 + 5 规则加载（2026-10-21）
 
 ### feat: 监控编排落地（infra/compose/monitoring.yml + conf/）

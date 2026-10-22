@@ -391,6 +391,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项） |
 
 ## 变更记录
+* 2026-10-22：**B6 SLO 大盘 + 错误预算落地（[0.2.53]）**：zhigou-slo.json 7 面板（错误预算/可用性 30d·7d/错误率 0.5% 线/P95 1s 线/各服务可用性/支付成功率）+ Prometheus retention 60d + payment-service 支付埋点（success/failed/refund 计数器）。实测：SLO 大盘加载、payment_success_total=1（create→mock-pay 200）、错误预算公式修复（坑 #59，PromQL 优先级 -99900 → 100）。
+
 * 2026-10-21：**A8 Prometheus 编排实跑全绿（[0.2.52]）**：monitoring.yml 修 4 处坑（compose 相对路径 ../../conf、Loki pin 2.9.10 + user root + compactor working_directory、healthcheck 移除、host-gateway）→ 4 容器全 Up、Prometheus targets 11/11 UP（8080-8090 全量 /actuator/prometheus）、5 规则加载 inactive、Grafana provisioning 生效（2 数据源 + RED 面板）。坑 #55-#58 已留痕。
 
 * 2026-10-21：**统一补验全绿 10/10（[0.2.51]）**：环境恢复（中间件全 healthy + 18/18 端口 UP + token 刷新）后跑 %TEMP%\verify_unified.py 迭代 5 轮：B5 写库加密 PASS → 读路径 MyBatis 自动映射 LongTypeHandler 读 ENC 密文 500（坑 #53，显式 ResultMap 6 方法 + 7 处查询替换）；A7 `{fileId:.+}` 在 PathPattern/Ant 均不匹配（坑 #54，三段式路径变量 `{date}/{userId}/{fileHash}` 治本）；B1 并发 30/30 全 200；B2 积压采样日志实测；A4 取消订单库存回滚 200。三件套已提交。

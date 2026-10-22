@@ -11,6 +11,7 @@ import com.zhigou.payment.entity.ReconcileLog;
 import com.zhigou.payment.mapper.PaymentMapper;
 import com.zhigou.payment.mapper.PaymentRefundMapper;
 import com.zhigou.payment.service.PaymentService;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRefundMapper refundMapper;
     private final com.zhigou.payment.mapper.ReconcileLogMapper reconcileLogMapper;
     private final OrderNotifyClient orderNotifyClient;
+    private final MeterRegistry meterRegistry;
     @Value("${payment.sandbox-secret}") private String sandboxSecret;
 
     @Override @Transactional
@@ -52,10 +54,16 @@ public class PaymentServiceImpl implements PaymentService {
         // 验签
         String expected = DigestUtil.sha256Hex(paymentNo + sandboxSecret);
         log.info("mockPay verify: paymentNo={}, secret={}, expected={}, sign={}", paymentNo, sandboxSecret, expected, sign);
-        if (!expected.equals(sign)) throw new BizException(403, "签名校验失败");
+        if (!expected.equals(sign)) {
+            meterRegistry.counter("payment_failed_total", "reason", "verify_fail").increment();
+            throw new BizException(403, "签名校验失败");
+        }
 
         Payment payment = paymentMapper.selectOne(new LambdaQueryWrapper<Payment>().eq(Payment::getPaymentNo, paymentNo));
-        if (payment == null) throw new BizException(404, "支付单不存在");
+        if (payment == null) {
+            meterRegistry.counter("payment_failed_total", "reason", "not_found").increment();
+            throw new BizException(404, "支付单不存在");
+        }
 
         if (!"PENDING".equals(payment.getStatus())) {
             log.info("重复支付回调: paymentNo={}", paymentNo);
@@ -64,6 +72,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         payment.setStatus("SUCCESS"); payment.setPaidTime(LocalDateTime.now());
         paymentMapper.updateById(payment);
+        meterRegistry.counter("payment_success_total").increment();
         log.info("支付成功: paymentNo={}, orderNo={}", paymentNo, payment.getOrderNo());
 
         // 联动订单服务：订单 INIT → PAID（失败不阻断，重试+对账兜底）
@@ -103,6 +112,7 @@ public class PaymentServiceImpl implements PaymentService {
         refund.setAmount(amount); refund.setReason(reason);
         refund.setStatus("SUCCESS"); refund.setRefundedAt(LocalDateTime.now());
         refundMapper.insert(refund);
+        meterRegistry.counter("payment_refund_total").increment();
         log.info("退款成功(沙箱): refundNo={}, paymentNo={}, orderNo={}, amount={}", refundNo, payment.getPaymentNo(), orderNo, amount);
         return refundNo;
     }

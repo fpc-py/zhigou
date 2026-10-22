@@ -1,5 +1,12 @@
 # 测试问题 & Bug 记录
 
+## #59 错误预算 PromQL 运算符优先级：ratio=0 时面板显示 -99900（[0.2.53] B6）
+- **现象**：SLO 大盘错误预算面板写 `100 - (1 - ratio) / 0.001 * 100`，ratio=0（零 5xx）时返回 **-99900**。
+- **根因**：PromQL 优先级——`(1 - ratio) / 0.001 * 100` 先整体计算（=100000），再 `100 - 100000 = -99900`；公式结构错误，预算剩余被表达为「100 减消耗比例×100000」。
+- **修复**：`100 * (1 - ratio / 0.001)`——ratio=0 → 100（预算全剩），ratio=0.001（耗尽）→ 0。实测返回 100。
+- **教训**：PromQL 无显式类型/括号隔离时，**除法在前、减法在后**的复合公式极易踩优先级；错误预算类公式先做边界验算（0 / 阈值 / 超阈值三档）再上大盘。
+- **实测**：修正后 query 返回 100；Grafana 大盘重载 7 面板正常。
+
 ## #58 非 Docker Desktop 引擎：host.docker.internal NXDOMAIN 抓不到宿主机服务（[0.2.52] A8）
 - **现象**：Prometheus 容器内 `getent hosts host.docker.internal` → NXDOMAIN，targets 11 个全 DOWN（宿主机服务实际全活，/actuator/prometheus 200+47KB）。
 - **根因**：host.docker.internal 是 Docker Desktop 注入的域名；本机 Docker 引擎非 Docker Desktop（WSL2 原生），不注入该条目。
