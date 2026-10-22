@@ -172,7 +172,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ---------- Job 3：部署状态汇总 ----------
+  # ---------- Job 4：部署状态汇总 ----------
   summary:
     name: Pipeline summary
     needs: [build-test, ai-eval, build-images]
