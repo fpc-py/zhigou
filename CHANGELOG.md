@@ -3,6 +3,20 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.79] · AI 深水区③ 主动式智能提醒（从被动问答到主动服务）（2026-10-22）
+### feat: 提醒引擎 + 端点 + 工具 + H5 提醒中心
+- **`app/reminders.py`**：聚合引擎（复用现有三源，不造轮子）——降价（product-service /price/notice/mine 已产出通知）、复购（order /order/mine 品类聚合 + 复用 CYCLE_RULES 周期规则）、换季穿搭（closet /closet/items 按当前季节覆盖检查）；`data/reminders.json`（tmp+replace 原子写），按 (userId,type,targetKey) 幂等去重；状态机 ACTIVE→READ/DISMISSED；调度每小时整点扫描（复用 scheduled_buy 60s 循环模式），只扫活跃用户（touch_user 登记，默认零推送）
+- **端点**：`GET /reminders/mine`（unreadOnly）、`POST /reminders/scan`（手动触发）、`POST /reminders/read/{id}`
+- **工具**：`reminders`（action=mine/scan）注册，TOOLS 34→35；路由「提醒中心|有什么提醒|提醒我|该补货|换季|换季穿搭」→ reminders
+- **BFF**：reminders 模块透传（JwtAuthGuard + X-User-Id 注入，契约同 life/closet）
+- **H5**：我的页「AI 提醒中心」菜单项（未读条数 hint）+ 提醒面板（列表/立即扫描/已读）
+### test: 确定性测试 5 项 + SSE/端点端到端
+- `tests/test_reminders.py`：三类提醒生成 / 幂等去重 / 状态机（mine+mark_read+他人不可读）/ 当季有衣物不打扰 / 路由命中不抢 price_alert / TOOLS 35 schema 唯一——**5 passed**
+- 全仓 pytest **70 passed, 2 warnings**；py_compile 全过
+- **端到端实测**：GET /reminders/mine → POST /scan 真实生成降价提醒 1 条（消费 product-service 现成通知）→ unread 列表 → mark_read 置已读；SSE「有什么提醒吗」→ tool_call reminders(mine)（105 事件）
+### fix/note: 路由优先级缺陷（坑 #76）
+- 「降价提醒」原被 dynamic_pricing 路由（商家定价）抢先截胡 → price_alert 提前至 dynamic_pricing 之前（消费者盯价语义优先于商家定价建议）；回归断言固化
+
 ## [0.2.78] · AI 深水区② AI 链路可观测（/metrics Prometheus + 全链路埋点）（2026-10-22）
 ### feat: AI 链路可观测（把「AI 链路不可见」变成「每个环节可量化」）
 - **`app/metrics.py`**：进程内计数器（零外部依赖，threading.Lock 保护）——工具调用次数/失败数/耗时(sum+count)、LLM outcome 分类（ok/timeout/auth/network/rate_limit/error/bad_request）、SSE 活跃连接/累计事件、对话总数、token 估算、uptime

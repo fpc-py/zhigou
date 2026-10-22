@@ -4,6 +4,14 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.79] AI 深水区③ 主动式智能提醒（从被动问答到主动服务）
+- **引擎**：reminders.py 聚合三类提醒（降价=消费省钱助手 B 块现成通知 / 复购=订单品类周期 / 换季=衣橱季节覆盖）+ data/reminders.json 幂等去重 + ACTIVE→READ 状态机 + 每小时整点调度（只扫活跃用户，零推送）
+- **端点/工具**：/reminders/mine + /scan + /read/{id}；reminders 工具（TOOLS 34→35）；路由命中「有什么提醒/该补货/换季」
+- **前端**：BFF 透传模块 + H5 我的页 AI 提醒中心（未读 hint + 面板）
+- **测试**：test_reminders 5 项 + 全仓 70 无回归 + py_compile + vue-tsc 过
+- **端到端**：/scan 真实生成降价提醒 1 条 + mark_read；SSE「有什么提醒吗」→ tool_call reminders
+- **坑**：#76 路由优先级（降价提醒被商家定价截胡 → price_alert 提前，回归固化）；#77 脚本编辑双坑（PowerShell \n 字面量 + .NET 相对路径）
+
 ## 2026-10-22 · [0.2.78] AI 深水区② AI 链路可观测（/metrics + 全链路埋点）
 - **指标**：`app/metrics.py` 进程内计数器（工具调用/失败/耗时、LLM outcome 六类、SSE 连接/事件、chat、token、uptime）+ `GET /metrics` Prometheus 文本格式
 - **埋点**：chat_service LLM 异常六类映射 + 工具耗时成败；api SSE 包装器连接/事件计数
@@ -488,7 +496,9 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | ~~压测仅覆盖 BFF 层~~（已闭环） | P1 | ~~50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项）~~ → [0.2.56] M3 容量模型：BFF 横扩 1.83x（290→531 RPS）+ 读层 1263 RPS + 5000 QPS 集群形态决策，唯一 P1 未闭环项已销 |
 
 ## 变更记录
-* 2026-10-22：**AI 深水区② AI 链路可观测（[0.2.78]）**：/metrics Prometheus 文本格式 + 全链路埋点（工具调用/失败/耗时、LLM outcome 六类、SSE 连接/事件、chat/token/uptime）；7 项确定性测试 + 全仓 65 无回归 + SSE 端到端实测（转人工对话后 chat 0→1/sse 0→95/llm 0→2/customer_service 1）；坑 #75（进程内单例 vs 多 worker）。
+* 2026-10-22：**AI 深水区③ 主动式智能提醒（[0.2.79]）**：reminders 聚合引擎（降价/复购/换季三类，复用现成数据源）+ /reminders/mine+scan+read 端点 + reminders 工具（TOOLS 35）+ BFF 透传 + H5 提醒中心；5 项测试 + 全仓 70 无回归 + SSE/端点端到端；坑 #76（路由优先级：降价提醒被商家定价截胡）、#77。
+* 2026-10-22：**AI 深水区② AI 链路可观测（[0.2.78]）**
+：/metrics Prometheus 文本格式 + 全链路埋点（工具调用/失败/耗时、LLM outcome 六类、SSE 连接/事件、chat/token/uptime）；7 项确定性测试 + 全仓 65 无回归 + SSE 端到端实测（转人工对话后 chat 0→1/sse 0→95/llm 0→2/customer_service 1）；坑 #75（进程内单例 vs 多 worker）。
 * 2026-10-22：**AI 深水区① AI 客服（[0.2.77]）**
 ：FAQ 知识库 7 类 + 转人工工单（ST 单号）+ support SSE 事件 + H5 工单卡片；TOOLS 33→34；13 项确定性测试 + 全仓 57 无回归 + SSE 端到端 2 场景实测通过（转人工建单 ST295D81E94DC1 / FAQ 运费命中）；坑 #71-#74（路由优先级/ainvoke/schema 结构/端口谜题）。
 * 2026-10-22：**全仓文档对齐（[0.2.76]）**

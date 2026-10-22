@@ -120,6 +120,10 @@ export const SERVICE_PATHS = {
   closetHomeList:     '/closet/home/list',
   closetHomeItem:     '/closet/home/item',
   closetHomeReplenish: '/closet/home/replenish',
+  // AI 主动提醒中心（块2，ai-orchestrator 8095）
+  remindersMine: '/api/v1/reminders/mine',
+  remindersScan: '/api/v1/reminders/scan',
+  remindersRead: (id: string) => `/api/v1/reminders/read/${id}`,
   walletAccount:      '/wallet/account',
   walletRecharge:     '/wallet/recharge',
   walletTransactions: '/wallet/transactions',

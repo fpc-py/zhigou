@@ -39,6 +39,8 @@ import { LifeController } from './life/life.controller.js';
 import { LifeService } from './life/life.service.js';
 import { ClosetController } from './closet/closet.controller.js';
 import { ClosetService } from './closet/closet.service.js';
+import { RemindersController } from './reminders/reminders.controller.js';
+import { RemindersService } from './reminders/reminders.service.js';
 import { WalletController } from './wallet/wallet.controller.js';
 import { WalletService } from './wallet/wallet.service.js';
 import { MerchantController } from './merchant/merchant.controller.js';
@@ -69,6 +71,7 @@ import { CostSaverService } from './cost-saver/cost-saver.service.js';
     CommunityController,
     LifeController,
     ClosetController,
+  RemindersController,
     WalletController,
     MerchantController,
     MonitorController,
@@ -91,6 +94,7 @@ import { CostSaverService } from './cost-saver/cost-saver.service.js';
     CommunityService,
     LifeService,
     ClosetService,
+  RemindersService,
     WalletService,
     MerchantService,
     FileService,

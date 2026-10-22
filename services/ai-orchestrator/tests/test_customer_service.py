@@ -6,7 +6,7 @@
 - 转人工确认门（无强信号不建单，错误不骚扰红线）
 - 工单创建与持久化（ST 单号 / OPEN 状态 / 落盘）
 - 确定性路由命中（转人工/运费 → customer_service；售后动作 → after_sale_manager 不误路由）
-- TOOLS 全量 schema 转换（34 个，防漏注册回归——bug #29/#144 同款）
+- TOOLS 全量 schema 转换（35 个，防漏注册回归——bug #29/#144 同款）
 """
 
 import asyncio
@@ -154,13 +154,14 @@ def test_route_human_signal_beats_after_sale():
 
 
 def test_tools_schema_all_convert():
-    """TOOLS 34 全量 schema 转换成功 + 名称唯一（防漏注册回归：bug #29/#144 同款）。"""
+    """TOOLS 35 全量 schema 转换成功 + 名称唯一（防漏注册回归：bug #29/#144 同款）。"""
     from langchain_core.utils.function_calling import convert_to_openai_tool
 
     names = [getattr(t, "name", "") for t in T.TOOLS]
-    assert len(names) == 34, f"TOOLS 应 34 个，实际 {len(names)}"
+    assert len(names) == 35, f"TOOLS 应 35 个，实际 {len(names)}"
     assert len(set(names)) == len(names), "工具名必须唯一"
     assert "customer_service" in names
+    assert "reminders" in names
     for t in T.TOOLS:
         schema = convert_to_openai_tool(t)
         fn = schema.get("function") or {}

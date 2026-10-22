@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # 确保项目根目录在 sys.path 中，支持直接运行 python main.py
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from app.api import metrics_router, router as chat_router
+from app.api import metrics_router, reminders_router, router as chat_router
 from app.config import settings
 from app.fallback_config import init_config as init_fallback_config
 
@@ -49,6 +49,7 @@ app.add_middleware(
 # ── 路由注册 ──
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(metrics_router)
+app.include_router(reminders_router, prefix="/api/v1")
 app.include_router(rag_router)
 app.include_router(community_router)
 
@@ -77,6 +78,13 @@ async def startup():
         logger.info("Agent 定时购调度器已启动（每 60s 扫描到期任务）")
     except Exception as e:
         logger.warning("定时购调度器启动失败: %s", e)
+
+    try:
+        from app.reminders import start_scheduler as start_reminder_scheduler
+        start_reminder_scheduler()
+        logger.info("主动提醒引擎已启动（每小时整点扫描）")
+    except Exception as e:
+        logger.warning("主动提醒引擎启动失败: %s", e)
 
 
 @app.get("/health")

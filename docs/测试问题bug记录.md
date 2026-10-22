@@ -5,6 +5,17 @@
 - **② H5 token 走 Pinia userStore**：localStorage 注入 token 后，Pinia store 初始化早于注入则读不到（store 只在启动时读一次 localStorage）→ 页面停留旧态。修复：注入后整页刷新 / 登录页跳转前显式初始化 store。
 - **③ Windows `Out-File` 写 JWT 带 BOM**：PowerShell `Out-File` 默认 UTF-16/带 BOM → Python urllib 直接请求带 BOM 的 Bearer token → 服务端 500。修复：读取时 `encoding='utf-8-sig'` 清洗 BOM。
 
+## #76 路由优先级缺陷：消费者盯价被商家定价路由截胡（[0.2.79]）
+- **背景**：块2 新增提醒工具后做路由回归，`_route_tool("降价提醒")` 返回 `dynamic_pricing`（商家定价建议）而非 `price_alert`（消费者盯价）。
+- **根因**：路由表顺序 dynamic_pricing（含「降价」宽关键词）在 price_alert 之前；用户说「降价提醒」语义是盯价，被商家「定价|降价|调价」宽匹配抢先。
+- **修复**：price_alert 提前至 dynamic_pricing 之前（消费者语义优先于商家建议），断言回归固化「降价提醒→price_alert」。
+- **教训**：确定性路由的**顺序即优先级**，宽关键词会截胡窄语义——新增路由必须做「同关键词多语义」回归清单。
+
+## #77 脚本编辑双坑：PowerShell 字面量 \n 与 .NET 相对路径（[0.2.79]）
+- **坑1**：PowerShell 双引号串不会把 `\n` 转成换行，文件被写入字面 `\n` 导致 test_customer_service.py 语法错误（pytest 收集即挂）——用 python chr(10) 修正。
+- **坑2**：`[IO.File]::ReadAllText` 用相对路径时解析到 .NET 进程工作目录而非 PowerShell 当前位置（报「未能找到路径」）——统一用绝对路径 + python io.open。
+- **实测**：两次失败分别导致 pytest 收集错误 ×2，修正后 70 passed。
+
 ## #75 可观测埋点设计取舍：进程内单例 vs 多 worker 采集（[0.2.78]）
 - **背景**：块6 落地 AI 链路可观测，指标选「进程内计数器 + /metrics 文本格式」（零外部依赖）。
 - **取舍**：单 worker（uvicorn workers=1）下模块级单例 + threading.Lock 足够，Prometheus 直接拉取；多 worker 部署时各进程计数独立，同一指标会被多次上报——需推模式（Pushgateway 合并）或改用共享存储（Redis 计数）。

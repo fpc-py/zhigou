@@ -57,6 +57,30 @@
 
     <!-- 退出登录 -->
     <button v-if="userStore.isLoggedIn" class="logout" @click="logout">退出登录</button>
+
+    <!-- AI 提醒中心面板 -->
+    <div v-if="reminderOpen" class="reminder-panel card">
+      <div class="rp-head">
+        <h3 class="sec-title">AI 提醒中心</h3>
+        <button class="rp-scan" @click="doScan">立即扫描</button>
+        <button class="rp-close" @click="reminderOpen = false">×</button>
+      </div>
+      <p v-if="reminderLoading" class="rp-empty">加载中…</p>
+      <div v-else-if="reminders.length === 0" class="rp-empty">
+        暂无待办提醒。小智会主动提醒降价、补货与换季穿搭。
+      </div>
+      <div v-else class="rp-list">
+        <div v-for="r in reminders" :key="r.id" class="rp-item">
+          <span class="rp-dot" :class="r.type"></span>
+          <div class="rp-body">
+            <p class="rp-title">{{ r.title }}</p>
+            <p class="rp-detail">{{ r.detail }}</p>
+            <p class="rp-time">{{ r.createdAt.slice(0, 16).replace('T', ' ') }}</p>
+          </div>
+          <button class="rp-done" @click="doRead(r.id)">已读</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -65,6 +89,8 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { getProfile } from '@/api/user';
 import type { UserProfile } from '@/api/user';
+import { listReminders, scanReminders, markReminderRead } from '@/api/reminders';
+import type { ReminderItem } from '@/api/reminders';
 import { useUserStore } from '@/stores/user';
 import { showToast } from '@/utils';
 import Icon from '@/components/Icon.vue';
@@ -82,8 +108,12 @@ const orderStats = [
 
 const aiTags = ['通勤穿搭', '数码性价比', '礼物场景', '百元好物'];
 
+const unreadCount = ref(0);
+const reminderHint = computed(() => (unreadCount.value > 0 ? `${unreadCount.value} 条待办` : ''));
+
 const menus = [
   { icon: 'wallet', label: '省钱助手', hint: '比价 · 凑单 · 降价', bg: '#FFF0E8', color: '#FF2D55', action: () => router.push('/cost-saver') },
+  { icon: 'bell', label: 'AI 提醒中心', hint: reminderHint, bg: '#FFF0E8', color: '#FF5C39', action: openReminders },
   { icon: 'wallet', label: '我的钱包', hint: '', bg: '#FFF3DF', color: '#FFA62B', action: () => router.push('/wallet') },
   { icon: 'heart', label: '我的收藏', hint: '', bg: '#FFEDF2', color: '#FF4D6D', action: () => router.push('/favorites') },
   { icon: 'eye', label: '浏览历史', hint: '', bg: '#EAF5FF', color: '#2F80ED', action: () => router.push('/history') },
@@ -115,6 +145,49 @@ function toast(msg: string) {
   showToast(msg);
 }
 
+const reminderOpen = ref(false);
+const reminderLoading = ref(false);
+const reminders = ref<ReminderItem[]>([]);
+
+async function loadReminders() {
+  if (!userStore.isLoggedIn) return;
+  reminderLoading.value = true;
+  try {
+    reminders.value = await listReminders(true);
+    unreadCount.value = reminders.value.length;
+  } catch {
+    reminders.value = [];
+  } finally {
+    reminderLoading.value = false;
+  }
+}
+
+function openReminders() {
+  reminderOpen.value = true;
+  loadReminders();
+}
+
+async function doScan() {
+  if (!userStore.isLoggedIn) return;
+  reminderLoading.value = true;
+  try {
+    await scanReminders();
+    reminders.value = await listReminders(true);
+    unreadCount.value = reminders.value.length;
+    if (reminders.value.length === 0) showToast('暂无新提醒');
+  } catch {
+    /* 忽略 */
+  } finally {
+    reminderLoading.value = false;
+  }
+}
+
+async function doRead(id: string) {
+  await markReminderRead(id);
+  reminders.value = reminders.value.filter((r) => r.id !== id);
+  unreadCount.value = reminders.value.length;
+}
+
 onMounted(async () => {
   if (!userStore.isLoggedIn) return;
   try {
@@ -122,6 +195,7 @@ onMounted(async () => {
   } catch {
     /* 忽略 */
   }
+  loadReminders();
 });
 </script>
 
@@ -187,4 +261,23 @@ onMounted(async () => {
 .menu-hint { font-size: 11px; color: var(--ink-3); }
 .menu-item > svg { color: var(--ink-3); }
 .logout { display: block; margin: 20px auto 0; font-size: 13px; color: var(--danger); background: var(--card); border-radius: 999px; padding: 11px 0; width: calc(100% - 28px); max-width: 386px; }
+</style>
+<style scoped>
+.reminder-panel { position: relative; }
+.rp-head { display: flex; align-items: center; gap: 8px; }
+.rp-head .sec-title { flex: 1; }
+.rp-scan { background: var(--brand); color: #fff; border-radius: 999px; font-size: 11.5px; font-weight: 700; padding: 5px 12px; }
+.rp-close { width: 26px; height: 26px; border-radius: 50%; background: #f1f2f4; color: #666; font-size: 14px; line-height: 1; }
+.rp-empty { color: var(--ink-3); font-size: 12.5px; line-height: 1.7; padding: 14px 0 6px; }
+.rp-list { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.rp-item { display: flex; gap: 10px; align-items: flex-start; background: #fafafb; border-radius: 12px; padding: 10px 12px; }
+.rp-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
+.rp-dot.price_drop { background: #FF5C39; }
+.rp-dot.repurchase { background: #FFA62B; }
+.rp-dot.season_outfit { background: #2F80ED; }
+.rp-body { flex: 1; min-width: 0; }
+.rp-title { font-size: 13px; font-weight: 700; }
+.rp-detail { font-size: 11.5px; color: var(--ink-2); line-height: 1.6; margin-top: 3px; word-break: break-all; }
+.rp-time { font-size: 10.5px; color: var(--ink-3); margin-top: 4px; }
+.rp-done { background: #eef0f2; color: var(--ink-2); font-size: 11px; border-radius: 999px; padding: 4px 10px; flex: none; }
 </style>

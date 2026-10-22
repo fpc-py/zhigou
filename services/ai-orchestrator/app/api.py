@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
+from fastapi import Header
 from sse_starlette.sse import EventSourceResponse
 
 from .metrics import render as render_metrics
@@ -19,6 +20,37 @@ from .fallback_handler import disabled_fallback
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+reminders_router = APIRouter(prefix="/reminders", tags=["reminders"])
+
+
+@reminders_router.get("/mine")
+async def reminders_mine(unreadOnly: bool = False, x_user_id: str | None = Header(default=None)):
+    """本人提醒列表（AI 主动提醒中心，块2）。"""
+    from .reminders import mine, touch_user
+    uid = x_user_id or "0"
+    touch_user(uid)
+    return {"data": mine(uid, unread_only=unreadOnly)}
+
+
+@reminders_router.post("/scan")
+async def reminders_scan(x_user_id: str | None = Header(default=None)):
+    """手动触发一次提醒扫描（当前用户）。"""
+    from .reminders import run_once, touch_user
+    uid = x_user_id or "0"
+    touch_user(uid)
+    counts = await run_once(uid)
+    return {"data": counts}
+
+
+@reminders_router.post("/read/{reminder_id}")
+async def reminders_read(reminder_id: str, x_user_id: str | None = Header(default=None)):
+    """标记提醒已读。"""
+    from .reminders import mark_read
+    r = mark_read(x_user_id or "0", reminder_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="提醒不存在或不属于当前用户")
+    return {"data": r}
+
 metrics_router = APIRouter(prefix="", tags=["metrics"])
 
 

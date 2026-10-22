@@ -2000,6 +2000,33 @@ async def customer_service(action: str = "faq", issue: str = "") -> str:
     except Exception as e:
         logger.warning("customer_service 调用失败: %s", e)
         return "客服服务暂时不可用，请稍后再试，或到『我的-帮助中心』反馈。"
+@tool
+async def reminders(action: str = "mine") -> str:
+    """
+    主动式智能提醒中心。聚合三类提醒：降价（关注商品降价通知）、补货（已购消耗品/食品/耐用品
+    使用周期将尽）、换季穿搭（衣橱缺当季衣物）。默认返回本人未读提醒列表；也可手动触发一次扫描。
+
+    用户问「有什么提醒」「提醒我」「该补货了吗」「换季了该买什么」「降价了提醒我」时调用。
+
+    Args:
+        action: mine=查看未读提醒（默认），scan=立即扫描一次生成新提醒
+    """
+    try:
+        from .reminders import format_reminders, mine, run_once, touch_user
+        uid = _get_current_user()
+        touch_user(uid)
+        if action == "scan":
+            counts = await run_once(uid)
+            summary = "，".join(f"{k} {v} 条" for k, v in counts.items() if v)
+            fresh = mine(uid, unread_only=True)
+            if summary:
+                return f"扫描完成，新增提醒：{summary}\n\n" + format_reminders(fresh)
+            return "本次扫描没有新的提醒。" + ("\n\n" + format_reminders(fresh) if fresh else "")
+        items = mine(uid, unread_only=True)
+        return format_reminders(items)
+    except Exception as e:
+        logger.warning("reminders 调用失败: %s", e)
+        return "提醒中心暂时不可用，请稍后再试。"
 
 
 TOOLS = [
@@ -2037,4 +2064,5 @@ TOOLS = [
     after_sale_manager,
     scheduled_buy,
     customer_service,
+    reminders,
 ]
