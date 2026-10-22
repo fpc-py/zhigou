@@ -4,6 +4,12 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.66] C 组 P0 AI 省钱助手 D 块：AI price_alert 工具
+- tools.py price_alert（watch/unwatch/mine）+ system.md 工具表 + _ROUTE_RULES 触发词 + pytest 2 用例
+- 实测：pytest 10 passed；工具真实调用关注/查询/坏参数降级 ✓
+- 遗留：SSE 在线对话 LLM 空流（外部 qwen 调用失败，待复验）
+- 下一块：E 块造数脚本 + 全链路冒烟断言 + 三件套 + 提交推送
+
 ## 2026-10-22 · [0.2.65] C 组 P0 AI 省钱助手 C 块：省钱汇总 + BFF + H5
 - product /cost-saver/overview 四口径聚合（满减实省/券预估/比价差/降价已省，独立合并防重复）
 - BFF 7 路由透传（rawBody 保真）+ H5 /cost-saver 页（hero 总节省 + 提醒 + 关注）+ profile 入口

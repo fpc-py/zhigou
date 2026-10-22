@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.66] — AI 省钱助手 D 块：AI price_alert 工具 + 触发词 + 测试（2026-10-22）
+
+### feat: ai-orchestrator price_alert 工具（watch/unwatch/mine）+ system.md + 路由 + pytest
+- **背景**：C 块 H5/BFF 已通，本块让 AI 对话直接听懂「关注降价/降到 X 元提醒我/我关注的降价了没」。
+- **实现**：
+  - tools.py 新增 `price_alert(action, sku_id, target_price?)`：watch 幂等关注（targetPrice 可选）、unwatch 取消、mine 聚合关注列表+未读提醒；金额分↔元换算；坏参数友好降级；调用失败「降价提醒操作暂时没成功」
+  - system.md 工具表新增 price_alert 行；chat_service `_ROUTE_RULES` 新增降价关注触发词（与 dynamic_pricing「降价/调价」商家侧词区分，用户侧词更明确）
+  - tests/test_tools.py 新增 2 用例（无用户上下文降级 + 坏目标价）；补齐 pytest-asyncio 依赖（STRICT 模式下 async 用例必需）
+- **实测**：pytest 10 passed；工具真实调用——watch→「已关注 黑色 的降价，降到 ¥45 提醒你，当前价 ¥45.00」、mine→含 1 条未读提醒（¥49→¥45 降 ¥4）、坏参数→「期望价 abc 格式不正确」
+- **遗留（已记录）**：SSE 在线对话链路本轮返回空流/error（外部 LLM qwen-plus 调用失败，工具层已验证，待环境恢复复验）
+- **面试叙事**：确定性路由 vs LLM 自觉调工具——关键场景用正则强制路由，不赌模型随机性；「降价提醒」工具不与商家「动态定价」混淆（同一动词双角色，用户侧/商家侧独立触发）
+
 ## [0.2.65] — AI 省钱助手 C 块：省钱汇总 + BFF 透传 + H5 页（2026-10-22）
 
 ### feat: /cost-saver/overview 汇总 + BFF 透传 + H5 /cost-saver（product-service + bff-shop + h5-shop）

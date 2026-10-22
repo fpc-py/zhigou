@@ -1708,6 +1708,74 @@ async def review_assistant(action: str = "pending", review_id: str = "", content
         lines.append('  回复请用：review_assistant(action="reply", review_id="%s", content="...")' % x.get("reviewId"))
     return "\n".join(lines)
 
+@tool
+async def price_alert(action: str, sku_id: str, target_price: Optional[str] = None) -> str:
+    """
+    降价关注与提醒。用户可关注某商品等待降价（可设期望价，不设则任意降价都提醒）、取消关注、
+    查询自己关注的商品是否已降价/降价提醒。用户问"关注降价""降价提醒我""降到多少提醒我"
+    "盯一下价格""降到 X 元提醒我""取消关注""我关注的降价了没"时调用。
+
+    Args:
+        action: "watch" 关注 / "unwatch" 取消关注 / "mine" 查看我的关注与提醒
+        sku_id: 商品 SKU ID（watch/unwatch 必填，mine 可忽略）
+        target_price: 期望价（元，watch 时可选；不填表示任意降价都提醒）
+    """
+    try:
+        headers = {"x-user-id": _get_current_user()}
+        if action == "mine":
+            alerts_data = await _http_get(
+                f"{settings.product_service_url}/price/alert/mine", headers=headers
+            )
+            notices_data = await _http_get(
+                f"{settings.product_service_url}/price/notice/mine?unreadOnly=true", headers=headers
+            )
+            lines = ["【我的降价关注】"]
+            alerts = alerts_data.get("data") or []
+            if not alerts:
+                lines.append("还没有关注任何商品。想让我帮你盯哪件商品降价？")
+            for a in alerts:
+                status = "已降 ¥%.2f" % (a.get("dropAmount", 0) / 100) if a.get("dropped") else "未降价"
+                target = "（期望价 ¥%.2f）" % (a.get("targetPrice", 0) / 100) if a.get("targetPrice") else ""
+                lines.append(f"· {a.get('skuName')}（SKU {a.get('skuId')}）当前 ¥{a.get('currentPrice', 0) / 100:.2f}，{status}{target}")
+            notices = notices_data.get("data") or []
+            if notices:
+                lines.append(f"· 有 {len(notices)} 条未读降价提醒：")
+                for n in notices[:3]:
+                    lines.append(f"  - {n.get('skuName')} ¥{n.get('oldPrice', 0) / 100:.2f} → ¥{n.get('newPrice', 0) / 100:.2f}（降了 ¥{n.get('dropAmount', 0) / 100:.2f}）")
+            return "\n".join(lines)
+
+        if action == "watch":
+            target_fen = None
+            if target_price:
+                try:
+                    target_fen = int(round(float(target_price) * 100))
+                except (TypeError, ValueError):
+                    return f"期望价 {target_price} 格式不正确，请用元为单位。"
+            body = {"skuId": sku_id}
+            if target_fen is not None:
+                body["targetPrice"] = target_fen
+            data = await _http_post(
+                f"{settings.product_service_url}/price/alert",
+                body,
+                headers=headers,
+            )
+            item = data.get("data") or {}
+            return (f"已关注 {item.get('skuName', 'SKU-' + sku_id)} 的降价"
+                    + (f"，降到 ¥{target_price} 提醒你" if target_fen is not None else "（任意降价都提醒你）")
+                    + f"，当前价 ¥{item.get('currentPrice', 0) / 100:.2f}。")
+        if action == "unwatch":
+            await _http_get(
+                f"{settings.product_service_url}/price/alert/{sku_id}",
+                headers=headers,
+                retry=False,
+            )
+            return f"已取消关注 SKU {sku_id} 的降价提醒。"
+        return "不支持的 action：" + action
+    except Exception as e:
+        logger.warning("price_alert(%s) 调用失败: %s", action, e)
+        return "降价提醒操作暂时没成功，稍后再试试？"
+
+
 TOOLS = [
     search_products,
     get_price,
@@ -1738,4 +1806,5 @@ TOOLS = [
     dynamic_pricing,
     marketing_plan,
     review_assistant,
+    price_alert,
 ]

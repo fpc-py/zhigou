@@ -4,7 +4,7 @@
 
 import pytest
 
-from app.tools import _check_user_id, _current_user_id, analyze_requirement, apply_coupon, check_inventory, compare_prices
+from app.tools import _check_user_id, _current_user_id, analyze_requirement, apply_coupon, check_inventory, compare_prices, price_alert
 
 
 class TestUserIdValidation:
@@ -88,3 +88,15 @@ class TestP1DecisionTools:
         """比价：无用户上下文时降级不崩溃"""
         result = await compare_prices.ainvoke({"sku_ids": ["sku001"]})
         assert "这项信息暂时没查到" in result or "价格/规格对比" in result
+
+    @pytest.mark.asyncio
+    async def test_price_alert_no_user_context(self):
+        """降价关注：无用户上下文时降级不崩溃"""
+        result = await price_alert.ainvoke({"action": "mine", "sku_id": "sku001"})
+        assert "降价提醒操作暂时没成功" in result or "我的降价关注" in result
+
+    @pytest.mark.asyncio
+    async def test_price_alert_watch_bad_target(self):
+        """降价关注：期望价格式错误给出友好提示（无用户上下文时降级为失败提示）"""
+        result = await price_alert.ainvoke({"action": "watch", "sku_id": "sku001", "target_price": "abc"})
+        assert "降价提醒操作暂时没成功" in result or "格式不正确" in result

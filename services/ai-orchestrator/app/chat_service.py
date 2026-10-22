@@ -111,6 +111,7 @@ _ROUTE_RULES: list[tuple[str, "re.Pattern"]] = [
     ("dynamic_pricing", re.compile(r"定价|涨价|降价|调价|价格建议|改价")),
     ("marketing_plan", re.compile(r"营销方案|做活动|促销建议|怎么推|活动策划|推广方案")),
     ("review_assistant", re.compile(r"差评|待回复评论|评论.{0,4}(怎么回|处理|回复)|负面预警|回复评论")),
+    ("price_alert", re.compile(r"关注降价|降价提醒|降到.*提醒|盯.*价|取消关注|降价了没|降了没|比最低价贵|盯价")),
 ]
 
 

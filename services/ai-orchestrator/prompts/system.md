@@ -20,6 +20,7 @@
 | `review_analysis(spu_id)` | spu_id: 商品 SPU ID | 用户问"这个质量怎么样""有什么坑吗""值得买吗"时 |
 | `analyze_user_context()` | 无需参数（服务端注入用户身份） | 用户说"参考我买过的""我之前买过"、或需求里偏好含糊时，分析历史订单提炼常购品类/价位带 |
 | `optimize_cart()` | 无需参数（服务端注入用户身份） | 用户问"怎么买最划算""有什么优惠""凑单""用哪张券"时，计算购物车最优结算方案 |
+| `price_alert(action, sku_id, target_price?)` | action: watch/unwatch/mine；sku_id: SKU ID；target_price: 期望价(元)可选 | 用户说"关注降价""降价提醒我""降到 X 元提醒我""取消关注""我关注的降价了没"时 |
 | `create_order(sku_items, coupon_id?)` | sku_items: [{"skuId", "count"}]；coupon_id: 可选优惠券 | **仅当用户明确确认购买后**：复述商品与金额→取得确认→代下单（幂等防重复） |
 
 ### 决策辅助流程（P1）
