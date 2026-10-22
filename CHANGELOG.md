@@ -3,6 +3,14 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.67] — AI 省钱助手 E 块：全链路冒烟闭环（采集→关注→降价→提醒→overview）（2026-10-22）
+
+### feat: C 组 P0 收尾——E 块端到端验证
+- **实现**：冒烟断言脚本（product 直连 userId=10001）：①关注 upsert（幂等推进基准价）→ ②造降价（4500→4400 + 快照）→ ③POST /price/alert/check 触发 → ④未读提醒 → ⑤历史价格最低价 → ⑥overview 降价已省 → ⑦关注列表
+- **实测**：**6/6 断言全通过**；提醒明细 3 条（4900→4500 真降 ¥4 / 4500→4500 目标价命中零降 / 4400→4400 watchPrice 命中零降）；**口径核对**：overview noticeSaving=400 只统计 dropAmount>0 的真实降幅，零降幅目标价命中不计入省钱——「提醒触发 ≠ 省钱」防虚增设计成立
+- **面试叙事**：省钱口径的防虚增——同一商品可能因目标价命中收到「提醒」但实际没降，总省钱只认确定性降幅；双触发语义（≤targetPrice 或 <watchPrice）与「watchPrice 推进防重复提醒」形成完整防骚扰闭环
+- **C 组 P0 至此 A–E 五块全部完成**（[0.2.63]~[0.2.67]），剩余：C 组 P1 候选（Agent 定时购 / AI 售后管家）待用户拍板
+
 ## [0.2.66] — AI 省钱助手 D 块：AI price_alert 工具 + 触发词 + 测试（2026-10-22）
 
 ### feat: ai-orchestrator price_alert 工具（watch/unwatch/mine）+ system.md + 路由 + pytest

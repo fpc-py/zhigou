@@ -4,6 +4,11 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.67] C 组 P0 AI 省钱助手 E 块：全链路冒烟闭环
+- 冒烟断言 6/6 通过（关注 upsert→造降价→check→提醒→历史→overview）
+- 口径核对：noticeSaving 只统计真实降幅（dropAmount>0），零降幅目标价命中不计省钱——防虚增 ✓
+- **C 组 P0（A–E）全部完成**；下一步：C 组 P1 候选拍板（Agent 定时购 / AI 售后管家）
+
 ## 2026-10-22 · [0.2.66] C 组 P0 AI 省钱助手 D 块：AI price_alert 工具
 - tools.py price_alert（watch/unwatch/mine）+ system.md 工具表 + _ROUTE_RULES 触发词 + pytest 2 用例
 - 实测：pytest 10 passed；工具真实调用关注/查询/坏参数降级 ✓
