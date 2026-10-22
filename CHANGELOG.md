@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.63] — AI 省钱助手 A 块：历史价格底座（2026-10-22）
+
+### feat: price_history 快照 + 趋势查询（product-service）
+- **背景**：省钱助手 P0 立项（[0.2.62] 规划）——比价/凑单底座已就绪，缺「历史价格 + 降价提醒」两块数据底座；本块先落地历史价格。
+- **实现**：
+  - `price_history` 表（Flyway V20261094）+ Entity/Mapper
+  - 每日 02:10 全量快照任务（@EnableScheduling + PriceSnapshotTask，当天幂等跳过）
+  - 查询时单 SKU 补点（ensureSnapshot：当天无快照写当前价，冷启动即有基线）
+  - `GET /price/history?skuId=&days=`：按天去重取最后一条 → 趋势 + 最低价 + 现价对比 + 一句话建议
+- **实测**：Flyway 建表 ✓；POST snapshot 写入 7 SKU；history(skuId=...024, 30d) → current=4900 lowest=4900 diff=0「当前价就是近 30 天最低价，可以放心买」
+- **口径（面试叙事）**：采集 = 每日全量 + 实时补点双轨（完整性与冷启动兼得）；最低价 = 近 N 天快照最小值；diffFromLowest = 现价 - 最低价（0 表示当前即最低）
+
 ## [0.2.59] — 坑 #63 读路径根治：响应 19 位 id 全量字符串化（2026-10-22）
 
 ### fix: 读路径 id 精度根治（43 文件 55 字段 @JsonSerialize(ToStringSerializer)）

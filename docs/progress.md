@@ -9,6 +9,11 @@
 - **验证**：product spuId/skuId [String]；拼团 id/skuId/spuId [String]；H5 全链路字符串 skuId 加购→下单 201 金额 4900→落库 19 位无损
 - **坑 #63 三阶段闭环**：写路径 rawBody 透传 → 8 透传接口统一 → 读路径字符串化；面试叙事：同 bug 系统级根治（源头保真 + 展示保真）
 
+## 2026-10-22 · [0.2.63] C 组 P0 AI 省钱助手 A 块：历史价格底座
+- price_history 表 + 每日 02:10 全量快照 + 查询补点 + GET /price/history（趋势/最低价/现价对比）
+- 实测：建表 ✓、快照 7 SKU、history 4900=4900 diff=0「当前即最低」
+- 下一块：B 块降价关注与提醒（price_alert/price_notice + 检测任务）
+
 ## 2026-10-20 · [0.2.50] B7 故障演练 / Runbook / on-call
 - docs/故障演练与Runbook.md（5 类故障速查 + 值班流程 + 复盘模板）+ scripts/fault-drill/ 3 场景演练脚本（语法已验证）；真实演练待环境恢复执行留痕
 
