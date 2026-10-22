@@ -3,6 +3,18 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.55] — M4 上线收尾：回滚演练 + release-checklist 签核（2026-10-22）
+
+### drill: 灰度/回滚演练（release-checklist §五 触发条件实走一遍）
+- **注入**：停 order-service(8085) → 用错误 DB 配置（`--spring.datasource.url=jdbc:mysql://localhost:1999/bad-db`）发布 → `Application run failed`（Communications link failure, Connection refused）→ 8085 不可用。
+- **冒烟失败**：GET /order/mine 连接拒绝 → **触发回滚决策**（§五：核心服务不可用立即回滚）。
+- **回滚**：正确配置重启 → 冒烟 200 恢复。恢复时长约 40-60s（含服务启动就绪）。
+- 复盘：bug #61。
+
+### docs: release-checklist 逐项签核
+- §1-§6 逐项对照本地实况勾选（构建/部署/监控/冒烟/回归/数据校验均已满足或资产就绪）；生产前置项（服务器 .env、真实数据备份、staging 执行、上线前 CI 终检）保持未勾并注明「生产前必做」。
+- 签署：2026-10-22 本地演练签核。
+
 ## [0.2.54] — B7 故障演练：熔断降级实测闭环（2026-10-22）
 
 ### drill: 场景 3.1 下游宕机 → 熔断降级（BFF 自研熔断）

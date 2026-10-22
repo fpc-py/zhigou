@@ -1,5 +1,14 @@
 # 测试问题 & Bug 记录
 
+## #61 演练复盘 4：发布配置错误 → 回滚恢复闭环（[0.2.55] M4）
+- **场景**：模拟「发布时配置错误导致服务不可用」→ 按 release-checklist §五 触发回滚。
+- **前置**：order-service(8085) 基线 GET /order/mine 200（空列表）。
+- **注入**：`Stop-Process` 停 8085；以错误 DB 配置（`--spring.datasource.url=jdbc:mysql://localhost:1999/bad-db`）启动 → `Application run failed`（Hikari/Flyway `Communications link failure` → `Connection refused`）。
+- **观测信号（实测数据）**：8085 无 LISTENING；冒烟 GET /order/mine 连接拒绝 → **按 §五 立即回滚**。
+- **恢复**：正确配置重启 → 冒烟 200；恢复时长约 40-60s（含启动就绪）。
+- **发现的问题**：未发现代码缺陷——故障由「配置错误」注入，验证的是**人工回滚路径**（区别于 B7 的熔断自愈路径：B7=系统自动降级，M4=发布负责人主动回滚）。
+- **改进项**：生产建议配置中心/部署前配置校验（K8s ConfigMap 校验或 compose config 前置检查），把「配置错误」拦在发布前。
+
 ## #60 演练复盘 3.1：下游宕机 → BFF 熔断降级实测闭环（[0.2.54] B7）
 - **场景**：product-service(8083) 宕机期间，BFF(3000) `/product/1/detail` 行为。
 - **前置**：BFF + product-service + 有效 JWT；基线 ~25ms。

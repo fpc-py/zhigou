@@ -391,6 +391,8 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | 压测仅覆盖 BFF 层 | P1 | 50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项） |
 
 ## 变更记录
+* 2026-10-22：**M4 上线收尾（[0.2.55]）**：回滚演练实测闭环（停 8085 → 错误 DB 配置发布失败 → 冒烟失败触发回滚 → 正确配置恢复 200）；release-checklist §1-§6 逐项签核（生产前置项注明「生产前必做」）。
+
 * 2026-10-22：**B7 故障演练 · 熔断降级闭环（[0.2.54]）**：注入停 product-service(8083) → BFF 详情接口降级 200 + 3ms（不 5xx/不挂起，日志熔断 OPEN 快失败）→ 恢复后 HALF_OPEN 探活成功（835ms）→ CLOSED 正常（~25ms）。复盘 bug #60；Runbook 已覆盖核心故障。
 
 * 2026-10-22：**B6 SLO 大盘 + 错误预算落地（[0.2.53]）**：zhigou-slo.json 7 面板（错误预算/可用性 30d·7d/错误率 0.5% 线/P95 1s 线/各服务可用性/支付成功率）+ Prometheus retention 60d + payment-service 支付埋点（success/failed/refund 计数器）。实测：SLO 大盘加载、payment_success_total=1（create→mock-pay 200）、错误预算公式修复（坑 #59，PromQL 优先级 -99900 → 100）。
