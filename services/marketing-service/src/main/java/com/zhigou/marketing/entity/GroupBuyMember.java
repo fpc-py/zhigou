@@ -1,6 +1,8 @@
 package com.zhigou.marketing.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -8,7 +10,9 @@ import java.time.LocalDateTime;
 @TableName("group_buy_member")
 public class GroupBuyMember {
     @TableId(type = IdType.AUTO)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long groupId;
     private Long userId;
     private Integer isLeader;

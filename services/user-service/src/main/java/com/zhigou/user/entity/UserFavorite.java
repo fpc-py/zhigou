@@ -1,6 +1,8 @@
 package com.zhigou.user.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -17,14 +19,17 @@ import java.time.LocalDateTime;
 public class UserFavorite {
 
     @TableId(type = IdType.AUTO)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     /** 分片键 */
     private Long userId;
 
     /** 商品 SPU ID（Snowflake，序列化需转字符串） */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long spuId;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long skuId;
 
     /** 商品名快照 */

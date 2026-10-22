@@ -4,6 +4,11 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.59] 读路径 id 字符串化根治（坑 #63 闭环）
+- **范围**：响应 DTO/Entity 19 位 id 统一 `@JsonSerialize(ToStringSerializer)`——批量脚本 43 文件 55 字段（product/order/marketing/aftersale/cart/inventory/user/auth/file）
+- **验证**：product spuId/skuId [String]；拼团 id/skuId/spuId [String]；H5 全链路字符串 skuId 加购→下单 201 金额 4900→落库 19 位无损
+- **坑 #63 三阶段闭环**：写路径 rawBody 透传 → 8 透传接口统一 → 读路径字符串化；面试叙事：同 bug 系统级根治（源头保真 + 展示保真）
+
 ## 2026-10-20 · [0.2.50] B7 故障演练 / Runbook / on-call
 - docs/故障演练与Runbook.md（5 类故障速查 + 值班流程 + 复盘模板）+ scripts/fault-drill/ 3 场景演练脚本（语法已验证）；真实演练待环境恢复执行留痕
 

@@ -1,6 +1,8 @@
 package com.zhigou.product.dto;
 
 import jakarta.validation.constraints.Max;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -12,6 +14,7 @@ import lombok.Data;
 public class ReviewSubmitRequest {
 
     @NotNull(message = "spuId 不能为空")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long spuId;
 
     @NotNull(message = "评分不能为空")

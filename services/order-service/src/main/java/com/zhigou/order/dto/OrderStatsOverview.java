@@ -1,6 +1,8 @@
 package com.zhigou.order.dto;
 
 import lombok.Data;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 import java.util.List;
 import java.util.Map;
@@ -27,6 +29,7 @@ public class OrderStatsOverview {
 
     @Data
     public static class HotSpu {
+        @JsonSerialize(using = ToStringSerializer.class)
         private Long spuId;
         private String spuName;
         private Long soldCount;

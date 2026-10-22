@@ -3,6 +3,17 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.59] — 坑 #63 读路径根治：响应 19 位 id 全量字符串化（2026-10-22）
+
+### fix: 读路径 id 精度根治（43 文件 55 字段 @JsonSerialize(ToStringSerializer)）
+- **背景**：[0.2.57]/[0.2.58] 修完写路径（rawBody 透传保真）；读路径仍是 number——product/order/marketing 响应里 19 位 id 到 H5 JS 侧仍失真（2^53 精度丢失），源头数据对、展示层错。
+- **方案**：响应 DTO/Entity 的 19 位 id 字段统一 `@JsonSerialize(using = ToStringSerializer.class)`——序列化输出字符串、反序列化不受影响；批量脚本扫描 `private Long (id|skuId|spuId|orderId|activityId|groupId|couponId|couponTemplateId|promotionId|postId|videoId|liveId|appointmentId|noteId|stockId)` 全库铺开，**43 文件 55 字段**。
+- **实测数据**：
+  - product 直连：spuId=9000000000000000012 [String]、skuId=9000000000000000024 [String]
+  - marketing 拼团：id=3 [String]、skuId/spuId [String]（金额 soloPrice/groupPrice 刻意保留 number）
+  - H5 真实链路（读→写全字符串）：GET 商品 skuId [String] → cart/add 201 → order/create 201 payAmount=4900 → 落库 `sku_id=9000000000000000024` 19 位无损
+- **面试叙事**：同一「JS 2^53 精度」问题做系统级闭环——写路径 rawBody 透传（源头保真）+ 读路径 Jackson 字符串化（展示保真），并暴露「类型标注 string ≠ 运行时保真」的认知盲区；金额字段刻意保留 number，不误伤业务语义。
+
 ## [0.2.58] — 坑 #63 精度修复全量铺开：含 19 位 id 的透传接口统一字符串透传（2026-10-22）
 
 ### fix: BFF 透传接口精度统一（坑 #63 铺开到 8 接口）

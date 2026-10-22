@@ -1,12 +1,15 @@
 package com.zhigou.inventory.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data @TableName("replenish_record")
 public class ReplenishRecord {
     @TableId(type = IdType.AUTO) private Long id;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long skuId;
     private Integer beforeQty;
     private Integer addQty;

@@ -1,6 +1,8 @@
 package com.zhigou.product.dto;
 
 import lombok.Builder;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.util.List;
@@ -12,8 +14,10 @@ import java.util.List;
 @Builder
 public class PriceCompareResponse {
     /** SKU ID */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long skuId;
     /** SPU ID */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long spuId;
     /** 商品名（SKU 规格名） */
     private String skuName;

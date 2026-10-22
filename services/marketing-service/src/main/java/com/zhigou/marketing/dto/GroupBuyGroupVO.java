@@ -1,12 +1,15 @@
 package com.zhigou.marketing.dto;
 
 import lombok.Builder;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 /** 团单进度视图 */
 @Data @Builder
 public class GroupBuyGroupVO {
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long groupId;
     private Long leaderUserId;
     private Integer memberCount;

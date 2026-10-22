@@ -356,4 +356,4 @@
 | #49 | 2026-10-20 | MinIO bucket 被 MinioInitializer 设为公开只读策略（PUBLIC_READ_POLICY），拿到 object key 即可匿名下载，绕过 file-service 鉴权 | bucket 保持私有 + 新增 /file/{id}/content 代理私有读 + presigned 短时效分发 | 编译构建通过；端到端（匿名403/跨用户403）待 3307 恢复补验 | A7 文件访问鉴权 |
 - 2026-10-08（P1）：压测复测 page 通过率在 2000VU 高 VU 段波动（82%↔67%）——缓存命中后 BFF 日志全成功（66ms），k6 侧失败源于单机容量（单 BFF 事件循环 + 写链路重事务排队）；结论：50VU 达标，2000VU 需横向扩展（报告 §6.3）。
 - 2026-10-08（P1）：**ai-orchestrator 日志 15 万行**——detail 每次迭代打 RAG，AI 服务处理不过来且日志爆炸；已加 BFF 内存缓存（同 spu 5min）消除重复调用。
-- 2026-10-08（P1）：**mvn package 假成功坑再现**——进程未杀干净时 Unable to rename ...jar to ...jar.original（BUILD FAILURE），须先杀 8083 占用进程再删 jar 重打包。
+- 2026-10-08（P1）：**mvn package 假成功坑再现**——进程未杀干净时 Unable to rename ...jar to ...jar.original（BUILD FAILURE），须先杀 8083 占用进程再删 jar 重打包。| #63 | 2026-10-22 | **读路径 19 位 id 仍为 number（展示层失真）**：写路径修复后 product/order/marketing 响应 id 仍超 JS 2^53 精度 | 响应 DTO/Entity 全量 @JsonSerialize(ToStringSerializer)——43 文件 55 字段；金额字段保留 number | product spuId/skuId [String]、拼团 id [String]、H5 全链路落库 19 位无损 | ✅ [0.2.59] 写+读双路径闭环 |

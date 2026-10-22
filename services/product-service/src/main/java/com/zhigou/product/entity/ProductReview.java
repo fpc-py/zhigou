@@ -1,6 +1,8 @@
 package com.zhigou.product.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -12,10 +14,12 @@ import java.time.LocalDateTime;
 @TableName("product_review")
 public class ProductReview {
     @TableId(type = IdType.AUTO)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     /** 业务评价 ID（Snowflake） */
     private Long reviewId;
     /** 商品 SPU ID（Snowflake） */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long spuId;
     /** 评价用户 ID（Snowflake） */
     private Long userId;

@@ -1,5 +1,7 @@
 package com.zhigou.aftersale.entity;
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import java.time.LocalDateTime;
 @Data @TableName("aftersale_order")
@@ -9,6 +11,7 @@ public class AftersaleOrder {
     private String type; private String reason; private Long amount; private String status;
     private String images; private String rejectReason;
     /** 售后商品明细（null=整单售后）；退回库存时使用 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long skuId;
     private Integer count;
     /** 退款单号（payment-service 返回，幂等键） */
