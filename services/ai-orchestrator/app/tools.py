@@ -1996,4 +1996,6 @@ TOOLS = [
     review_assistant,
     price_alert,
     merchant_after_sale,
+    after_sale_manager,
+    scheduled_buy,
 ]

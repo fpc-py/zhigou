@@ -1,5 +1,15 @@
 # 测试问题 & Bug 记录
 
+## #70 商家售后管家开发三坑：BFF 路由顺序 / H5 Pinia 初始化时机 / Windows JWT BOM（[0.2.75]）
+- **① BFF 新路由必须在 `@Get(':no')` 之前声明**：NestJS 路由按声明顺序匹配，`merchant/pending` 若声明在 `:no` 动态参数之后会被吞成参数路由 → 404/错匹配。修复：具名路由前置声明。
+- **② H5 token 走 Pinia userStore**：localStorage 注入 token 后，Pinia store 初始化早于注入则读不到（store 只在启动时读一次 localStorage）→ 页面停留旧态。修复：注入后整页刷新 / 登录页跳转前显式初始化 store。
+- **③ Windows `Out-File` 写 JWT 带 BOM**：PowerShell `Out-File` 默认 UTF-16/带 BOM → Python urllib 直接请求带 BOM 的 Bearer token → 服务端 500。修复：读取时 `encoding='utf-8-sig'` 清洗 BOM。
+
+## #69 RocketMQ 消费者启动失败：connect to null（[0.2.74]）
+- **现象**：inventory-service 集成测试启动时 orderClosedListener 连接 RocketMQ 失败 `RemotingConnectException: connect to null failed`。
+- **根因（双确认）**：① `ROCKETMQ_NAME_SERVER` 环境变量为空串——`${VAR:default}` 语法在变量**存在但为空**时不触发默认值，spring 配置注入空地址；② 本地 namesrv 容器未运行。
+- **修复**：启动前确认 namesrv 容器运行 + 环境变量非空；测试 profile 下禁用 MQ 监听（`rocketmq.listeners.enabled=false` 或等价的 @ConditionalOnProperty）。
+
 ## #63 BFF JSON 透传精度丢失：19 位 Snowflake skuId 失真（[0.2.57]）
 - **现象**：BFF 下单落库 sku_id=9000000000000000000，但请求是 9000000000000000020 → 查不到 SKU → 金额占位价 100（sku_name 变 "SKU-xxx" 兜底）。
 - **根因**：**JS 安全整数上限 2^53≈9.007e15**；Snowflake skuId 19 位（9e18）超限。NestJS/Express body 解析把 skuId 转 **number** 即失真；axios JSON.stringify 再转发 → Java 收到错误值。**在 BFF 内已无法还原**（源头失真）。
@@ -397,3 +407,4 @@
   - 发现的问题：坑 #69（namesrv 未起 + ROCKETMQ_NAME_SERVER 空串导致服务启动失败）——已修复并回归
   - 恢复时长：namesrv 拉起 + inventory 重启 < 1min
   - 改进项：启动脚本统一注入 ROCKETMQ_NAME_SERVER（避免空串陷阱）；compose 健康检查确认 namesrv 就绪
+

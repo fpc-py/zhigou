@@ -21,6 +21,13 @@
 | `analyze_user_context()` | 无需参数（服务端注入用户身份） | 用户说"参考我买过的""我之前买过"、或需求里偏好含糊时，分析历史订单提炼常购品类/价位带 |
 | `optimize_cart()` | 无需参数（服务端注入用户身份） | 用户问"怎么买最划算""有什么优惠""凑单""用哪张券"时，计算购物车最优结算方案 |
 | `price_alert(action, sku_id, target_price?)` | action: watch/unwatch/mine；sku_id: SKU ID；target_price: 期望价(元)可选 | 用户说"关注降价""降价提醒我""降到 X 元提醒我""取消关注""我关注的降价了没"时 |
+| `recommend_products(scene, limit)` | scene: 首页/详情/购物车/我的；limit: 返回条数（默认 6） | 用户说"给我推荐""有什么适合我的""猜你喜欢"、或需要个性化选择建议时 |
+| `search_by_image(image_url, limit)` | image_url: 商品图片 URL；limit: 条数（默认 5） | 用户上传商品图片/截图问"有没有同款/类似的"时（先让用户提供图片 URL，或提示在对话页上传图片） |
+| `gift_assistant(recipient, occasion, budget)` | recipient: 收礼人（女朋友/父母/闺蜜/长辈…）；occasion: 生日/纪念日/情人节/七夕/过节/贺卡；budget: 预算（元）可选 | 用户表达送礼意图（"送 XX 什么礼物""生日礼物""纪念日送什么"）时，输出方案+贺卡文案 |
+| `aftersale_assistant(issue, aftersale_no)` | issue: 问题描述；aftersale_no: 售后单号（可选） | 用户说"商品有问题""怎么申请售后""售后到哪一步了""我要退货/换货/退款"时，生成售后话术或查进度 |
+| `logistics_tracker(shipment_no)` | shipment_no: 运单号 | 用户问"快递到哪了""物流什么时候到""包裹卡住了/一直不动"时查轨迹并做时效评估 |
+| `usage_cycle_assistant()` | 无需参数（服务端注入用户身份） | 用户问"我该补点什么了""上次买的什么时候用完""有没有快到期的""哪些该换新了"时（注意：只做提醒，不自动下单，与定时购 scheduled_buy 区分） |
+| `groupbuy_finder(sku_id, keywords)` | sku_id: SKU ID 可选；keywords: 关键词可选 | 用户问"这个能拼团吗""有没有拼团""想找人拼/开团/参团"时，查询进行中的拼团活动（拼团价/成团人数/还差几人） |
 | `create_order(sku_items, coupon_id?)` | sku_items: [{"skuId", "count"}]；coupon_id: 可选优惠券 | **仅当用户明确确认购买后**：复述商品与金额→取得确认→代下单（幂等防重复） |
 
 ### 决策辅助流程（P1）
@@ -53,6 +60,7 @@
 | `merchant_warnings()` | 无 | 商家问经营预警：低库存、差评/负面评价 |
 | `fulfillment_alert()` | 无 | 商家问履约：待发货订单、缺货/卡单风险 |
 | `supply_replenish(threshold, targetQty)` | threshold: 低库存阈值；targetQty: 补至目标库存 | 商家问补货/备货 |
+| `fulfillment_action(action, order_ids, reason)` | action: SPLIT(拆分发货)/DELAY(延期)/OFF_SHELF(下架停单)/REPLENISH(补货后发货)；order_ids: 订单 ID 列表（可不传=全量待发货，演示口径）；reason: 原因 | 商家说"处理缺货订单""自动处理异常订单""拆分发货""延期发货""下架停单""补货后发货"时批量处理履约异常 |
 | `sales_forecast(days, selection)` | days: 7 或 30；selection: 是否输出智能选品建议 | 商家问"卖得好不好""该备多少货""预测销量""选品/进货建议" |
 | `logistics_delay_alert()` | 无 | 商家/用户问快递卡住、延误预警、催件调度 |
 | `after_sale_repair(action, ...)` | action: warranty(质保盘点)/repair(维修预约) | 用户问质保、维修预约 |

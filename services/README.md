@@ -23,7 +23,7 @@
 | life-service | 8092 | zhigou_life | 本地生活 | POI/商圈/服务 SKU、到店预约状态机 |
 | closet-service | 8093 | zhigou_closet | 衣橱家居 | 衣物/穿搭/家居盘点、穿搭推荐、补货清单 |
 | wallet-service | 8094 | zhigou_wallet | 钱包/会员 | 余额/流水（bizNo 幂等）、沙箱充值、会员等级、AI 订阅 |
-| ai-orchestrator | 8095 | PostgreSQL + pgvector | AI 编排 | FastAPI + LangChain/LangGraph Agent、SSE 流式回复、RAG、29 个 AI 工具、降级兜底 |
+| ai-orchestrator | 8095 | PostgreSQL + pgvector | AI 编排 | FastAPI + 原生 OpenAI 工具循环（SSE 流式）、RAG、33 个 AI 工具、降级兜底 |
 
 ## 通用约定
 
@@ -32,7 +32,7 @@
 - **金额**：`Long` 存分；Snowflake ID 序列化为字符串（避免 JS 精度丢失）
 - **数据**：Flyway 迁移（`db/migration`）+ dev profile mock（`db/mock`）；所有表含 `id/create_time/update_time/version/deleted`
 - **配置**：`application-{env}.yml` + 环境变量（密钥不进代码）
-- **AI 工具**：`ai-orchestrator/tools.py` 的 TOOLS 列表为唯一真相（29 个，含搜索/比价/避坑/凑单/代下单/送礼/拼团/售后/物流/商家经营等）；新工具必须同时入列表
+- **AI 工具**：`ai-orchestrator/tools.py` 的 TOOLS 列表为唯一真相（33 个，含搜索/比价/避坑/凑单/代下单/送礼/拼团/售后/物流/省钱/定时购/售后管家/商家经营等）；新工具必须同时入列表
 
 ## 启动
 

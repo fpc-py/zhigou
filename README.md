@@ -27,7 +27,7 @@
 
 ### 核心特性
 
-- 🤖 **AI 导购** —— 对话式购物助手「小智」，SSE 流式回复，29 个 AI 工具（搜索/比价/差评避坑/凑单/代下单/送礼/拼团/售后/物流/补货/商家经营等），工具结果按关键词拉取真实商品卡
+- 🤖 **AI 导购** —— 对话式购物助手「小智」，SSE 流式回复，33 个 AI 工具（搜索/比价/差评避坑/凑单/代下单/送礼/拼团/售后/物流/补货/省钱/定时购/售后管家/商家经营等），工具结果按关键词拉取真实商品卡
 - 🛍️ **完整电商闭环** —— 商品 → 购物车（服务端）→ 下单（requestId 幂等 + 真实价格）→ 沙箱支付 → 库存扣减（Redis Lua）→ 物流 → 售后逆向流程
 - 🔍 **语义搜索** —— PostgreSQL pgvector 实现商品语义检索，告别 MySQL `LIKE %keyword%`
 - 📊 **可观测** —— Prometheus + Grafana + Loki 全栈监控，RED 指标 + JVM + 业务大盘
@@ -41,8 +41,8 @@
 | M0 脚手架 — Monorepo + 中间件 + auth-center 登录 | ✅ |
 | M1 交易闭环 — 下单→支付→库存→物流 | ✅ 全链路联调 17/17 |
 | M2 AI 导购 — SSE + RAG + 降级 + 对话商品卡 | ✅ |
-| M3 大促压测 — 5000 QPS | 🚧 BFF 层已压（718 RPS），全链路压测待做 |
-| M4 上线 — 灰度 + 监控 + 回滚 | 🚧 文档已就绪（release-checklist/gray-release/monitoring-alerting），未真执行 |
+| M3 大促压测 — 5000 QPS | ✅ [0.2.56] 容量模型：BFF 横扩 1.83x + 读层 1263 RPS + 5000 QPS 集群形态决策（单机可解释容量验收） |
+| M4 上线 — 灰度 + 监控 + 回滚 | ✅ [0.2.55] 回滚演练实测闭环 + release-checklist §1-§6 签核（生产前置项注明） |
 
 > 详细进度见 [docs/progress.md](docs/progress.md)；与目标态的差距与执行顺序见 [docs/智购开发任务差距分析报告.md](docs/智购开发任务差距分析报告.md)。
 
@@ -94,7 +94,8 @@ $root = "D:\aafpc\Java\demo\zhigou\zhigou"
 $services = @(
   'auth-center','user-service','file-service','product-service','cart-service',
   'order-service','inventory-service','payment-service','marketing-service',
-  'logistics-service','aftersale-service'
+  'logistics-service','aftersale-service','community-service','life-service',
+  'closet-service','wallet-service'
 )
 foreach ($svc in $services) {
   $jar = "services\$svc\target\zhigou-$svc-0.1.0-SNAPSHOT.jar"
@@ -220,14 +221,14 @@ curl -N -X POST http://localhost:8095/api/v1/chat/sse \
                           ▼
                ┌─────────────────────┐
                │  AI Orchestrator     │
-               │  (LangGraph Agent)   │
+               │  (原生 OpenAI 工具循环)   │
                │                      │
                │  1. search_products  │──▶ product-service
                │  2. get_price        │──▶ product-service
                │  3. check_inventory  │──▶ inventory-service
                │  4. get_user_profile │──▶ user-service
                │  5. apply_coupon     │──▶ marketing-service
-               │  6-29. 比价/避坑/凑单/送礼/拼团/售后/物流/商家经营 │──▶ 各业务服务
+               │  6-33. 比价/避坑/凑单/送礼/拼团/售后/物流/省钱/定时购/售后管家/商家经营 │──▶ 各业务服务
                └─────────────────────┘
                           │
                           ▼
@@ -313,8 +314,6 @@ zhigou/
 │   ├── prometheus/              #   Prometheus 抓取配置
 │   ├── grafana/                 #   Grafana 数据源+面板
 │   └── loki/                    #   Loki 存储配置
-├── prompts/                     # AI 系统提示词
-│   └── system.md                #   导购「小智」角色设定
 ├── docs/                        # 文档中心（索引见 docs/README.md）
 └── CLAUDE.md                    # AI 协作项目指令
 ```
@@ -328,7 +327,7 @@ mvn test -pl services/auth-center,services/product-service,services/order-servic
 # Python 测试
 cd services/ai-orchestrator && pytest
 
-# 端到端冒烟（全链路 17 步黄金路径；前置：12 微服务 + BFF 3000 + H5 5173 全启动）
+# 端到端冒烟（全链路 17 步黄金路径；前置：16 服务（15 Java + AI 8095） + BFF 3000 + H5 5173 全启动）
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke/zhigou-e2e.ps1
 # 期望输出：PASS=17 FAIL=0（最新验证 2026-10-07）
 
@@ -345,6 +344,8 @@ k6 run scripts/load-test/smoke-test.js
 | 50 | 4,500 | 0% | 77ms | 131ms | 142ms | 718 |
 
 > 完整报告见 [docs/load-test/](docs/load-test/)
+>
+> **最新（[0.2.56] M3 容量模型）**：BFF 横扩 1.83x（单 290 → 双 531 RPS 零错误）+ 读层 1263 RPS + 写链路瓶颈定位（order→product 级联超时，坑 #62），详见 [docs/load-test/M3生产化路径容量模型.md](docs/load-test/M3生产化路径容量模型.md)
 
 ## 红线
 
@@ -365,3 +366,4 @@ MIT（LICENSE 文件待补充）
 <p align="center">
   <sub>Built with ❤️ by the 智购 Team</sub>
 </p>
+

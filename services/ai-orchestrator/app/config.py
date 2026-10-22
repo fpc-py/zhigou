@@ -13,8 +13,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # ── 系统提示词路径 ──
+    # 单一来源：与代码同目录的权威提示词（services/ai-orchestrator/prompts/system.md）；
+    # 根目录 prompts/system.md 曾为加载点，[0.2.11] 后停更造成运行时提示词滞后，已迁移
     system_prompt_path: str = str(
-        Path(__file__).resolve().parent.parent.parent.parent / "prompts" / "system.md"
+        Path(__file__).resolve().parent.parent / "prompts" / "system.md"
     )
 
     # ── LLM ──

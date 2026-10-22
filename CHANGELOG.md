@@ -3,6 +3,20 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.76] · 全仓文档对齐（以功能文档/技术方案为准绳）+ AI 三处代码修复（2026-10-22）
+### docs: 系统性对齐 17 份文档
+- 修复 AI 工具数口径 29→33（README 核心特性/数据流、services-README、技术方案 M2、功能实现全景清单）
+- 里程碑：M3 ⬜→✅（[0.2.56] 容量模型）/ M4 🚧→✅（[0.2.55] 回滚演练+签核），README/技术方案/progress 三处一致
+- progress：待办池勾销「BFF 补全+埋点+熔断降级+SSE 重连」；风险表「压测仅覆盖 BFF 层」勾销（唯一 P1 未闭环项）
+- 技术方案：状态待评审→已评审·落地中；交易一致性/AI 导购（原生循环+33 工具）/可观测（SLO/错误预算/告警）当前实现列对齐
+- 未完成任务清单：快照 2026-10-22 + 定时购/省钱助手勾销；bug 记录补 #70（商家售后管家三坑）+ #69（MQ connect null 双根因）
+- 差距报告执行状态说明更新（16 服务/33 工具/C 组 P0-P1 全闭环/M3 M4 闭环）
+- apps 三 README：h5-shop 路由 16→30 + 衣橱/社区占位→已实现；bff-shop 模块 10→20 + 上游 11→15 Java；admin-merchant 脚手架说明→商家中心承载
+- 功能文档插入「落地状态对照」框（愿景蓝图 ≠ 现状清单，指向全景清单/progress/未完成任务清单）
+### fix: AI 三处代码缺陷（对齐中发现，非纯文档）
+- `config.py` system_prompt_path 指向 services/ai-orchestrator/prompts/system.md（根 prompts/system.md 为 [0.2.11] 后停更死副本，已 git rm）
+- `tools.py` TOOLS 补 after_sale_manager/scheduled_buy 注册（31→33；漏注册重演 bug #29——schema 不生成、路由必抛未知工具）
+- `prompts/system.md` 工具表补 8 个工具描述（消费者 7 + 商家 1；33/33 全覆盖，表行 123）
 ## [0.2.75] · C 组 P1 商家侧 AI 售后管家落地（merchant/pending + approve/reject + H5 售后工作台）（2026-10-22）
 
 ### feat: 商家售后闭环（商家中心可直接处理售后单）
