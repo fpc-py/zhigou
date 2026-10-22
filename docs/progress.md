@@ -4,6 +4,14 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.78] AI 深水区② AI 链路可观测（/metrics + 全链路埋点）
+- **指标**：`app/metrics.py` 进程内计数器（工具调用/失败/耗时、LLM outcome 六类、SSE 连接/事件、chat、token、uptime）+ `GET /metrics` Prometheus 文本格式
+- **埋点**：chat_service LLM 异常六类映射 + 工具耗时成败；api SSE 包装器连接/事件计数
+- **测试**：test_metrics 7 项全绿 + 全仓 65 无回归 + py_compile 过
+- **SSE 端到端（真实 LLM）**：初始渲染 → 转人工对话 95 事件 → chat 0→1 / sse 0→95 / llm 0→2 / customer_service 1 —— 单调递增 + Prometheus 可解析
+- **坑**：#75 进程内单例 vs 多 worker（推模式取舍）；Grafana AI 面板遗留
+- 遗留记录：监控编排加 Prometheus job 抓 8095（可选）；Grafana AI 面板
+
 ## 2026-10-22 · [0.2.77] AI 深水区① AI 在线客服（FAQ 知识库 + 转人工工单 + H5 工单卡片）
 - **后端**：`customer_service.py` FAQ 7 类 + 工单持久化（ST 单号/状态机/分类）；`tools.py` 注册（TOOLS 33→34）；`chat_service.py` 客服路由置顶 + `support` SSE 事件
 - **前端**：H5 对话页客服工单卡片（Message.support + SSE 分支）；`vue-tsc --build` 通过
@@ -480,7 +488,9 @@ ollbackOrder(orderId, items) Redis SETNX 幂等（双通道只释放一次）；
 | ~~压测仅覆盖 BFF 层~~（已闭环） | P1 | ~~50 并发 718 RPS；M3 目标 5000 QPS 需全链路压测 + 瓶颈优化（当前唯一 P1 未闭环项）~~ → [0.2.56] M3 容量模型：BFF 横扩 1.83x（290→531 RPS）+ 读层 1263 RPS + 5000 QPS 集群形态决策，唯一 P1 未闭环项已销 |
 
 ## 变更记录
-* 2026-10-22：**AI 深水区① AI 客服（[0.2.77]）**：FAQ 知识库 7 类 + 转人工工单（ST 单号）+ support SSE 事件 + H5 工单卡片；TOOLS 33→34；13 项确定性测试 + 全仓 57 无回归 + SSE 端到端 2 场景实测通过（转人工建单 ST295D81E94DC1 / FAQ 运费命中）；坑 #71-#74（路由优先级/ainvoke/schema 结构/端口谜题）。
+* 2026-10-22：**AI 深水区② AI 链路可观测（[0.2.78]）**：/metrics Prometheus 文本格式 + 全链路埋点（工具调用/失败/耗时、LLM outcome 六类、SSE 连接/事件、chat/token/uptime）；7 项确定性测试 + 全仓 65 无回归 + SSE 端到端实测（转人工对话后 chat 0→1/sse 0→95/llm 0→2/customer_service 1）；坑 #75（进程内单例 vs 多 worker）。
+* 2026-10-22：**AI 深水区① AI 客服（[0.2.77]）**
+：FAQ 知识库 7 类 + 转人工工单（ST 单号）+ support SSE 事件 + H5 工单卡片；TOOLS 33→34；13 项确定性测试 + 全仓 57 无回归 + SSE 端到端 2 场景实测通过（转人工建单 ST295D81E94DC1 / FAQ 运费命中）；坑 #71-#74（路由优先级/ainvoke/schema 结构/端口谜题）。
 * 2026-10-22：**全仓文档对齐（[0.2.76]）**
 ：17 份文档以功能文档/技术方案为准绳对齐——AI 工具 29→33、M3/M4 里程碑三处一致、待办池/风险表勾销、apps 三 README（h5 路由 30/衣橱社区已实现、BFF 20 模块/15 Java、admin 商家中心承载）、功能文档落地对照框；顺带修复 AI 三处代码缺陷（config.py 提示词路径死副本、TOOLS 漏注册 2 工具、system.md 缺 8 工具描述）。
 * 2026-10-22：**坑 #63 精度修复铺开（[0.2.58]）**：含 19 位 id 的透传接口统一字符串透传——ship-partial/aftersale/cart 走 rawBody 原样转发，marketing 拼团/秒杀 id 字段字符串化（Java Jackson 字符串→Long）。实证：下单落库 sku_id=9000000000000000020 保真；cart/aftersale 透传无损。

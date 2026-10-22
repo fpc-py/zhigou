@@ -3,6 +3,19 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.78] · AI 深水区② AI 链路可观测（/metrics Prometheus + 全链路埋点）（2026-10-22）
+### feat: AI 链路可观测（把「AI 链路不可见」变成「每个环节可量化」）
+- **`app/metrics.py`**：进程内计数器（零外部依赖，threading.Lock 保护）——工具调用次数/失败数/耗时(sum+count)、LLM outcome 分类（ok/timeout/auth/network/rate_limit/error/bad_request）、SSE 活跃连接/累计事件、对话总数、token 估算、uptime
+- **埋点**：`chat_service._run_agent` LLM 调用六类异常映射 + 工具执行耗时/成败（`record_tool`/`record_llm`/`record_tokens`）；`api.chat_sse` SSE 包装器（`_sse_counted`：连接/事件计数）
+- **端点**：`GET /metrics`（PlainTextResponse，text/plain; version=0.0.4）Prometheus 文本格式
+### test: 确定性测试 7 项 + SSE 端到端实测
+- `tests/test_metrics.py`：指标族齐全 / Prometheus 可解析 / 工具计数单调递增 / 失败注入 error+1 / LLM outcome 分类 / 非法 outcome 回退 error / SSE 开合归零与 chat/token 计数——**7 passed**
+- 全仓 pytest **65 passed, 2 warnings**；`py_compile` 全过
+- **SSE 端到端实测（真实 LLM）**：初始 /metrics 指标族齐全 → 触发转人工对话（95 个 SSE 事件 + tool_call + support）→ 对话后 chat 0→1、sse_events 0→95、llm_calls 0→2、customer_service 工具计数 1 —— **计数单调递增 + Prometheus 可解析**
+### fix/note: 设计取舍（面试叙事）
+- LLM outcome 在 `create` 处记录（流式 token 不在耗时内）；token 估算 len/4 为负载观察口径（非计费）
+- 进程内单例适用于单 worker 部署；多 worker 需推模式（Pushgateway/自建）——见 #75
+
 ## [0.2.77] · AI 深水区① AI 在线客服（FAQ 知识库 + 转人工工单 + H5 工单卡片）（2026-10-22）
 ### feat: AI 客服接管咨询（TOOLS 33→34）
 - **客服模块** `app/customer_service.py`：结构化 FAQ 知识库 7 类（运费/退货政策/发票/发货时效/会员权益/优惠券规则/支付方式，关键词命中返回确定答案，未命中不硬答=防编造）；工单持久化 `data/support_tickets.json`（原子写，ST+12 位单号，状态机 OPEN→PROCESSING→RESOLVED/CLOSED，粗分类 COMPLAINT/INVOICE/AFTERSALE/LOGISTICS/GENERAL）

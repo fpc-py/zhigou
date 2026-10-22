@@ -5,6 +5,12 @@
 - **② H5 token 走 Pinia userStore**：localStorage 注入 token 后，Pinia store 初始化早于注入则读不到（store 只在启动时读一次 localStorage）→ 页面停留旧态。修复：注入后整页刷新 / 登录页跳转前显式初始化 store。
 - **③ Windows `Out-File` 写 JWT 带 BOM**：PowerShell `Out-File` 默认 UTF-16/带 BOM → Python urllib 直接请求带 BOM 的 Bearer token → 服务端 500。修复：读取时 `encoding='utf-8-sig'` 清洗 BOM。
 
+## #75 可观测埋点设计取舍：进程内单例 vs 多 worker 采集（[0.2.78]）
+- **背景**：块6 落地 AI 链路可观测，指标选「进程内计数器 + /metrics 文本格式」（零外部依赖）。
+- **取舍**：单 worker（uvicorn workers=1）下模块级单例 + threading.Lock 足够，Prometheus 直接拉取；多 worker 部署时各进程计数独立，同一指标会被多次上报——需推模式（Pushgateway 合并）或改用共享存储（Redis 计数）。
+- **实测**：单进程下 /metrics 初始渲染 → 触发真实对话（95 SSE 事件）→ chat 0→1 / sse 0→95 / llm 0→2 / customer_service 1，计数单调递增、Prometheus 文本可解析。
+- **教训**：指标架构随部署形态走——先最小可用（进程内），架构演进再换采集通道；面试可说「我知道多实例的正确做法，当前单实例先落地」。
+
 ## #74 AI 服务端口谜题：旧进程残留 + pydantic env_prefix（[0.2.77]）
 - **现象**：SSE 实测「转人工」一直无 tool_call（仅 token 流）；重启服务反复绑 8000 失败 `[Errno 10048]`。
 - **根因（双确认）**：① 旧会话启动的 AI 进程（系统 Python312 + main.py）**未被「停所有服务」清掉**，占着 8095 跑旧代码——探活 8095 UP 打到的全是旧代码（无客服路由）；② `config.py` 用 `env_prefix="ZHIGOU_"`，启动端口须设 `ZHIGOU_APP_PORT=8095`（设 `APP_PORT` 无效，默认 8000）。

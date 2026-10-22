@@ -5,7 +5,11 @@
 import logging
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import PlainTextResponse
 from sse_starlette.sse import EventSourceResponse
+
+from .metrics import render as render_metrics
+from .metrics import record_chat, record_sse_close, record_sse_event, record_sse_open
 
 from .models import ChatRequest
 from .chat_service import chat_stream, clear_session
@@ -15,6 +19,13 @@ from .fallback_handler import disabled_fallback
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+metrics_router = APIRouter(prefix="", tags=["metrics"])
+
+
+@metrics_router.get("/metrics")
+async def metrics():
+    """Prometheus 文本格式指标（AI 链路可观测，块6）。"""
+    return PlainTextResponse(render_metrics(), media_type="text/plain; version=0.0.4")
 
 
 @router.delete("/session/{session_id}")
@@ -51,10 +62,11 @@ async def chat_sse(req: ChatRequest):
     )
 
     # ── 降级开关检查 ──
+    record_chat()
     if not ai_enabled():
         logger.info("AI 导购已关闭，返回固定文案")
         return EventSourceResponse(
-            disabled_fallback(),
+            _sse_counted(disabled_fallback()),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -64,11 +76,13 @@ async def chat_sse(req: ChatRequest):
         )
 
     return EventSourceResponse(
-        chat_stream(
-            query=req.query,
-            user_id=req.userId,
-            session_id=req.sessionId,
-            image_url=req.imageUrl or "",
+        _sse_counted(
+            chat_stream(
+                query=req.query,
+                user_id=req.userId,
+                session_id=req.sessionId,
+                image_url=req.imageUrl or "",
+            )
         ),
         media_type="text/event-stream",
         headers={
@@ -77,3 +91,14 @@ async def chat_sse(req: ChatRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+async def _sse_counted(events):
+    """SSE 生成器包装：活跃连接数 / 累计事件数（块6 可观测埋点）。"""
+    record_sse_open()
+    try:
+        async for ev in events:
+            record_sse_event()
+            yield ev
+    finally:
+        record_sse_close()

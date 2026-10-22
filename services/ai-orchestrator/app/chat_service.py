@@ -26,6 +26,8 @@ from .fallback_config import llm_timeout_ms
 from .fallback_handler import timeout_fallback_stream
 from .prompt_guard import sanitize_query
 from .tools import TOOLS, _current_user_id
+from .metrics import record_llm, record_tokens, record_tool
+import time as _time
 
 logger = logging.getLogger(__name__)
 
@@ -220,11 +222,14 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
             stream=True,
             tool_choice=tool_choice,
         )
+        _llm_t0 = _time.monotonic()
         try:
             stream = await client.chat.completions.create(**stream_kwargs)
+            record_llm("ok", _time.monotonic() - _llm_t0)
         except BadRequestError as e:
             # 部分模型（如 deepseek）不支持 specific function tool_choice，
             # 强制路由会 400 或静默忽略 → 降级 auto + 注入「必须先调用工具」指令
+            record_llm("bad_request", _time.monotonic() - _llm_t0)
             if not (forced_tool and first_round and "tool_choice" in str(e)):
                 raise
             logger.warning("模型 %s 不支持 specific tool_choice，降级为 auto+指令强制", settings.llm_model)
@@ -237,6 +242,22 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
             })
             stream_kwargs["tool_choice"] = "auto"
             stream = await client.chat.completions.create(**stream_kwargs)
+            record_llm("ok", _time.monotonic() - _llm_t0)
+        except TimeoutError:
+            record_llm("timeout", _time.monotonic() - _llm_t0)
+            raise
+        except AuthenticationError:
+            record_llm("auth", _time.monotonic() - _llm_t0)
+            raise
+        except APIConnectionError:
+            record_llm("network", _time.monotonic() - _llm_t0)
+            raise
+        except RateLimitError:
+            record_llm("rate_limit", _time.monotonic() - _llm_t0)
+            raise
+        except APIError:
+            record_llm("error", _time.monotonic() - _llm_t0)
+            raise
 
         content_buf = ""
         tool_calls: dict[int, dict] = {}
@@ -256,7 +277,8 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
                 if tc.function and tc.function.arguments:
                     slot["args"] += tc.function.arguments
 
-        # 无工具调用 → 直接结束（本轮为最终答复）
+        # 无工具调用 → 直接结束（本轮为最终答复）；累计本轮输出 token 估算
+        record_tokens(max(1, len(content_buf) // 4))
         if not tool_calls:
             return
 
@@ -286,10 +308,13 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
             if "userId" in safe_args:
                 safe_args["userId"] = str(safe_args["userId"])[:3] + "***"
             yield {"event": "tool_call", "data": json.dumps({"tool": name, "args": safe_args}, ensure_ascii=False)}
+            _tool_t0 = _time.monotonic()
             try:
                 result = await _dispatch_tool(name, args)
+                record_tool(name, _time.monotonic() - _tool_t0, True)
                 result_str = _guard_result(result)
             except Exception as e:  # 工具自身异常 → 反馈给 LLM 继续
+                record_tool(name, _time.monotonic() - _tool_t0, False)
                 logger.warning("工具 %s 执行失败: %s", name, e)
                 result_str = f"工具执行失败: {e}" + _FORGE_GUARD
             yield {"event": "tool_result", "data": json.dumps({"tool": name, "result": result_str}, ensure_ascii=False)}
