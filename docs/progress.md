@@ -4,6 +4,11 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.72] B 组残余补验 · B3 安全头端到端（XSS 编码载荷绕过修复）
+- 端到端发现 XssFilter 漏检 URL 编码载荷（%3Cscript%3E → 200）；修复=query 先 URLDecoder.decode 再匹配
+- 复验：4/4 编码 XSS 样本 400 拦截 + 正常请求 200 带 CSP/nosniff/DENY；product 重启加载新 common
+- 坑 #67；清单 B3 ⏸ → ✅
+
 ## 2026-10-22 · [0.2.71] C 组 P1 · 对话页快捷入口（售后管家聚合 + 定时购卡）
 - 售后助手卡升级为「售后管家」（prompt 触发 after_sale_manager overview 三路聚合）；新增「定时购」卡（bell 图标，触发 scheduled_buy 创建确认流）
 - **验证**：H5 `vue-tsc --build` 通过；quickActs 6 卡（送礼/比价/售后管家/物流/补货/定时购）

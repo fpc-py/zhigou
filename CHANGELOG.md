@@ -3,6 +3,13 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.72] — B3 安全头端到端补验：XSS 编码载荷绕过修复（坑 #67）（2026-10-22）
+### fix: XssFilter URL 编码载荷绕过
+- 端到端补验暴露真 bug：`keyword=%3Cscript%3E`（URL 编码）绕过明文 pattern → 200 放行
+- 修复：query 先 `URLDecoder.decode` 再 9 pattern 匹配；编译链路踩坑（Windows 运行中 java 进程锁 jar → 需停进程 `-am clean package` 重建）
+- **实测**：4/4 编码样本 400 拦截（script/onerror/img-onerror/javascript，0.00-0.07s）；正常请求 200 + CSP/nosniff/DENY/no-referrer 安全头
+- **文档**：bug #67；清单 B3 ⏸ → ✅
+
 ## [0.2.71] — C 组 P1 前端承接：对话页快捷入口升级（售后管家聚合 + 定时购）（2026-10-22）
 ### feat: H5 对话页 quickActs 快捷入口
 - **售后助手卡 → 售后管家**：prompt 从「质保提醒/维修预约」升级为「售后健康度聚合」——一次对话触发 `after_sale_manager` overview（处理中售后单 + 物流延误 + 质保到期三路汇总），对齐 [0.2.69] 新工具

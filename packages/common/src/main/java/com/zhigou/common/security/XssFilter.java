@@ -35,16 +35,20 @@ public class XssFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
-        // 1) 反射型 XSS：URL query 检查
+        // 1) 反射型 XSS：URL query 检查（先 URL 解码——原始 query 是 %3Cscript%3E 编码形态，
+        //    不解码直接匹配 `<script` 会被绕过（坑 #67：编码载荷漏检））
         String qs = request.getQueryString();
-        if (qs != null && !qs.isBlank() && matches(qs)) {
-            log.warn("XSS 请求被拦截: {} {}?{}", request.getMethod(), request.getRequestURI(),
-                    qs.length() > 200 ? qs.substring(0, 200) : qs);
-            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":40010,\"message\":\"非法请求参数\"}");
-            return;
+        if (qs != null && !qs.isBlank()) {
+            String decoded = java.net.URLDecoder.decode(qs, StandardCharsets.UTF_8);
+            if (matches(decoded)) {
+                log.warn("XSS 请求被拦截: {} {}?{}", request.getMethod(), request.getRequestURI(),
+                        decoded.length() > 200 ? decoded.substring(0, 200) : decoded);
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":40010,\"message\":\"非法请求参数\"}");
+                return;
+            }
         }
 
         // 2) 安全响应头
