@@ -3,6 +3,13 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.71] — C 组 P1 前端承接：对话页快捷入口升级（售后管家聚合 + 定时购）（2026-10-22）
+### feat: H5 对话页 quickActs 快捷入口
+- **售后助手卡 → 售后管家**：prompt 从「质保提醒/维修预约」升级为「售后健康度聚合」——一次对话触发 `after_sale_manager` overview（处理中售后单 + 物流延误 + 质保到期三路汇总），对齐 [0.2.69] 新工具
+- **新增定时购卡**：icon bell（定时提醒语义）、prompt「每周五 10:00 自动买 SKU 9000000000000000020」→ 触发 `scheduled_buy` 创建确认流，对齐 [0.2.70] 新工具
+- **验证**：`vue-tsc --build` type-check 通过；注释行对齐工具清单
+### 无后端变更：纯前端入口承接（工具层 [0.2.69]/[0.2.70] 已交付）
+
 ## [0.2.70] — C 组 P1 二期：Agent 定时购（确认门 + 后台调度 + 复用一键代下单）（2026-10-22）
 ### feat: ai-orchestrator 定时购工具 scheduled_buy + 调度执行
 - **工具** `scheduled_buy(action=list|create|cancel, sku_id, count, frequency, run_at, weekday, confirm)`：创建/查看/取消定时自动下单任务；**确认门前置**——create 必须 confirm=true（向用户复述商品/频率/时刻），未确认零落库

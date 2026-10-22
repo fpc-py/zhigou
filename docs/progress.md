@@ -4,6 +4,11 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-22 · [0.2.71] C 组 P1 · 对话页快捷入口（售后管家聚合 + 定时购卡）
+- 售后助手卡升级为「售后管家」（prompt 触发 after_sale_manager overview 三路聚合）；新增「定时购」卡（bell 图标，触发 scheduled_buy 创建确认流）
+- **验证**：H5 `vue-tsc --build` 通过；quickActs 6 卡（送礼/比价/售后管家/物流/补货/定时购）
+- 无后端变更（[0.2.69]/[0.2.70] 工具已交付）
+
 ## 2026-10-22 · [0.2.70] C 组 P1 二期 · Agent 定时购（确认门 + 后台调度）
 - **工具** `scheduled_buy`（list/create/cancel）：确认门前置（未确认零落库）+ `data/scheduled_buys.json` 持久化 + 后台 asyncio 调度（60s 扫描，main.py startup 挂载）到点复用 `create_order` 真实下单；一次性 DONE、周期滚动 ACTIVE、**失败不轰炸**
 - **路由**：触发词（定时购/自动买/每周买…）置 usage_cycle 之前；system.md 登记
