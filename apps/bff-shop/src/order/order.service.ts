@@ -30,10 +30,16 @@ export class OrderService {
 
   constructor(private readonly http: HttpService) {}
 
-  async create(userId: string, body: CreateOrderBody): Promise<OrderDetail | null> {
+  /**
+   * 坑 #63 修复：create 接收原始 JSON 字符串原样转发（rawBody），
+   * 避免 19 位 Snowflake skuId 经 JS number 精度丢失。
+   */
+  async create(userId: string, rawBody: string): Promise<OrderDetail | null> {
     const url = `${SERVICES.orderService.url}${SERVICE_PATHS.orderCreate}`;
     const resp = await firstValueFrom(
-      this.http.post(url, body, { headers: { 'x-user-id': userId } }).pipe(
+      this.http.post(url, rawBody, {
+        headers: { 'x-user-id': userId, 'content-type': 'application/json' },
+      }).pipe(
         timeout(SERVICES.orderService.timeout),
         catchError((err) => {
           this.logger.warn(`order-service /order/create 失败: ${err.message}`);

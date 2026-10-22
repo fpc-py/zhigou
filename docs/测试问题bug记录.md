@@ -1,5 +1,12 @@
 # 测试问题 & Bug 记录
 
+## #63 BFF JSON 透传精度丢失：19 位 Snowflake skuId 失真（[0.2.57]）
+- **现象**：BFF 下单落库 sku_id=9000000000000000000，但请求是 9000000000000000020 → 查不到 SKU → 金额占位价 100（sku_name 变 "SKU-xxx" 兜底）。
+- **根因**：**JS 安全整数上限 2^53≈9.007e15**；Snowflake skuId 19 位（9e18）超限。NestJS/Express body 解析把 skuId 转 **number** 即失真；axios JSON.stringify 再转发 → Java 收到错误值。**在 BFF 内已无法还原**（源头失真）。
+- **修复**：`NestFactory.create(AppModule, { rawBody: true })` + `/order/create` 改用 `req.rawBody.toString()` 原始 JSON 字符串转发（不 parse→stringify）→ 精度 100% 保留 → Java Jackson Long 正确解析。
+- **实证**：修复前 `sku_id=9000000000000000000 price=100`；修复后 `sku_id=9000000000000000020 price=9900`，订单金额 9900 正确。
+- **遗留**：ship-partial 等其余含 19 位 id 的 body 透传接口未改（订单内 skuId 与外部一致，暂无影响）；生产建议 BFF 网关层统一「大整数字段按字符串透传」或约定后端 id 一律字符串序列化。
+
 ## #62 压测发现：order→product 同步调用级联超时，回退占用价静默漂移（[0.2.56] M3）
 - **现象**：混合读写压测（读 90%/写 10%）80VU 双 BFF 实例时错误率 40.61%——错误率与读层/BFF 均无关。
 - **根因（日志实证）**：order-service 创建订单时**同步 GET product-service /product/page** 拉取商品信息；product-service 被读压测打满后，order 的同步调用 `Read timed out` → **回退占用价** → 订单照常创建但金额口径漂移（接口返回 200/201，数据不对）。

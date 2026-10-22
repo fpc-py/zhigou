@@ -36,6 +36,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Slf4j @Service @RequiredArgsConstructor
@@ -56,6 +58,24 @@ public class OrderServiceImpl implements OrderService {
     private static final long FALLBACK_PRICE = 100L;
 
     /**
+     * 坑 #62 修复：SKU 信息本地缓存（TTL 30s）。
+     * 原实现每单一次同步 /product/page（pageSize=100），读压测打满 product-service 时
+     * order→product 同步调用 Read timed out → 回退占位价 → 订单金额口径静默漂移。
+     * 修复：缓存命中直接用；过期/未命中才回源一次；回源失败保留旧缓存值
+     * （价格短暂过期优于错误价格）；完全无值才用占位价并升级 ERROR 告警（不再静默）。
+     */
+    private static final long SKU_CACHE_TTL_MS = 30_000L;
+    private final Map<String, CachedSku> skuCache = new ConcurrentHashMap<>();
+    private final AtomicLong skuFallbackCount = new AtomicLong();
+
+    private static class CachedSku {
+        final long price;
+        final String name;
+        final long ts;
+        CachedSku(long price, String name, long ts) { this.price = price; this.name = name; this.ts = ts; }
+    }
+
+    /**
      * create 事务显式用 READ COMMITTED（而非 MySQL 默认 REPEATABLE READ），解决并发幂等兜底回查：
      * REPEATABLE READ 下事务内普通 SELECT 是快照读（读事务首次读建立的快照），catch 回查看不到并发线程刚提交的订单，
      * 返回 null 只能 rethrow，幂等退化为 500；READ COMMITTED 每语句重建快照，回查能读到最新已提交数据。
@@ -70,21 +90,16 @@ public class OrderServiceImpl implements OrderService {
             return buildResponse(existing);
         }
 
-        // 2. 拉取商品真实价格/名称（失败自动回退占位值）
-        Map<String, Long> priceMap = new HashMap<>();
-        Map<String, String> nameMap = new HashMap<>();
-        fetchSkuInfo(userId, priceMap, nameMap);
-
-        // 3. 创建订单
+        // 2. 商品价格/名称：本地缓存优先（坑 #62 修复），未命中才回源 product-service
         long orderId = IdUtil.getSnowflakeNextId();
         long totalAmount = 0;
         List<OrderItem> items = new ArrayList<>();
 
         for (CreateOrderRequest.SkuItem si : req.getSkuItems()) {
             String key = String.valueOf(si.getSkuId());
-            Long price = priceMap.get(key);
-            if (price == null) price = FALLBACK_PRICE;
-            String skuName = nameMap.getOrDefault(key, "SKU-" + si.getSkuId());
+            CachedSku c = resolveSku(key, userId);
+            long price = c != null ? c.price : FALLBACK_PRICE;
+            String skuName = c != null ? c.name : "SKU-" + si.getSkuId();
 
             OrderItem item = new OrderItem();
             item.setOrderId(orderId); item.setSkuId(si.getSkuId()); item.setCount(si.getCount());
@@ -125,17 +140,33 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * 从 product-service 拉取商品信息（真实价格 + SPU 名称）。
-     * 一次 /product/page 即可覆盖全部 SKU（演示环境商品量小）；
-     * 任一环节失败仅告警，由调用方回退占位值，不影响下单主流程。
+     * 解析单个 SKU 价格/名称：缓存命中且未过期直接用；
+     * 过期/未命中才回源一次（批量刷新缓存）；回源失败保留旧缓存值；
+     * 完全无值返回 null（调用方用占位价并告警）。
      */
-    private void fetchSkuInfo(Long userId, Map<String, Long> priceMap, Map<String, String> nameMap) {
+    private CachedSku resolveSku(String key, Long userId) {
+        CachedSku c = skuCache.get(key);
+        long now = System.currentTimeMillis();
+        if (c != null && now - c.ts <= SKU_CACHE_TTL_MS) return c;
+        refreshSkuCache(userId);
+        c = skuCache.get(key);
+        if (c != null) return c;   // 回源成功或旧值兜底（价格短暂过期优于错误价格）
+        skuFallbackCount.incrementAndGet();
+        return null;               // 完全无值 → 调用方占位价 + ERROR 告警
+    }
+
+    /**
+     * 回源 product-service 批量拉取 SKU 价格/名称并写本地缓存（TTL 30s）。
+     * 一次 /product/page 即可覆盖全部 SKU（演示环境商品量小）；
+     * 回源失败仅告警且不清缓存（旧值兜底），杜绝「回退占位价」静默漂移。
+     */
+    private void refreshSkuCache(Long userId) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("X-User-Id", String.valueOf(userId));
             HttpEntity<Void> entity = new HttpEntity<>(headers);
             String url = productServiceUrl + "/product/page?pageNum=1&pageSize=100";
-            // 工作流3 #7：熔断（orderFetchSku）——product 故障时快速失败，由 catch 降级占位值
+            // 工作流3 #7：熔断（orderFetchSku）——product 故障时快速失败，旧缓存兜底
             ResponseEntity<String> resp = resilientHttp.execute("orderFetchSku",
                     () -> restTemplate.exchange(url, HttpMethod.GET, entity, String.class));
             if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
@@ -145,6 +176,7 @@ public class OrderServiceImpl implements OrderService {
             JSONObject body = JSONUtil.parseObj(resp.getBody());
             JSONArray records = body.getJSONObject("data").getJSONArray("records");
             if (records == null) return;
+            long now = System.currentTimeMillis();
             for (Object o : records) {
                 JSONObject spu = (JSONObject) o;
                 String name = spu.getStr("name");
@@ -155,14 +187,13 @@ public class OrderServiceImpl implements OrderService {
                     Long skuId = sku.getLong("skuId");
                     Long price = sku.getLong("price");
                     if (skuId != null && price != null) {
-                        priceMap.put(String.valueOf(skuId), price);
-                        if (name != null) nameMap.put(String.valueOf(skuId), name);
+                        skuCache.put(String.valueOf(skuId), new CachedSku(price, name == null ? "SKU-" + skuId : name, now));
                     }
                 }
             }
-            log.info("拉取商品信息: sku 数={}", priceMap.size());
+            log.info("SKU 缓存刷新: sku 数={}", skuCache.size());
         } catch (Exception e) {
-            log.warn("拉取商品信息失败，回退占位价格: {}", e.getMessage());
+            log.error("SKU 缓存刷新失败（旧缓存兜底）: {}", e.getMessage());
         }
     }
 
