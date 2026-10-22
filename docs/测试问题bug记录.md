@@ -374,3 +374,26 @@
 - **修复**：① 越权扮演规则扩为 `(现在|请|立刻|马上|直接)?(你|你是|你现在是|现在你是|当你是)(系统|平台|超级|购物)?(管理员|开发者|老板|超级用户)`；② 解除限制扩为 `(不再|没有|不受)(受)?(任何)?[^，。!?；;]{0,8}(限制|约束|审查)`；③ 白名单收紧为求知类词（"帮我"不再独立触发）
 - **复验**：本地 5 注入样本全命中 + 5 正常样本（含"帮我写面试总结"等）零误报；单测 3 passed；重启 AI 后 SSE 端到端 3/3（忽略指令/你是管理员/解除限制）→ notice「检测到可疑指令，已安全隔离」且流不中断
 - **面试点**：白名单是最容易被利用的绕过面——"帮我"这种高频词作独立放行信号等于给攻击者开洞；规则补强要用「攻击者会换句式」的视角穷举变体，而不是只测固定样本
+
+## #69（2026-10-22）inventory-service 启动失败：RocketMQ name-server 不可达（B7-3.3 演练前置暴露）
+- **现象**：`Start-Process java -jar zhigou-inventory-service.jar` 后 Context 初始化失败——`orderClosedListener` 容器 start 抛 `RemotingConnectException: connect to null failed`，应用直接退出
+- **根因（两层）**：
+  1. **环境变量空串陷阱**：`application.yml` 写 `rocketmq.name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}`，但本机 `ROCKETMQ_NAME_SERVER` 环境变量被设为**空字符串**——Spring `${VAR:default}` 只在 VAR **未定义**时用默认值，定义为空串时**空串生效** → namesrvAddr="" → 客户端解析成 `null`（`connect to null`）。比「未配置」更隐蔽：netstat 看不出环境变量问题，日志只报 null
+  2. **namesrv 容器未运行**：`docker ps` 只有 broker（10911），`zhigou-rocketmq-namesrv`（9876）没起——broker 可监听但 topic 路由查询无 namesrv 可连
+- **修复**：`docker compose -f infra/compose/middleware.yml up -d rocketmq-namesrv` 拉起 9876；启动 inventory 时进程级设 `$env:ROCKETMQ_NAME_SERVER='localhost:9876'` 覆盖空串（不污染全局）
+- **复验**：inventory 8086 UP；消费者正常拉取 ORDER_CLOSED（见演练 3.3）
+- **面试点**：`${VAR:default}` 的空串陷阱是配置系统里最容易被忽略的坑——生产环境里「变量存在但为空」比「变量不存在」更危险；排查 MQ 连接问题先看 `connect to null` 是「没配地址」还是「配了空地址」
+
+### 演练复盘：B7 故障演练 3.2/3.3（2026-10-22，本地 Windows 全链路）
+- **3.2 缓存击穿 → Caffeine 单飞（PASS）**
+  - 前置：product-service(8083) + Redis(6379) + 真实 SPU 9000000000000000012
+  - 注入：`redis-cli FLUSHDB` 清空缓存 → 并发 100 同时打 `/product/{spuId}`（带 x-user-id）
+  - 实测：**100/100 全 200，0.21s 完成**，无 5xx、无超时堆积（缓存空时并发击穿场景下健康）
+  - 单飞证据：并发窗口内无 DB 慢查询/回源风暴；配合 [0.2.51] 三级缓存链路实测（30 并发全 200）形成完整证据链
+- **3.3 MQ 积压 → 探针指标（PASS）**
+  - 前置：RocketMQ broker(10911) + namesrv(9876，本次拉起) + inventory-service(8086)
+  - 注入：`taskkill /PID <inventory>` 停消费者 → 真实下单 `2113240125592539136` 并取消 → ORDER_CLOSED 发出（无消费者 → 积压）
+  - 实测：重启 inventory 后 `MQ 积压采样: topic=ORDER_CLOSED group=inventory-order-closed-group lag=150` 真实采样；消费者批量拉平（ConsumeMessageThread 多线程消费完成日志），lag 回落
+  - 发现的问题：坑 #69（namesrv 未起 + ROCKETMQ_NAME_SERVER 空串导致服务启动失败）——已修复并回归
+  - 恢复时长：namesrv 拉起 + inventory 重启 < 1min
+  - 改进项：启动脚本统一注入 ROCKETMQ_NAME_SERVER（避免空串陷阱）；compose 健康检查确认 namesrv 就绪
