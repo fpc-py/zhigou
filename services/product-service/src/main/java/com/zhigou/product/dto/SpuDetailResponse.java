@@ -24,7 +24,9 @@ public class SpuDetailResponse {
     private Long priceMin;
     private Long priceMax;
     private Integer salesVolume;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long categoryId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long brandId;
     private List<SkuItem> skus;
 

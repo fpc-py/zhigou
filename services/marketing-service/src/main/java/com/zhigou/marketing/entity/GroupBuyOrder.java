@@ -14,6 +14,7 @@ public class GroupBuyOrder {
     private Long id;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long activityId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long leaderUserId;
     private Integer targetSize;
     private String status;

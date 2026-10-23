@@ -4,6 +4,15 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-23 · [0.2.82] 精度闭环收口：读路径 19 位 id 字符串化（bug #63 根治）
+- **修复**：响应 DTO/Entity 的 Long id 语义字段全量 `@JsonSerialize(ToStringSerializer)`——39 文件 61 字段（含 Shipment/CalculateResponse 两处拆行避开金额字段）+ 17 文件补 import
+- **纪律**：请求 DTO 不动；金额字段永不注解；id 语义 = id + 以 Id/id/No 结尾
+- **实测**：10 服务 mvn compile 全过；响应侧缺口复扫 **0**、金额误注解 **0**
+- **坑**：#63 读路径闭环收尾（写[0.2.58] rawBody + 读[0.2.82] 字符串化 = 双路径彻底闭环）；[0.2.81] 文档治理登记
+
+## 2026-10-23 · [0.2.81] 文档治理（按商用版标准整理优化全仓文档）
+- progress 42 段归档 + bug #1-#40 归档 + 5 报告迁 docs/reports/ + C 组立项合并 + 待办清单并入差距报告附录 B + ADR 并入技术方案 + docs/README 重写 + 14 处失效引用修复
+
 ## 2026-10-22 · [0.2.80] AI 深水区④ AI 评测回归集（离线确定性断言进 CI）
 - **scripts/ai-eval/**：test_tool_schema（35 工具 schema 全量转换/名称唯一/参数完整）+ test_tool_routing（14 路由 × 正负样例，固化 #71/#76）+ test_injection_regression（#68 主集 + 4 类变体）
 - **CI**：.github/workflows/ci.yml 新增 ai-eval job（python 3.12 + pip cache），失败即红

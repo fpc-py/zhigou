@@ -23,6 +23,7 @@ public class UserBrowseHistory {
     private Long id;
 
     /** 分片键 */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
 
     /** 商品 SPU ID（Snowflake，序列化需转字符串） */

@@ -15,8 +15,10 @@ public class Address {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long addressId;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
 
     private String receiverName;

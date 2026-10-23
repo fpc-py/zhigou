@@ -1,4 +1,6 @@
 package com.zhigou.user.dto;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,6 +15,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class UserProfileResponse {
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
     private String phone;
     private String nickname;

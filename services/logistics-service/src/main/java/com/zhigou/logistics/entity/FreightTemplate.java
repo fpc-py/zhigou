@@ -1,9 +1,12 @@
 package com.zhigou.logistics.entity;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 @Data @TableName("freight_template")
 public class FreightTemplate {
+    @JsonSerialize(using = ToStringSerializer.class)
     @TableId(type = IdType.AUTO) private Long id;
     private String name; private Integer firstWeightG; private Long firstFee; private Integer continuedWeightG; private Long continuedFee; private Long freeThresholdAmount; private String regionJson;
     

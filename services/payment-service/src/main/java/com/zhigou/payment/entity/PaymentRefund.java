@@ -1,4 +1,6 @@
 package com.zhigou.payment.entity;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
@@ -10,6 +12,7 @@ import java.time.LocalDateTime;
  */
 @Data @TableName("payment_refund")
 public class PaymentRefund {
+    @JsonSerialize(using = ToStringSerializer.class)
     @TableId(type = IdType.AUTO) private Long id;
     /** 退款单号（幂等键） */
     private String refundNo;
@@ -17,6 +20,7 @@ public class PaymentRefund {
     private String paymentNo;
     /** 业务订单号 */
     private String orderNo;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
     /** 退款金额（分） */
     private Long amount;

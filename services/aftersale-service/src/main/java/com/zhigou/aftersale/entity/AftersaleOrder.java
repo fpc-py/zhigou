@@ -6,7 +6,9 @@ import lombok.Data;
 import java.time.LocalDateTime;
 @Data @TableName("aftersale_order")
 public class AftersaleOrder {
+    @JsonSerialize(using = ToStringSerializer.class)
     @TableId(type = IdType.AUTO) private Long id;
+    @JsonSerialize(using = ToStringSerializer.class)
     private String aftersaleNo; private String orderNo; private Long userId;
     private String type; private String reason; private Long amount; private String status;
     private String images; private String rejectReason;

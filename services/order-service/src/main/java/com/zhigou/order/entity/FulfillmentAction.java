@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 
 @Data @TableName("fulfillment_action")
 public class FulfillmentAction {
+    @JsonSerialize(using = ToStringSerializer.class)
     @TableId(type = IdType.AUTO) private Long id;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long orderId;

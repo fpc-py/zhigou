@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class GroupBuyGroupVO {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long groupId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long leaderUserId;
     private Integer memberCount;
     private Integer targetSize;

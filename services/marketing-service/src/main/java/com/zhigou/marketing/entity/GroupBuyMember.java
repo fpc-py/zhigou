@@ -14,6 +14,7 @@ public class GroupBuyMember {
     private Long id;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long groupId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
     private Integer isLeader;
     private LocalDateTime joinTime;

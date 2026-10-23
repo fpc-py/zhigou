@@ -14,7 +14,9 @@ public class ProductSpu {
     private Long id;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long spuId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long categoryId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long brandId;
     private String name;
     private String subtitle;

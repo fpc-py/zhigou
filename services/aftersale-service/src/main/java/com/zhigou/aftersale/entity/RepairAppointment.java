@@ -1,10 +1,14 @@
 package com.zhigou.aftersale.entity;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 @Data @TableName("repair_appointment")
 public class RepairAppointment {
+    @JsonSerialize(using = ToStringSerializer.class)
     @TableId(type = IdType.AUTO) private Long id;
+    @JsonSerialize(using = ToStringSerializer.class)
     private String appointmentNo; private String orderNo; private String skuId; private Long userId;
     private String productName; private String faultDesc; private String contactPhone;
     private LocalDateTime appointmentTime;

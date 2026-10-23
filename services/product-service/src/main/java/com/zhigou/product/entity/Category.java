@@ -12,6 +12,7 @@ public class Category {
     @TableId(type = IdType.AUTO)
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long parentId;
     private String name;
     private Integer level;

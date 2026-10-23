@@ -6,6 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 @Data @TableName("discount_snapshot")
 public class DiscountSnapshot {
+    @JsonSerialize(using = ToStringSerializer.class)
     @TableId(type = IdType.AUTO) private Long id;
     private String orderNo; private Long totalAmount; private Long discountAmount;
     @JsonSerialize(using = ToStringSerializer.class)

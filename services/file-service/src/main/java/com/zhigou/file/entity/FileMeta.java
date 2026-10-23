@@ -17,6 +17,7 @@ public class FileMeta {
 
     private String fileId;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
 
     private String objectKey;

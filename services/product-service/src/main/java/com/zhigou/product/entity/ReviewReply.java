@@ -14,8 +14,10 @@ public class ReviewReply {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     /** 被回复的评价 ID（Snowflake） */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long reviewId;
     /** 回复商家（演示：平台聚合商家） */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long merchantId;
     /** 商家回复正文 */
     private String replyContent;

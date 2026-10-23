@@ -3,6 +3,24 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.81] · 文档治理（按商用版标准整理优化全仓文档）（2026-10-23）
+### docs: 全仓文档重构
+- progress 42 段归档至 docs/archive；bug #1-#40 归档；5 份报告 git mv 到 docs/reports/
+- C 组三份立项合并为 docs/立项决策记录.md；未完成任务清单并入差距报告附录 B
+- prompts/CHANGELOG 并入根 CHANGELOG；ADR×2 并入技术方案附录；重写 docs/README
+- 修复 14 处失效引用；根目录两个 patch 文件恢复原位（未跟踪）
+- 说明：docs/adr/ADR-0001-服务治理与AI端口迁移.md 一并并入技术方案 ADR 附录（内容保全，git 可回滚）
+
+## [0.2.82] · 精度闭环收口：读路径 19 位 id 字符串化（bug #63 根治）（2026-10-23）
+### fix: 响应侧 Long id 全量字符串序列化
+- **背景**：bug #63（[0.2.57]）——Snowflake 19 位 id 超 JS 2^53；[0.2.58] 修 8 个写路径接口（rawBody 字符串透传），**读路径响应 id 仍为 number → H5 JS 侧失真**
+- **改动**：响应 DTO/Entity 的 Long id 语义字段统一 `@JsonSerialize(using = ToStringSerializer.class)`——39 文件 61 字段补齐（含 2 处多字段行拆行：Shipment.userId 避开 freightFee、CalculateResponse.AvailableCoupon.couponId 避开 saveAmount）；17 文件补 jackson import
+- **边界纪律**：请求 DTO（*Request/*Query）不动；金额字段（payAmount/freightFee/saveAmount/totalAmount/price 等）永不注解；id 语义 = `id` + 以 Id/id/No 结尾
+### test: 编译 + 全覆盖复扫
+- 10 个涉及服务 `mvn compile -DskipTests` 全部通过（aftersale/auth/file/inventory/logistics/marketing/order/payment/product/user）
+- 复扫验证：响应侧 Long id 缺口 **0**；金额字段误注解 **0**；请求 DTO 维持 HEAD 基线
+- 面试叙事：一个 2^53 精度 bug 的**系统级闭环**——盘点全仓 180+ 字段 → 分类（响应/请求/金额）→ 白名单/黑名单双纪律 → 全覆盖 + 复扫自证；「类型标注 String ≠ 运行时保真」认知盲区
+
 ## [0.2.80] · AI 深水区④ AI 评测回归集（离线确定性断言进 CI）（2026-10-22）
 ### feat: scripts/ai-eval 三脚本 + CI job
 - `scripts/ai-eval/test_tool_schema.py`：TOOLS 全量 convert_to_openai_tool + 名称唯一 + 参数 properties 完整（防 #144 漏注册重演）

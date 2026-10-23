@@ -17,11 +17,13 @@ public class ProductReview {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     /** 业务评价 ID（Snowflake） */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long reviewId;
     /** 商品 SPU ID（Snowflake） */
     @JsonSerialize(using = ToStringSerializer.class)
     private Long spuId;
     /** 评价用户 ID（Snowflake） */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
     /** 脱敏昵称 */
     private String userName;

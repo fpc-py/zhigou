@@ -10,9 +10,11 @@ import java.time.LocalDateTime;
 
 @Data @TableName("order_main")
 public class OrderMain {
+    @JsonSerialize(using = ToStringSerializer.class)
     @TableId(type = IdType.AUTO) private Long id;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long orderId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
     private String requestId;
     private String orderStatus;

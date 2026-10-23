@@ -1,4 +1,6 @@
 package com.zhigou.user.dto;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,6 +13,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AddressResponse {
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long addressId;
     private String receiverName;
     private String receiverPhone;
