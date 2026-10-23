@@ -44,7 +44,11 @@ class Settings(BaseSettings):
     # ── pgvector ──
     pg_dsn: str = "postgresql+asyncpg://zhigou:zhigou123@localhost:5432/zhigou_rag"
 
-    # ── Embedding ──
+    # ── Embedding（独立端点；为空时回退 LLM 端点）──
+    # 智购 LLM 走 DeepSeek（无 embeddings 端点），embedding 需独立配置阿里云百炼
+    # OpenAI 兼容端点；未配置时 RAG 自动降级为关键词检索（router.py fallback）
+    embedding_base_url: str = ""
+    embedding_api_key: str = ""
     embedding_model: str = "text-embedding-v4"
     embedding_dim: int = 1536
 

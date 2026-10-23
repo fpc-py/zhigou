@@ -7,17 +7,17 @@
       <ErrorRetry v-else-if="error" @retry="load" />
       <template v-else>
         <el-table :data="orders" style="width:100%" v-if="orders.length">
-          <el-table-column prop="orderId" label="订单号" width="180" />
+          <el-table-column prop="orderId" label="订单号" width="220" />
           <el-table-column label="金额" width="120">
-            <template #default="{row}">¥{{ (row.totalAmount / 100).toFixed(2) }}</template>
+            <template #default="{row}">¥{{ ((row.totalAmount ?? row.payAmount ?? 0) / 100).toFixed(2) }}</template>
           </el-table-column>
           <el-table-column prop="orderStatus" label="状态" width="100">
             <template #default="{row}">
-              <el-tag :type="statusType(row.orderStatus)">{{ row.orderStatus }}</el-tag>
+              <el-tag :type="statusType(row.orderStatus)">{{ statusLabel(row.orderStatus) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="商品数" width="80">
-            <template #default="{row}">{{ row.items?.length || 0 }}</template>
+          <el-table-column label="商品" min-width="220">
+            <template #default="{row}">{{ skuSummary(row.items) }}</template>
           </el-table-column>
           <el-table-column label="操作" width="120">
             <template #default="{row}">
@@ -33,26 +33,31 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import http from '@/api/request';
+import Skeleton from '@/components/Skeleton.vue';
+import ErrorRetry from '@/components/ErrorRetry.vue';
+import EmptyState from '@/components/EmptyState.vue';
 
 const loading = ref(false);
 const error = ref(false);
 const orders = ref<any[]>([]);
 
-function statusType(s: string) {
-  const m: Record<string, string> = { PAYING: 'warning', PAID: 'primary', SHIPPED: '', RECEIVED: 'success', CLOSED: 'info' };
-  return m[s] || 'info';
-}
+const LABELS: Record<string, string> = {
+  INIT: '待支付', PAID: '已支付', SHIPPED: '已发货', COMPLETED: '已完成',
+  CLOSED: '已关闭', REFUNDING: '退款中', REFUNDED: '已退款',
+};
+const statusLabel = (s: string) => LABELS[s] ?? s;
+const statusType = (s: string) =>
+  ({ PAID: 'primary', SHIPPED: 'success', COMPLETED: 'info', INIT: 'warning', CLOSED: 'info', REFUNDING: 'danger', REFUNDED: 'danger' } as Record<string, string>)[s] || 'info';
+const skuSummary = (items: any[] | undefined) =>
+  (items || []).map((i) => `${i.skuName ?? 'SKU' + i.skuId} ×${i.count}`).join('、') || '无商品';
 
 async function load() {
   loading.value = true;
   error.value = false;
   try {
-    // 后端暂无订单列表接口，展示模拟数据
-    orders.value = [
-      { orderId: 202610010001, totalAmount: 39900, orderStatus: 'PAID', items: [{ skuId: 1 }] },
-      { orderId: 202610010002, totalAmount: 12900, orderStatus: 'SHIPPED', items: [{ skuId: 2 }] },
-      { orderId: 202610010003, totalAmount: 69900, orderStatus: 'PAYING', items: [{ skuId: 3 }] },
-    ];
+    const res = await http.get('/order/mine');
+    orders.value = res.data?.data ?? [];
   } catch {
     error.value = true;
   } finally {

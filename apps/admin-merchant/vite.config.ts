@@ -10,12 +10,14 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5174,
+    port: 5175,
     proxy: {
-      '/api/product': { target: 'http://localhost:8083', changeOrigin: true },
-      '/api/order':   { target: 'http://localhost:8085', changeOrigin: true },
-      '/api/aftersale': { target: 'http://localhost:8090', changeOrigin: true },
-      '/api/auth':    { target: 'http://localhost:8080', changeOrigin: true },
+      // 前端 /api/* → BFF（去掉 /api 前缀）：auth/order/aftersale/merchant 全走 BFF 鉴权与聚合
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
     },
   },
 });

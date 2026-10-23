@@ -49,8 +49,10 @@ export class HomeService {
 
   private async fetchRagRecommend() {
     const url = `${SERVICES.aiOrchestrator.url}${SERVICE_PATHS.ragRetrieve}`;
+    // RAG 检索是首页推荐增强：2s 快速失败（对话才用 30s），
+    // 避免聚合整体撞上入口 5s 超时；AI 不可用或慢时降级为空推荐。
     const obs = this.http.post(url, { query: '热门推荐', top_k: 6 }).pipe(
-      timeout(SERVICES.aiOrchestrator.timeout),
+      timeout(2_000),
       catchError((err) => {
         if (err instanceof TimeoutError) {
           this.logger.warn('ai-orchestrator RAG 超时');

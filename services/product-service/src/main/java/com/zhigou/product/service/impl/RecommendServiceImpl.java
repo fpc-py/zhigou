@@ -61,6 +61,8 @@ public class RecommendServiceImpl implements RecommendService {
         List<String> orderNames = new ArrayList<>();
         Set<Long> boughtSpuIds = new HashSet<>();
         Map<Integer, Integer> priceBandFreq = new HashMap<>();
+        Set<Long> orderSkuIds = new HashSet<>();   // 批量解析收集（避免 N+1）
+        Set<Long> cartSkuIds = new HashSet<>();
         boolean hasOrder = false;
         try {
             List<JsonNode> orders = fetchJsonArray(orderServiceUrl + "/order/mine?userId=" + userId, userId);
@@ -77,8 +79,7 @@ public class RecommendServiceImpl implements RecommendService {
                         priceBandFreq.merge(bucketIndex(p), 1, Integer::sum);
                     }
                     if (it.get("skuId") != null && it.get("skuId").isTextual()) {
-                        Long spuId = skuIdToSpuId(Long.parseLong(it.get("skuId").asText()));
-                        if (spuId != null) boughtSpuIds.add(spuId);
+                        orderSkuIds.add(Long.parseLong(it.get("skuId").asText()));
                     }
                 }
             }
@@ -86,19 +87,36 @@ public class RecommendServiceImpl implements RecommendService {
             log.warn("拉取历史订单失败，降级口碑榜: {}", e.getMessage());
         }
 
-        Set<Long> cartSpuIds = new HashSet<>();
         boolean hasCart = false;
         try {
             List<JsonNode> cart = fetchJsonArray(cartServiceUrl + "/cart/mine", userId);
             hasCart = !cart.isEmpty();
             for (JsonNode it : cart) {
                 if (it.get("skuId") != null && it.get("skuId").isTextual()) {
-                    Long spuId = skuIdToSpuId(Long.parseLong(it.get("skuId").asText()));
-                    if (spuId != null) cartSpuIds.add(spuId);
+                    cartSkuIds.add(Long.parseLong(it.get("skuId").asText()));
                 }
             }
         } catch (Exception e) {
             log.warn("拉取购物车失败，降级口碑榜: {}", e.getMessage());
+        }
+
+        // 批量 skuId → spuId（一次 IN 查询替代逐 SKU 查库；订单量大时曾是 recommend 卡 15s+ 的根因）
+        Map<Long, Long> skuToSpu = new HashMap<>();
+        Set<Long> allSkuIds = new HashSet<>(orderSkuIds);
+        allSkuIds.addAll(cartSkuIds);
+        if (!allSkuIds.isEmpty()) {
+            List<ProductSku> skus = skuMapper.selectList(
+                    new LambdaQueryWrapper<ProductSku>().in(ProductSku::getSkuId, allSkuIds));
+            for (ProductSku s : skus) skuToSpu.put(s.getSkuId(), s.getSpuId());
+        }
+        for (Long skuId : orderSkuIds) {
+            Long spuId = skuToSpu.get(skuId);
+            if (spuId != null) boughtSpuIds.add(spuId);
+        }
+        Set<Long> cartSpuIds = new HashSet<>();
+        for (Long skuId : cartSkuIds) {
+            Long spuId = skuToSpu.get(skuId);
+            if (spuId != null) cartSpuIds.add(spuId);
         }
 
         // 2) 候选商品：全部上架 SPU
@@ -255,11 +273,18 @@ public class RecommendServiceImpl implements RecommendService {
         return PRICE_BUCKETS.length;
     }
 
-    /** 内网 GET 拉取数组（Result.data 为数组；x-user-id 透传身份） */
+    /** 内网 GET 拉取数组（Result.data 为数组；x-user-id 透传身份）。
+     *  带 2s 连接/读超时：下游（order/cart）慢或挂时快速失败，由调用方降级口碑榜，
+     *  避免 RestTemplate 默认无超时导致个性化推荐无限等待（曾实测被拖到 25s+）。 */
     private List<JsonNode> fetchJsonArray(String url, Long userId) throws java.io.IOException {
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory =
+                new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(2_000);
+        factory.setReadTimeout(2_000);
+        RestTemplate rt = new RestTemplate(factory);
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-user-id", String.valueOf(userId));
-        ResponseEntity<String> resp = new RestTemplate().exchange(
+        ResponseEntity<String> resp = rt.exchange(
                 url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
         JsonNode root = objectMapper.readTree(resp.getBody());
         JsonNode data = root.get("data");

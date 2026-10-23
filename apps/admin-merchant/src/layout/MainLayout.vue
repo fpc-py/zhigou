@@ -16,6 +16,26 @@
           <el-icon><DataAnalysis /></el-icon>
           <span>数据看板</span>
         </el-menu-item>
+        <el-menu-item index="/alert">
+          <el-icon><Warning /></el-icon>
+          <span>经营预警</span>
+        </el-menu-item>
+        <el-menu-item index="/fulfillment">
+          <el-icon><Van /></el-icon>
+          <span>履约异常</span>
+        </el-menu-item>
+        <el-menu-item index="/supply">
+          <el-icon><TakeawayBox /></el-icon>
+          <span>补货中心</span>
+        </el-menu-item>
+        <el-menu-item index="/brain">
+          <el-icon><DataBoard /></el-icon>
+          <span>经营大脑</span>
+        </el-menu-item>
+        <el-menu-item index="/review">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>评论管理</span>
+        </el-menu-item>
         <el-menu-item index="/product">
           <el-icon><Goods /></el-icon>
           <span>商品管理</span>
@@ -48,7 +68,7 @@
 
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
-import { DataAnalysis, Goods, List, WarningFilled } from '@element-plus/icons-vue';
+import { DataAnalysis, Goods, List, WarningFilled, Warning, Van, TakeawayBox, DataBoard, ChatDotRound } from '@element-plus/icons-vue';
 import { useUserStore } from '@/stores/user';
 
 const route = useRoute();

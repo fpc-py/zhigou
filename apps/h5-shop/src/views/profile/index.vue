@@ -117,7 +117,6 @@ const menus = [
   { icon: 'wallet', label: '我的钱包', hint: '', bg: '#FFF3DF', color: '#FFA62B', action: () => router.push('/wallet') },
   { icon: 'heart', label: '我的收藏', hint: '', bg: '#FFEDF2', color: '#FF4D6D', action: () => router.push('/favorites') },
   { icon: 'eye', label: '浏览历史', hint: '', bg: '#EAF5FF', color: '#2F80ED', action: () => router.push('/history') },
-  { icon: 'shop', label: '商家中心', hint: '经营概览 · 演示', bg: '#E7F7EC', color: '#21A366', action: () => router.push('/merchant') },
   { icon: 'loc', label: '收货地址', hint: '', bg: '#E9EBFF', color: '#4C5CFF', action: () => router.push('/address') },
   { icon: 'tag', label: '优惠券', hint: '', bg: '#FFEDE7', color: '#FF5C39', action: () => router.push('/coupons') },
   { icon: 'lock', label: '隐私设置', hint: '', bg: '#E3F7F0', color: '#00A87E', action: () => toast('隐私设置规划中') },

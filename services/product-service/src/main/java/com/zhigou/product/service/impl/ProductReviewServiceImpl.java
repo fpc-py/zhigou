@@ -154,6 +154,15 @@ public class ProductReviewServiceImpl implements ProductReviewService {
     @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public void merchantReply(Long reviewId, String content) {
         if (content == null || content.isBlank()) throw new BizException(400, "回复内容不能为空");
+        // 幂等：同一评价重复提交直接成功（review_reply.review_id 唯一约束；前端重复点击/重试不落脏数据、不报 500）
+        Long replied = reviewReplyMapper.selectCount(
+                new LambdaQueryWrapper<com.zhigou.product.entity.ReviewReply>()
+                        .eq(com.zhigou.product.entity.ReviewReply::getReviewId, reviewId)
+                        .eq(com.zhigou.product.entity.ReviewReply::getDeleted, 0));
+        if (replied != null && replied > 0) {
+            log.info("merchantReply 幂等命中 reviewId={}，已回复，直接返回", reviewId);
+            return;
+        }
         com.zhigou.product.entity.ReviewReply rr = new com.zhigou.product.entity.ReviewReply();
         rr.setReviewId(reviewId);
         rr.setMerchantId(0L);

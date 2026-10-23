@@ -6,10 +6,15 @@
 
       <el-form :model="form" label-width="0">
         <el-form-item>
-          <el-input v-model="form.username" placeholder="账号" size="large" />
+          <el-input v-model="form.phone" placeholder="手机号" size="large" maxlength="11" />
         </el-form-item>
         <el-form-item>
-          <el-input v-model="form.password" type="password" placeholder="密码" size="large" show-password @keyup.enter="login" />
+          <div style="display:flex;gap:8px;width:100%">
+            <el-input v-model="form.code" placeholder="验证码" size="large" maxlength="6" @keyup.enter="login" />
+            <el-button style="width:120px" :disabled="counting > 0" @click="sendCode">
+              {{ counting > 0 ? `${counting}s` : '获取验证码' }}
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" size="large" style="width:100%" :loading="loading" @click="login">
@@ -19,43 +24,78 @@
       </el-form>
 
       <div style="text-align:center;color:#999;font-size:12px">
-        W11 演示账号: admin / admin123
+        演示账号：13800138000（验证码由短信服务发放，开发环境从 Redis 读取）
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import http from '@/api/request';
 import { useUserStore } from '@/stores/user';
 
 const router = useRouter();
 const userStore = useUserStore();
 const loading = ref(false);
+const counting = ref(0);
+let timer: ReturnType<typeof setInterval> | null = null;
 
-const form = ref({ username: '', password: '' });
+const form = ref({ phone: '', code: '' });
+
+async function sendCode() {
+  if (!/^1\d{10}$/.test(form.value.phone)) {
+    ElMessage.warning('请输入正确的手机号');
+    return;
+  }
+  try {
+    await http.post('/auth/send-sms-code', { phone: form.value.phone });
+    ElMessage.success('验证码已发送');
+    counting.value = 60;
+    timer = setInterval(() => {
+      counting.value -= 1;
+      if (counting.value <= 0 && timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    }, 1000);
+  } catch {
+    ElMessage.error('发送失败，请稍后再试');
+  }
+}
 
 async function login() {
-  if (!form.value.username || !form.value.password) {
-    ElMessage.warning('请输入账号和密码');
+  if (!/^1\d{10}$/.test(form.value.phone)) {
+    ElMessage.warning('请输入正确的手机号');
+    return;
+  }
+  if (!form.value.code) {
+    ElMessage.warning('请输入验证码');
     return;
   }
   loading.value = true;
   try {
-    // W11 先写死 admin/admin123
-    if (form.value.username === 'admin' && form.value.password === 'admin123') {
-      userStore.setToken('mock-admin-token-' + Date.now());
-      ElMessage.success('登录成功');
-      router.push('/dashboard');
-    } else {
-      ElMessage.error('账号或密码错误');
+    const res = await http.post('/auth/login', { phone: form.value.phone, code: form.value.code });
+    const token = res.data?.data?.accessToken;
+    if (!token) {
+      ElMessage.error('登录失败：未获取到凭证');
+      return;
     }
+    userStore.setToken(token);
+    ElMessage.success('登录成功');
+    router.push('/dashboard');
+  } catch {
+    ElMessage.error('验证码错误或已过期');
   } finally {
     loading.value = false;
   }
 }
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+});
 </script>
 
 <style scoped>

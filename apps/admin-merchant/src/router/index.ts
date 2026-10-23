@@ -11,6 +11,11 @@ const router = createRouter({
       redirect: '/dashboard',
       children: [
         { path: 'dashboard', name: 'dashboard', component: () => import('@/views/dashboard/index.vue'), meta: { title: '数据看板' } },
+        { path: 'alert', name: 'alert', component: () => import('@/views/alert/index.vue'), meta: { title: '经营预警' } },
+        { path: 'fulfillment', name: 'fulfillment', component: () => import('@/views/fulfillment/index.vue'), meta: { title: '履约异常' } },
+        { path: 'supply', name: 'supply', component: () => import('@/views/supply/index.vue'), meta: { title: '补货中心' } },
+        { path: 'brain', name: 'brain', component: () => import('@/views/brain/index.vue'), meta: { title: '经营大脑' } },
+        { path: 'review', name: 'review', component: () => import('@/views/review/index.vue'), meta: { title: '评论管理' } },
         { path: 'product', name: 'product', component: () => import('@/views/product/index.vue'), meta: { title: '商品管理' } },
         { path: 'product/edit/:spuId?', name: 'productEdit', component: () => import('@/views/product/edit.vue'), meta: { title: '商品编辑' } },
         { path: 'order', name: 'order', component: () => import('@/views/order/index.vue'), meta: { title: '订单管理' } },

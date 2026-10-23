@@ -125,6 +125,47 @@ async def batch_upsert(records: list[tuple[int, str, list[float]]]) -> int:
 # ── 检索 ──
 
 
+async def keyword_search(query: str, top_k: int = 10) -> list[RetrieveItem]:
+    """
+    关键词兜底检索（Embedding 端点不可用时的降级路径）。
+
+    1. 对 products_vec.text 做 ILIKE 命中，按更新时间倒序返回；
+    2. 无关键词命中（如首页推荐 query「热门推荐」）时，返回最新 top_k 条
+       （“热门 ≈ 最新”兜底语义），保证首页 AI 推荐区块有数据。
+    语义检索失败（如 DeepSeek 无 embeddings 端点）时使用，
+    保证 RAG 接口永不 500、首页 AI 推荐有兜底数据。
+    """
+    rows = await _fetch(
+        """
+        SELECT spu_id, text, 1.0 AS score
+        FROM products_vec
+        WHERE text ILIKE '%' || $1 || '%'
+        ORDER BY updated_at DESC
+        LIMIT $2
+        """,
+        query,
+        top_k,
+    )
+    if rows:
+        return [
+            RetrieveItem(spu_id=row["spu_id"], text=row["text"], score=round(row["score"], 4))
+            for row in rows
+        ]
+    rows = await _fetch(
+        """
+        SELECT spu_id, text, 1.0 AS score
+        FROM products_vec
+        ORDER BY updated_at DESC
+        LIMIT $1
+        """,
+        top_k,
+    )
+    return [
+        RetrieveItem(spu_id=row["spu_id"], text=row["text"], score=round(row["score"], 4))
+        for row in rows
+    ]
+
+
 async def similarity_search(
     query_embedding: list[float],
     top_k: int = 10,

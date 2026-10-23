@@ -32,6 +32,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -233,7 +234,19 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<OrderResponse> mine(Long userId) {
         List<OrderMain> orders = orderMapper.selectFullByUserId(userId);
-        return orders.stream().map(this::buildResponse).collect(Collectors.toList());
+        if (orders.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // 批量查明细：一次 IN 查询替代逐单 N+1，避免订单量大时接口被拖慢（实测曾 25s+）
+        List<Long> orderIds = orders.stream()
+                .map(OrderMain::getOrderId).collect(Collectors.toList());
+        List<OrderItem> allItems = itemMapper.selectList(
+                new LambdaQueryWrapper<OrderItem>().in(OrderItem::getOrderId, orderIds));
+        Map<Long, List<OrderItem>> itemsByOrder = allItems.stream()
+                .collect(Collectors.groupingBy(OrderItem::getOrderId));
+        return orders.stream()
+                .map(o -> buildResponse(o, itemsByOrder.getOrDefault(o.getOrderId(), Collections.emptyList())))
+                .collect(Collectors.toList());
     }
 
     @Override @Transactional
@@ -503,6 +516,18 @@ public class OrderServiceImpl implements OrderService {
 
     private OrderResponse buildResponse(OrderMain order) {
         return buildResponse(order, false);
+    }
+
+    /** mine() 批量场景专用：明细已批量查好，不再逐单查询（N+1 修复） */
+    private OrderResponse buildResponse(OrderMain order, List<OrderItem> items) {
+        return OrderResponse.builder()
+                .orderId(order.getOrderId()).userId(order.getUserId()).orderStatus(order.getOrderStatus())
+                .totalAmount(order.getTotalAmount()).payAmount(order.getPayAmount())
+                .handled(false)
+                .items(items.stream().map(i -> OrderResponse.Item.builder()
+                        .skuId(i.getSkuId()).skuName(i.getSkuName()).price(i.getPrice()).count(i.getCount()).build())
+                        .collect(Collectors.toList()))
+                .build();
     }
 
     private OrderResponse buildResponse(OrderMain order, boolean handled) {

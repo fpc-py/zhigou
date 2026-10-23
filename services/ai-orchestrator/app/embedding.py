@@ -16,7 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingClient:
-    """Embedding 客户端，复用 LLM 的 base_url 和 api_key。"""
+    """Embedding 客户端，复用 LLM 的 base_url 和 api_key。
+
+    优先级：显式传入 > settings.embedding_base_url/key（独立 Embedding 端点）
+    > settings.llm_base_url/key（回退 LLM 端点）。
+    智购 LLM 走 DeepSeek（无 embeddings 端点），若未配置独立 Embedding 端点，
+    RAG 检索会失败并由 router 层降级为关键词检索。
+    """
 
     def __init__(
         self,
@@ -24,8 +30,12 @@ class EmbeddingClient:
         api_key: Optional[str] = None,
         model: Optional[str] = None,
     ):
-        self.base_url = (base_url or settings.llm_base_url).rstrip("/")
-        self.api_key = api_key or settings.llm_api_key
+        self.base_url = (
+            base_url
+            or settings.embedding_base_url
+            or settings.llm_base_url
+        ).rstrip("/")
+        self.api_key = api_key or settings.embedding_api_key or settings.llm_api_key
         self.model = model or settings.embedding_model
         self._client: Optional[AsyncOpenAI] = None
 
