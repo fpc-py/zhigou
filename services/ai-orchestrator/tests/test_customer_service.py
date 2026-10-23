@@ -158,7 +158,7 @@ def test_tools_schema_all_convert():
     from langchain_core.utils.function_calling import convert_to_openai_tool
 
     names = [getattr(t, "name", "") for t in T.TOOLS]
-    assert len(names) == 35, f"TOOLS 应 35 个，实际 {len(names)}"
+    assert len(names) == 37, f"TOOLS 应 37 个，实际 {len(names)}"
     assert len(set(names)) == len(names), "工具名必须唯一"
     assert "customer_service" in names
     assert "reminders" in names

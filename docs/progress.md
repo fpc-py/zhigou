@@ -4,6 +4,13 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-23 · [0.2.84] 衣橱零录入 + AI 每日穿搭（TOOLS 35→37）
+- **工具**：`closet_scan_item`（衣物图 → 视觉识别 → 自动入库）+ `outfit_daily`（真实衣橱 + 场合规则 + AI 润色，失败降级）；`_vision_extract` 参数化 schema
+- **路由/提示词**：chat_service 2 条规则 + system.md 工具表登记
+- **测试**：test_closet 9 项 + 全仓 79 passed + py_compile；TOOLS 断言 35→37
+- **真实链路**：outfit_daily 衣橱 3 件 → 规则 + LLM 润色 + 越权拦截 PASS；closet_scan_item 视觉识别 → 自动入库（中文/字符串 id）PASS
+- **坑**：#82 LLM 视觉外网图首次下载失败 → 重试兜底
+
 ## 2026-10-23 · [0.2.83] A4 双场景端到端实测闭环（部分退款 + 部分发货）
 - **① 部分发货 PASS**：订单 2113578357719015424（3 件 ¥132）→ ship-partial 2+1 分批发 → SHIPPED + /shipments 2 条明细（SF-TEST-001/002）
 - **② 部分退款 PASS**：订单 2113579450880466944（2 件 ¥88）→ payment/create + mock-pay（签名）→ PAID → 1+1 分批发 → SHIPPED → 售后 ¥44 apply/approve/refund → REFUNDED；payment_refund 落库 4400/SUCCESS/RF8ACD6CCAB5FE4D70；订单保持 SHIPPED；超退申请 13200 → 400 拦截

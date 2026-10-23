@@ -31,6 +31,8 @@
 | `usage_cycle_assistant()` | 无需参数（服务端注入用户身份） | 用户问"我该补点什么了""上次买的什么时候用完""有没有快到期的""哪些该换新了"时（注意：只做提醒，不自动下单，与定时购 scheduled_buy 区分） |
 | `groupbuy_finder(sku_id, keywords)` | sku_id: SKU ID 可选；keywords: 关键词可选 | 用户问"这个能拼团吗""有没有拼团""想找人拼/开团/参团"时，查询进行中的拼团活动（拼团价/成团人数/还差几人） |
 | `create_order(sku_items, coupon_id?)` | sku_items: [{"skuId", "count"}]；coupon_id: 可选优惠券 | **仅当用户明确确认购买后**：复述商品与金额→取得确认→代下单（幂等防重复） |
+| `closet_scan_item(image_url)` | image_url: 衣物图片 URL | 用户上传衣物照片问"这件衣服放进衣橱/识别这件衣服/帮我录入衣橱"时：识别品类/季节/颜色自动入库（衣橱零录入） |
+| `outfit_daily(user_id, occasion)` | user_id: 用户 ID；occasion: 日常/通勤/约会/运动/正式（默认日常） | 用户问"今天穿什么/怎么搭配/穿搭建议"时，基于真实衣橱 + 场合规则 + AI 搭配理由 |
 
 ### 决策辅助流程（P1）
 

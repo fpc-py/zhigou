@@ -21,6 +21,18 @@
 - 复扫验证：响应侧 Long id 缺口 **0**；金额字段误注解 **0**；请求 DTO 维持 HEAD 基线
 - 面试叙事：一个 2^53 精度 bug 的**系统级闭环**——盘点全仓 180+ 字段 → 分类（响应/请求/金额）→ 白名单/黑名单双纪律 → 全覆盖 + 复扫自证；「类型标注 String ≠ 运行时保真」认知盲区
 
+## [0.2.84] · 衣橱零录入 + AI 每日穿搭（AI 工具 ×2，TOOLS 35→37）（2026-10-23）
+### feat: 多模态衣橱 AI 工具
+- `closet_scan_item`：衣物照片 → LLM 视觉识别（复用 `_vision_extract`，参数化 schema product/closet）→ 自动入库（免手填分类/季节/颜色）
+- `outfit_daily`：真实衣橱衣物 + 场合规则引擎 + AI 润色搭配理由（润色失败降级规则结果，不阻塞）
+- 路由 2 条（放进衣橱/识别这件衣服 → scan；今天穿什么/穿搭建议 → outfit）+ system.md 工具表登记
+### test: 确定性测试 9 项 + 真实链路闭环
+- `tests/test_closet.py` 9 项（URL 校验/识别失败/入库含 X-User-Id 头/空衣橱引导/规则+润色降级/越权 403/路由 2×2/TOOLS 注册）
+- 全仓 pytest 79 passed + py_compile；TOOLS 数量断言 35→37 同步
+- 真实链路（closet-service 8093 实测）：outfit_daily 真实衣橱 3 件 → 规则推荐 + LLM 润色成功 + 越权拦截；closet_scan_item 视觉识别 unsplash 衣物图 → 自动入库（中文正常、id 字符串化）
+### fix: 坑 #82 LLM 视觉外网图下载失败 → 重试兜底
+- LLM 视觉首次拉取 unsplash 外网图 400（Failed to download image）→ `_vision_extract` 既有重试机制第 2 次成功
+
 ## [0.2.83] · A4 双场景端到端实测闭环（部分退款 + 部分发货）（2026-10-23）
 ### test: 差距报告附录 B A4 勾销
 - **① 部分发货 PASS**：订单 2113578357719015424（3 件 ¥132）→ ship-partial 2+1 分批发 → SHIPPED，/shipments 2 条发货明细（SF-TEST-001/002）

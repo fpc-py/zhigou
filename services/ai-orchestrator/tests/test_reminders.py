@@ -6,7 +6,7 @@
 - 幂等去重：同 (user,type,targetKey) 不重复生成
 - 状态机：mine 未读优先 + mark_read 置已读
 - 路由命中：提醒语义 → reminders 强制路由；降价盯价语义不抢 price_alert
-- 工具注册：TOOLS=35、reminders 在列、schema 名称唯一
+- 工具注册：TOOLS=37、reminders 在列、schema 名称唯一
 """
 
 import asyncio
@@ -117,7 +117,7 @@ def test_tools_registered_35_with_reminders():
     from langchain_core.utils.function_calling import convert_to_openai_tool
 
     names = [getattr(t, "name", None) for t in TOOLS]
-    assert len(TOOLS) == 35, f"TOOLS={len(TOOLS)}"
+    assert len(TOOLS) == 37, f"TOOLS={len(TOOLS)}"
     assert "reminders" in names
     assert len(set(names)) == len(names), "工具名重复"
     schemas = [convert_to_openai_tool(t) for t in TOOLS]

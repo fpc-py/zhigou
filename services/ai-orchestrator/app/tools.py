@@ -785,9 +785,13 @@ async def search_by_image(image_url: str, limit: int = 5) -> str:
         return "这项信息暂时没查到"
 
 
-async def _vision_extract(image_url: str) -> dict | None:
-    """调 LLM 视觉模型提取商品特征（OpenAI 兼容 image_url）。60s 超时 + 一次重试，失败返回 None。"""
+async def _vision_extract(image_url: str, schema: str = "product") -> dict | None:
+    """调 LLM 视觉模型提取特征（OpenAI 兼容 image_url）。60s 超时 + 一次重试，失败返回 None。
+
+    schema 决定提取目标：product=商品特征（search_by_image 用）、closet=衣物属性（衣橱零录入用）。
+    """
     from openai import AsyncOpenAI
+    schema_prompt = _VISION_SCHEMA_PROMPT.get(schema, _VISION_SCHEMA_PROMPT["product"])
     last_err: Exception | None = None
     for attempt in (1, 2):
         try:
@@ -799,7 +803,7 @@ async def _vision_extract(image_url: str) -> dict | None:
                 messages=[{
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "识别这张商品图，只输出 JSON：{'category': '品类', 'colors': ['颜色'], 'style': '风格', 'keywords': ['2-3个搜索关键词']}，不要解释。"},
+                        {"type": "text", "text": schema_prompt},
                         {"type": "image_url", "image_url": {"url": image_url}},
                     ],
                 }],
@@ -809,7 +813,7 @@ async def _vision_extract(image_url: str) -> dict | None:
             if text.startswith("```"):
                 text = text.strip("`").removeprefix("json").strip()
             parsed = json.loads(text)
-            if parsed.get("keywords"):
+            if parsed:
                 return parsed
         except Exception as e:
             last_err = e
@@ -817,6 +821,127 @@ async def _vision_extract(image_url: str) -> dict | None:
     logger.warning("视觉识别最终失败 %s: %s", image_url, last_err)
     return None
 
+
+# ── 衣橱零录入 + AI 每日穿搭（多模态复用 _vision_extract，不造轮子） ──
+
+_VISION_SCHEMA_PROMPT = {
+    "product": "识别这张商品图，只输出 JSON：{'category': '品类', 'colors': ['颜色'], 'style': '风格', 'keywords': ['2-3个搜索关键词']}，不要解释。",
+    "closet": "识别这张衣物照片，只输出 JSON：{'name': '衣物名称（简洁，如：白色圆领T恤）', 'category': '上装/下装/外套/鞋履/配饰 之一', 'season': '春夏秋冬/四季 之一', 'color': '主色调', 'tags': ['2-3个标签，如：休闲/通勤/棉质']}，不要解释。",
+}
+
+
+@tool
+async def closet_scan_item(image_url: str) -> str:
+    """
+    衣橱零录入（多模态）：识别衣物照片并自动加入衣橱（免手填分类/季节/颜色）。
+    用户上传衣物照片问"这件衣服放进衣橱/识别这件衣服/帮我录入衣橱"时调用。
+
+    Args:
+        image_url: 衣物图片 URL（file-service 上传返回的公开 URL）
+    """
+    try:
+        if not image_url or not image_url.startswith(("http://", "https://")):
+            return "请提供有效的图片地址。"
+        feats = await _vision_extract(image_url, schema="closet")
+        if not feats or not feats.get("name"):
+            return "识别失败：暂时看不清这件衣服，请换一张更清晰的平铺照片试试？"
+        uid = _get_current_user()
+        body = {
+            "userId": uid,
+            "name": str(feats.get("name"))[:60],
+            "category": str(feats.get("category") or "配饰"),
+            "season": str(feats.get("season") or "四季"),
+            "color": str(feats.get("color") or ""),
+            "imageUrl": image_url,
+            "tags": "、".join(str(t) for t in (feats.get("tags") or [])),
+        }
+        resp = await _http_post(
+            f"{settings.closet_service_url}/closet/item",
+            json_data=body,
+            headers={"X-User-Id": uid},
+        )
+        item = resp.get("data") or {}
+        if not item.get("id"):
+            return "衣橱服务暂时不可用，请稍后再试。"
+        return (
+            f"已自动加入衣橱 ✅\n"
+            f"· {item.get('name')}（{item.get('category')} · {item.get('season')} · {item.get('color') or '未识别颜色'}）\n"
+            f"· 标签：{item.get('tags') or '无'}\n"
+            f"识别结果来自 AI 视觉模型，如果分类不对，直接说「帮我改一下」，我帮你修正。"
+        )
+    except Exception as e:
+        logger.warning("closet_scan_item 调用失败: %s", e)
+        return "这件衣服暂时没能加入衣橱，稍后再试试？"
+
+
+@tool
+async def outfit_daily(user_id: str, occasion: str = "日常") -> str:
+    """
+    AI 每日穿搭：基于真实衣橱衣物 + 场合规则引擎推荐 + AI 搭配理由。
+    用户问"今天穿什么/穿什么好/怎么搭配/穿搭建议/搭配推荐"时调用。
+
+    Args:
+        user_id: 当前用户 ID（服务端注入）
+        occasion: 场合（日常/通勤/约会/运动/正式，默认日常）
+    """
+    try:
+        _check_user_id(user_id)
+        items = await _http_get(
+            f"{settings.closet_service_url}/closet/items?userId={user_id}",
+            headers={"X-User-Id": user_id},
+        )
+        item_list = items.get("data") or []
+        if not item_list:
+            return "你的衣橱还是空的——拍一件衣服照片发给我，我帮你一键录入，攒几件就能出穿搭。"
+        rec = await _http_get(
+            f"{settings.closet_service_url}/closet/outfit/recommend?userId={user_id}&occasion={occasion}",
+            headers={"X-User-Id": user_id},
+        )
+        outfit = rec.get("data") or {}
+        lines = [f"今日穿搭建议（{occasion}）· 基于你的真实衣橱 {len(item_list)} 件衣物："]
+        if outfit.get("items"):
+            for it in outfit["items"]:
+                lines.append(
+                    f"· {it.get('name')}（{it.get('color') or '未识别'} · {it.get('season') or '四季'}）"
+                )
+            if outfit.get("note"):
+                lines.append(f"搭配说明：{outfit['note']}")
+        else:
+            lines.append("· 规则引擎暂未匹配到完整搭配，以下为衣橱可选项：")
+            for it in item_list[:5]:
+                lines.append(
+                    f"  - {it.get('name')}（{it.get('category')} · {it.get('color') or ''}）"
+                )
+        # AI 润色（可选）：生成 1-2 句搭配理由；失败降级为规则结果，不阻塞
+        try:
+            names = "、".join(str(it.get("name")) for it in (outfit.get("items") or item_list[:5]))
+            if names:
+                from openai import AsyncOpenAI
+                client = AsyncOpenAI(base_url=settings.llm_base_url, api_key=settings.llm_api_key, timeout=15.0)
+                tip_resp = await client.chat.completions.create(
+                    model=settings.llm_model,
+                    temperature=0.5,
+                    max_tokens=120,
+                    messages=[{
+                        "role": "user",
+                        "content": (
+                            f"用户有这些衣物：{names}。场合：{occasion}。"
+                            f"用 1-2 句话给出搭配建议和理由（只谈搭配本身，不要提及数据库/工具）。"
+                        ),
+                    }],
+                )
+                tip = (tip_resp.choices[0].message.content or "").strip()
+                if tip:
+                    lines.append(f"AI 提示：{tip}")
+        except Exception as e:
+            logger.warning("outfit_daily 润色失败（降级为规则结果）: %s", e)
+        lines.append("（搭配依据：你的真实衣物 + 场合规则，非凭空推荐）")
+        return "\n".join(lines)
+    except PermissionError:
+        raise
+    except Exception as e:
+        logger.warning("outfit_daily 调用失败: %s", e)
+        return "穿搭建议暂时给不了，稍后再试试？"
 
 
 
@@ -2041,6 +2166,8 @@ TOOLS = [
     analyze_user_context,
     recommend_products,
     search_by_image,
+    closet_scan_item,
+    outfit_daily,
     gift_assistant,
     aftersale_assistant,
     logistics_tracker,
