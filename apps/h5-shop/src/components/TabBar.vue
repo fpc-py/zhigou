@@ -6,7 +6,7 @@
       :class="{ on: currentPath === tab.path }"
       @click="go(tab.path)"
     >
-      <Icon :name="tab.icon" size="lg" :class="{ on: currentPath === tab.path }" />
+      <span class="tab-ic"><Icon :name="tab.icon" size="lg" :class="{ on: currentPath === tab.path }" /></span>
       <span class="tab-label">{{ tab.label }}</span>
     </button>
   </nav>
@@ -61,14 +61,13 @@ function go(path: string) {
   color: var(--ink-3);
   font-size: 10.5px;
   font-weight: 500;
-  transition: 0.15s;
   background: transparent;
   border: none;
+  transition: color var(--dur-fast) var(--ease-out);
 }
-.tabbar button.on {
-  color: var(--brand);
-}
-.tab-label {
-  line-height: 1;
-}
+.tab-ic { display: flex; align-items: center; justify-content: center; transition: transform var(--dur-mid) var(--ease-spring); }
+.tabbar button.on { color: var(--brand); }
+.tabbar button.on .tab-ic { transform: translateY(-2px) scale(1.12); }
+.tabbar button:active .tab-ic { transform: scale(0.9); }
+.tab-label { line-height: 1; }
 </style>

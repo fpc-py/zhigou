@@ -9,11 +9,28 @@ const showTabBar = computed(() => route.meta.tabbar !== false);
 
 <template>
   <div class="app-shell">
-    <RouterView />
+    <!-- 路由转场（P5：fade + 轻微上滑，out-in 避免重叠） -->
+    <RouterView v-slot="{ Component }">
+      <Transition name="zf-page" mode="out-in">
+        <component :is="Component" :key="$route.path" />
+      </Transition>
+    </RouterView>
     <TabBar v-if="showTabBar" />
   </div>
 </template>
 
-<style>
-/* 全局样式已从 main.ts 导入 */
+<style scoped>
+/* 路由转场：仅 opacity/transform，≤300ms，尊重 prefers-reduced-motion（全局兜底） */
+.zf-page-enter-active,
+.zf-page-leave-active {
+  transition: opacity 0.24s var(--ease-out), transform 0.24s var(--ease-out);
+}
+.zf-page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.zf-page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
 </style>

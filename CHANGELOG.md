@@ -3,6 +3,30 @@
 > 每个可交付单元（功能/修复/重构/文档）在此登记，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 > 格式：`[类型] 模块：描述`。类型：feat / fix / refactor / test / docs / chore。
 
+## [0.2.86] · 前端深度优化 P1-P5：设计令牌 + 动效系统 + 叙事化（UI/UX 全量）（2026-10-23）
+### feat: 设计令牌 v2（P1）
+- variables.css：品牌渐变体系（--brand-grad #4C5CFF→#7A6BFF）、阴影 3 层（--sh-1/2/3）、圆角升级（--radius 20px / --r-lg 22px）、动效令牌（--ease-spring/--ease-out/--dur-fast/mid/slow）、毛玻璃令牌（--glass）；旧令牌名保留指向新体系（存量页面自动升级，零破坏）
+- global.css：动效原语（.press 按压反馈 / .glass 玻璃拟态 / .btn-brand 渐变主按钮）、动画关键帧（zf-floaty/glow/shimmer/pulse-ring/bounce-in/typing/badge-pop/spin）、通用入场类 .anim-in + stagger、.skel-block 内容感知骨架 shimmer、**prefers-reduced-motion 全站可关**
+- 动效库引入：motion 14.6.0（命令式 API）+ @vueuse/motion（Vue 指令层，MotionPlugin 全局注册）——坑记录：motion 14 主包仅 DOM/JS 导出（无 vue 子路径），Vue 项目采用「@vueuse/motion 指令 + motion 命令式 animate」双栈
+### feat: 首页 + 公共组件质感升级（P2）
+- home：问候头像渐变光晕（zf-glow）、今日省 chip 渐变 + 数字滚动（motion animate，0→86）、AI 输入条玻璃拟态 + 顶部渐变流光、8 宫格 staggered 入场 + hover 上浮 + 图标微动、Banner 流动光晕 + 漂浮球（zf-glow/floaty）、登录按钮渐变、FAB 圆角化 + hover 上浮 + 徽章弹跳
+- Skeleton：统一 shimmer 令牌（#F0F1F8→#E6E8F4，400px 渐变，1.4s）+ 圆角令牌
+- TabBar：选中图标上浮放大（spring）+ 按压反馈
+- ProductCard：入场 bounce-in、hover 抬升 + 图片 zoom、收藏弹跳、加购按钮按压
+### feat: 对话页叙事动效（P3）
+- 头部渐变头像光晕 + 在线呼吸点、AI 快捷卡 staggered 入场 + hover 上浮图标微动、chips 入场、消息气泡渐变用户态 + AI 态入场动画
+- **AI 思考态三点呼吸**（typing 且无 token 时）+ 打字机光标保留、工具调用理由框渐入 + flash 图标脉冲、推荐商品 mini-list staggered、工单卡片渐入、断链状态条滑入、发送按钮渐变 + 按压 + 聚焦输入框光晕
+### feat: 空状态/错误叙事化（P4）
+- EmptyState 重构：光晕插画环 + 叙事标题 + 副文案 + 唯一主 CTA（新增 title/desc/actionText/small props；兼容旧 illustration/icon/text 调用，15+ 页面零改动）
+- ErrorRetry 重构：「网络开了个小差」叙事 + 渐变重试按钮（兼容旧 props）
+### feat: 路由转场 + 动效收尾（P5）
+- App.vue：RouterView 包裹 Transition（fade + 10px 上滑，out-in 防重叠，240ms，仅 opacity/transform）
+- 新增 composables/useCountUp.ts（motion animate 命令式数字滚动，reduced-motion 自动降级）
+- 性能纪律：单屏并行动画 ≤3-4、主动画 ≤500ms、仅 transform/opacity
+### test: 全量验证
+- vue-tsc type-check 通过；vite build 通过（home 69.31kB / index 150.54kB）
+- 浏览器端到端（dev 5174）：首页问候/玻璃输入条/8 宫格/Banner/数字滚动/错误叙事组件全部渲染正确；对话页头部光晕/在线呼吸/6 快捷卡/思考态就绪；路由转场无 JS 错误（502 为 BFF 未启动所致，前端正确降级显示叙事错误态）
+
 ## [0.2.81] · 文档治理（按商用版标准整理优化全仓文档）（2026-10-23）
 ### docs: 全仓文档重构
 - progress 42 段归档至 docs/archive；bug #1-#40 归档；5 份报告 git mv 到 docs/reports/

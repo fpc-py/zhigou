@@ -25,13 +25,10 @@ defineProps<{
   flex-direction: column;
 }
 .skeleton-item {
-  background: linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  background: linear-gradient(90deg, #F0F1F8 25%, #E6E8F4 50%, #F0F1F8 75%);
+  background-size: 400px 100%;
+  animation: zf-shimmer 1.4s linear infinite;
   margin-bottom: 8px;
-}
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  border-radius: var(--radius-sm, 12px);
 }
 </style>

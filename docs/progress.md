@@ -4,6 +4,15 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-23 · [0.2.86] 前端深度优化 P1-P5（设计令牌 + 动效系统 + 叙事化）
+- **P1 令牌**：variables.css v2（渐变/阴影3层/圆角20-22/动效token/毛玻璃，旧名兼容零破坏）+ global.css 动效原语（press/glass/btn-brand + zf-* 关键帧 + anim-in + skel-block + prefers-reduced-motion）
+- **动效库**：motion 14.6.0 + @vueuse/motion（MotionPlugin 注册）；坑记录：motion 14 无 vue 子路径 → 双栈（指令 + 命令式 animate）
+- **P2 首页/组件**：头像光晕/今日省数字滚动（motion 0→86）/玻璃 AI 条流光/8 宫格 stagger+hover 上浮/Banner 流动光晕+FAB 弹跳；Skeleton shimmer 令牌/TabBar 图标 spring/ProductCard 入场+hover+收藏弹跳
+- **P3 对话页**：头部光晕+在线呼吸/AI 快捷卡 stagger/消息气泡叙事/**AI 思考三点**/工具理由框脉冲/mini-list stagger/工单卡片渐入/发送钮渐变
+- **P4 叙事化**：EmptyState（光晕环+标题+副文案+单 CTA，兼容 15+ 旧调用）+ ErrorRetry（「网络开了个小差」）
+- **P5 收尾**：App.vue 路由转场（Transition out-in 240ms）+ composables/useCountUp.ts（motion animate）
+- **验证**：vue-tsc ✅ + vite build ✅；浏览器端到端（dev 5174）首页/对话页全部渲染正确 + 数字滚动 + 转场无 JS 错误（502=BFF 未启，前端正确降级叙事错误态）
+
 ## 2026-10-23 · [0.2.85] 衣橱零录入 H5 闭环（AI 端点 + BFF + 拍照识别）
 - **AI 端点**：`POST /api/v1/closet/scan`（X-User-Id → closet_scan_item；401/422/降级兜底）；main.py 注册
 - **BFF**：`POST /closet/scan` 透传（JWT → X-User-Id）；SERVICE_PATHS.closetScan

@@ -1,9 +1,10 @@
 <template>
-  <div class="error-retry">
-    <div class="error-icon">⚠</div>
-    <p class="error-text">{{ text }}</p>
-    <button class="retry-btn" @click="$emit('retry')">
-      {{ btnText }}
+  <div class="error-retry anim-in">
+    <div class="error-ring"><span class="error-icon anim-float">😵</span></div>
+    <p class="error-title">{{ title || '网络开了个小差' }}</p>
+    <p class="error-text">{{ text || '请检查网络后重试' }}</p>
+    <button class="retry-btn btn-brand press" @click="$emit('retry')">
+      {{ btnText || '重试' }}
     </button>
   </div>
 </template>
@@ -12,6 +13,7 @@
 defineProps<{
   text?: string;
   btnText?: string;
+  title?: string;
 }>();
 
 defineEmits<{
@@ -25,23 +27,38 @@ defineEmits<{
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
+  padding: 48px 24px;
+  text-align: center;
+}
+.error-ring {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--danger-soft), transparent 72%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .error-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
+  font-size: 44px;
+  opacity: 0.9;
+}
+.error-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-top: 14px;
 }
 .error-text {
-  color: var(--ink-2);
-  font-size: 14px;
-  margin-bottom: 20px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  margin-top: 8px;
 }
 .retry-btn {
-  padding: 10px 28px;
-  background: var(--brand);
-  color: #fff;
+  margin-top: 18px;
+  padding: 11px 28px;
+  font-size: 13.5px;
+  font-weight: 700;
   border-radius: 999px;
-  font-size: 14px;
-  font-weight: 500;
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
   <div class="page home-page">
     <!-- 问候头部 -->
-    <header class="greet">
+    <header class="greet anim-in">
       <div class="greet-left">
         <div class="avatar">{{ avatarChar }}</div>
         <div>
@@ -9,19 +9,19 @@
           <p class="greet-date">{{ todayText }} · <span class="ai-ready"><Icon name="ai" size="xs" /> 小智已就绪</span></p>
         </div>
       </div>
-      <div class="save-chip"><Icon name="tag" size="xs" /> 今日省 ¥86</div>
+      <div class="save-chip anim-float"><Icon name="tag" size="xs" /> 今日省 ¥<span class="save-num">{{ saveCount }}</span></div>
     </header>
 
-    <!-- AI 输入条 -->
-    <div class="chat-bar" @click="goChat('')">
+    <!-- AI 输入条（玻璃拟态 + 顶部流光） -->
+    <div class="chat-bar glass press anim-in" @click="goChat('')" style="animation-delay:.06s">
       <div class="chat-avatar"><Icon name="ai" size="sm" /></div>
       <span class="chat-placeholder">问问小智，想买什么？</span>
       <span class="chat-btn"><Icon name="arrow-up" size="sm" /></span>
     </div>
 
-    <!-- 快捷入口 4 宫格 -->
+    <!-- 快捷入口 4 宫格（staggered 入场） -->
     <div class="quick-grid">
-      <button v-for="e in entries" :key="e.label" class="entry" @click="e.action">
+      <button v-for="(e, i) in entries" :key="e.label" class="entry press anim-in" :style="{ animationDelay: (0.10 + i * 0.06) + 's' }" @click="e.action">
         <span class="entry-ic" :style="{ background: e.bg, color: e.color }"><Icon :name="e.icon" /></span>
         <span class="entry-label">{{ e.label }}</span>
         <span class="entry-sub">{{ e.sub }}</span>
@@ -29,7 +29,7 @@
     </div>
 
     <!-- Banner -->
-    <div class="banner" @click="goChat('帮我挑一份礼物，预算 300 元')">
+    <div class="banner anim-in" @click="goChat('帮我挑一份礼物，预算 300 元')" style="animation-delay:.2s">
       <div class="banner-text">
         <p class="banner-title">AI 帮你买得更好</p>
         <p class="banner-sub">全网比价 · 智能衣橱 · AR 试穿</p>
@@ -98,6 +98,7 @@ import { getHomeFeed } from '@/api/home';
 import { getProfile } from '@/api/user';
 import { getCartMine } from '@/api/cart';
 import { useUserStore } from '@/stores/user';
+import { useCountUp } from '@/composables/useCountUp';
 import type { HomeFeedData, ProductItem } from '@/api/home';
 import Skeleton from '@/components/Skeleton.vue';
 import ErrorRetry from '@/components/ErrorRetry.vue';
@@ -141,6 +142,9 @@ const greeting = computed(() => {
 });
 
 const avatarChar = computed(() => (nickname.value ? nickname.value.slice(0, 1) : '夏'));
+
+/** 今日省钱数字滚动（motion 驱动，纯展示动效，不改后端数据） */
+const { value: saveCount, start: startSaveCount } = useCountUp(86, 900);
 
 function goChat(prefill: string) {
   router.push({ path: '/chat', query: prefill ? { q: prefill } : {} });
@@ -198,6 +202,7 @@ async function loadCartCount() {
 }
 
 onMounted(() => {
+  startSaveCount();
   loadProfile();
   loadFeed();
   loadCartCount();
@@ -217,10 +222,10 @@ onMounted(() => {
 }
 .greet-left { display: flex; align-items: center; gap: 10px; }
 .avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--brand), #8A94FF);
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
+  background: var(--brand-grad);
   color: #fff;
   font-weight: 700;
   font-size: 17px;
@@ -228,6 +233,18 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   flex: none;
+  position: relative;
+  box-shadow: var(--sh-3);
+}
+.avatar::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(122, 107, 255, 0.45), transparent 60%);
+  filter: blur(7px);
+  z-index: -1;
+  animation: zf-glow 3.2s ease-in-out infinite;
 }
 .greet-hi { font-size: 15px; font-weight: 700; }
 .greet-date { font-size: 11.5px; color: var(--ink-3); margin-top: 1px; display: flex; align-items: center; gap: 4px; }
@@ -238,46 +255,61 @@ onMounted(() => {
   gap: 4px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--accent);
-  background: var(--accent-soft);
-  padding: 7px 11px;
+  color: #fff;
+  background: linear-gradient(135deg, #FF5C39, #FFA62B);
+  padding: 7px 12px;
   border-radius: 999px;
   flex: none;
+  box-shadow: 0 8px 18px rgba(255, 92, 57, 0.28);
 }
+.save-num { font-variant-numeric: tabular-nums; }
 .chat-bar {
   margin: 10px 16px;
   padding: 11px 12px 11px 14px;
-  background: var(--card);
   border-radius: 999px;
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 6px 20px rgba(20, 26, 58, 0.08);
+  box-shadow: var(--sh-2);
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.chat-bar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1.5px;
+  background: linear-gradient(90deg, transparent, var(--brand), transparent);
+  background-size: 400px 100%;
+  animation: zf-shimmer 2.6s linear infinite;
 }
 .chat-avatar {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--brand), #8A94FF);
+  background: var(--brand-grad);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
+  box-shadow: 0 4px 12px rgba(76, 92, 255, 0.35);
 }
 .chat-placeholder { flex: 1; color: var(--ink-3); font-size: 13.5px; }
 .chat-btn {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: var(--brand);
+  background: var(--brand-grad);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
+  transition: transform var(--dur-fast) var(--ease-spring);
 }
+.chat-bar:active .chat-btn { transform: rotate(-45deg) scale(1.08); }
 .quick-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -292,8 +324,11 @@ onMounted(() => {
   background: var(--card);
   border-radius: var(--radius);
   padding: 13px 4px 11px;
-  box-shadow: 0 4px 14px rgba(20, 26, 58, 0.05);
+  box-shadow: var(--sh-1);
+  border: 1px solid var(--line);
+  transition: transform var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), border-color var(--dur-mid) var(--ease-out);
 }
+.entry:hover { transform: translateY(-3px); box-shadow: var(--sh-2); border-color: var(--brand-soft); }
 .entry-ic {
   width: 38px;
   height: 38px;
@@ -301,7 +336,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform var(--dur-mid) var(--ease-spring);
 }
+.entry:hover .entry-ic { transform: scale(1.12) rotate(-5deg); }
 .entry-label { font-size: 12px; font-weight: 600; }
 .entry-sub { font-size: 9.5px; color: var(--ink-3); }
 .banner {
@@ -313,9 +350,32 @@ onMounted(() => {
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  box-shadow: var(--sh-3);
 }
-.banner-title { font-size: 17px; font-weight: 800; letter-spacing: 0.5px; }
-.banner-sub { font-size: 11.5px; opacity: 0.85; margin-top: 4px; }
+.banner::before {
+  content: '';
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.35), transparent 65%);
+  top: -120px;
+  right: -60px;
+  animation: zf-glow 4s ease-in-out infinite;
+}
+.banner::after {
+  content: '';
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 162, 43, 0.5), transparent 60%);
+  bottom: -80px;
+  left: -40px;
+  animation: zf-glow 3.4s ease-in-out infinite reverse;
+}
+.banner-title { font-size: 17px; font-weight: 800; letter-spacing: 0.5px; position: relative; z-index: 1; }
+.banner-sub { font-size: 11.5px; opacity: 0.85; margin-top: 4px; position: relative; z-index: 1; }
 .banner-balls {
   position: absolute;
   right: -14px;
@@ -323,16 +383,17 @@ onMounted(() => {
   width: 110px;
   height: 110px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
+  z-index: 1;
 }
 .banner-balls i {
   position: absolute;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.2);
+  animation: zf-floaty 2.6s ease-in-out infinite;
 }
 .banner-balls i:nth-child(1) { width: 46px; height: 46px; right: 20px; bottom: -6px; }
-.banner-balls i:nth-child(2) { width: 24px; height: 24px; right: -6px; bottom: 26px; }
-.banner-balls i:nth-child(3) { width: 12px; height: 12px; right: 44px; bottom: -14px; }
+.banner-balls i:nth-child(2) { width: 24px; height: 24px; right: -6px; bottom: 26px; animation-delay: .3s; }
+.banner-balls i:nth-child(3) { width: 12px; height: 12px; right: 44px; bottom: -14px; animation-delay: .6s; }
 .feed-section { padding: 0 16px; }
 .section-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
 .personal-section { margin-top: 18px; }
@@ -365,27 +426,29 @@ onMounted(() => {
 .login-prompt { text-align: center; padding: 60px 24px; cursor: pointer; }
 .login-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
 .login-desc { font-size: 13px; color: var(--ink-3); margin-bottom: 20px; }
-.login-btn { display: inline-block; padding: 10px 32px; background: var(--brand); color: #fff; border-radius: 999px; font-size: 15px; font-weight: 500; }
+.login-btn { display: inline-block; padding: 10px 32px; background: var(--brand-grad); color: #fff; border-radius: 999px; font-size: 15px; font-weight: 500; box-shadow: 0 8px 18px rgba(76, 92, 255, 0.3); transition: transform var(--dur-fast) var(--ease-spring); }
+.login-btn:active { transform: scale(.96); }
 
 /* 悬浮购物车入口（与 TabBar 对齐：按 414px 手机容器居中定位） */
 .cart-fab {
   position: fixed;
   right: max(16px, calc((100vw - 414px) / 2 + 16px));
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--brand), #8A94FF);
+  width: 54px;
+  height: 54px;
+  border-radius: 19px;
+  background: var(--brand-grad);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 22px rgba(76, 92, 255, 0.38);
+  box-shadow: var(--sh-3);
   z-index: 90;
   border: none;
   cursor: pointer;
-  transition: transform 0.15s;
+  transition: transform var(--dur-mid) var(--ease-spring), box-shadow var(--dur-mid) var(--ease-out);
 }
+.cart-fab:hover { transform: translateY(-3px) rotate(-6deg); }
 .cart-fab:active { transform: scale(0.92); }
 .cart-badge {
   position: absolute;
@@ -403,5 +466,6 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 6px rgba(255, 92, 57, 0.4);
+  animation: zf-badge-pop .5s var(--ease-spring);
 }
 </style>

@@ -96,11 +96,16 @@ async function onAdd() {
   background: var(--card);
   border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 4px 16px rgba(20, 26, 58, 0.05);
+  box-shadow: var(--sh-1);
+  border: 1px solid var(--line);
   cursor: pointer;
   display: flex;
   flex-direction: column;
+  transition: transform var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out);
+  animation: zf-bounce-in .5s var(--ease-out) both;
 }
+.prod-card:hover { transform: translateY(-4px); box-shadow: var(--sh-2); }
+.prod-card:active { transform: scale(.98); }
 .prod-media {
   position: relative;
   aspect-ratio: 1;
@@ -110,7 +115,8 @@ async function onAdd() {
   justify-content: center;
   overflow: hidden;
 }
-.prod-media img { width: 100%; height: 100%; object-fit: cover; }
+.prod-media img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--dur-mid) var(--ease-out); }
+.prod-card:hover .prod-media img { transform: scale(1.05); }
 .img-placeholder { font-size: 34px; opacity: 0.5; }
 .prod-tag {
   position: absolute;
@@ -133,8 +139,10 @@ async function onAdd() {
   align-items: center;
   justify-content: center;
   color: var(--ink-3);
+  transition: transform var(--dur-fast) var(--ease-spring);
 }
-.prod-fav .faved { color: var(--accent); fill: var(--accent); }
+.prod-fav:active { transform: scale(1.3); }
+.prod-fav .faved { color: var(--accent); fill: var(--accent); animation: zf-badge-pop .4s var(--ease-spring); }
 .prod-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .prod-name {
   font-size: 13px;
@@ -161,6 +169,8 @@ async function onAdd() {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform var(--dur-fast) var(--ease-spring), background var(--dur-fast) var(--ease-out);
 }
+.add-btn:active { transform: scale(1.2); }
 .add-btn svg { width: 15px; height: 15px; }
 </style>

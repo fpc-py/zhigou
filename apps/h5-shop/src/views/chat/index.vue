@@ -14,7 +14,7 @@
 
     <!-- AI 功能快捷入口 -->
     <div v-if="messages.length === 0" class="quick">
-      <button v-for="q in quickActs" :key="q.label" class="quick-card" @click="sendWith(q.prompt)">
+      <button v-for="(q, qi) in quickActs" :key="q.label" class="quick-card press anim-in" :style="{ animationDelay: (qi * 0.05) + 's' }" @click="sendWith(q.prompt)">
         <span class="quick-icon"><Icon :name="q.icon" size="sm" /></span>
         <span class="quick-txt">
           <span class="quick-label">{{ q.label }}</span>
@@ -25,16 +25,19 @@
 
     <!-- 快捷 chips -->
     <div v-if="messages.length === 0" class="chips">
-      <button v-for="c in chips" :key="c" class="chip" @click="sendWith(c)">{{ c }}</button>
+      <button v-for="(c, ci) in chips" :key="c" class="chip press anim-in" :style="{ animationDelay: (0.3 + ci * 0.06) + 's' }" @click="sendWith(c)">{{ c }}</button>
     </div>
 
     <!-- 消息列表 -->
     <div class="msg-list" ref="msgList">
-      <div v-for="(msg, i) in messages" :key="i" :class="['msg', msg.role]">
+      <div v-for="(msg, i) in messages" :key="i" :class="['msg', msg.role]" class="anim-in" :style="{ animationDelay: (i * 0.04) + 's' }">
         <div v-if="msg.role === 'ai'" class="msg-avatar ai"><Icon name="ai" size="sm" /></div>
         <div class="msg-col">
           <div class="msg-bubble" :class="msg.role">
-            <template v-if="msg.role === 'ai' && msg.tokens">
+            <template v-if="msg.role === 'ai' && msg.typing && msg.tokens && msg.tokens.length === 0">
+              <span class="thinking"><i /><i /><i /></span>
+            </template>
+            <template v-else-if="msg.role === 'ai' && msg.tokens">
               <span v-for="(t, ti) in msg.tokens" :key="ti">{{ t }}</span>
               <span v-if="msg.typing" class="typing-cursor">▌</span>
             </template>
@@ -42,13 +45,13 @@
           </div>
 
           <!-- 工具调用中的理由框 -->
-          <div v-if="msg.role === 'ai' && msg.toolHint" class="ai-reason">
+          <div v-if="msg.role === 'ai' && msg.toolHint" class="ai-reason anim-in">
             <Icon name="flash" size="xs" />
             {{ msg.toolHint }}
           </div>
 
           <!-- 客服工单卡片（AI 客服转人工成功，块1） -->
-          <div v-if="msg.support" class="support-card">
+          <div v-if="msg.support" class="support-card anim-in">
             <p class="support-title">🤝 客服工单已创建</p>
             <p class="support-no">工单号：{{ msg.support.ticketNo }}</p>
             <p class="support-msg">{{ msg.support.message }}</p>
@@ -56,14 +59,14 @@
 
           <!-- 推荐商品 mini-list -->
           <div v-if="msg.products && msg.products.length" class="mini-list">
-            <div v-for="p in msg.products" :key="p.spuId" class="mini-item" @click="goProduct(p.spuId)">
+            <div v-for="(p, pi) in msg.products" :key="p.spuId" class="mini-item anim-in" :style="{ animationDelay: (pi * 0.07) + 's' }" @click="goProduct(p.spuId)">
               <img v-if="p.mainImage" :src="p.mainImage" :alt="p.name" class="mini-img" />
               <div v-else class="mini-img ph">🛍️</div>
               <div class="mini-info">
                 <p class="mini-name">{{ p.name }}</p>
                 <p class="mini-price"><b>¥{{ formatPrice(p.priceMin) }}</b></p>
               </div>
-              <button class="mini-add" @click.stop="onMiniAdd(p)"><Icon name="plus" /></button>
+              <button class="mini-add press" @click.stop="onMiniAdd(p)"><Icon name="plus" /></button>
             </div>
           </div>
         </div>
@@ -334,17 +337,30 @@ onMounted(() => {
   background: var(--card);
   border-bottom: 1px solid var(--line);
 }
-.head-back { display: flex; align-items: center; color: var(--ink); padding: 4px; }
+.head-back { display: flex; align-items: center; color: var(--ink); padding: 4px; transition: transform var(--dur-fast) var(--ease-spring); }
+.head-back:active { transform: scale(.9); }
 .head-avatar {
   width: 34px;
   height: 34px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--brand), #8A94FF);
+  border-radius: 11px;
+  background: var(--brand-grad);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
+  box-shadow: var(--sh-3);
+  position: relative;
+}
+.head-avatar::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(122, 107, 255, 0.45), transparent 60%);
+  filter: blur(6px);
+  z-index: -1;
+  animation: zf-glow 3.2s ease-in-out infinite;
 }
 .head-title { flex: 1; }
 .head-name { font-size: 15px; font-weight: 700; line-height: 1.3; }
@@ -357,7 +373,7 @@ onMounted(() => {
   color: var(--mint);
   font-weight: 600;
 }
-.head-online i { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); }
+.head-online i { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); animation: zf-glow 2.4s ease-in-out infinite; }
 .head-clear {
   flex: none;
   color: var(--ink-3);
@@ -365,7 +381,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform var(--dur-fast) var(--ease-spring), color var(--dur-fast) var(--ease-out);
 }
+.head-clear:active { transform: scale(.88); color: var(--danger); }
 .chips {
   flex: none;
   display: flex;
@@ -381,7 +399,9 @@ onMounted(() => {
   background: var(--brand-soft);
   border-radius: 999px;
   padding: 7px 13px;
+  transition: transform var(--dur-fast) var(--ease-spring), background var(--dur-fast) var(--ease-out);
 }
+.chip:hover { background: #E1E5FF; }
 .quick {
   flex: none;
   display: grid;
@@ -395,10 +415,12 @@ onMounted(() => {
   gap: 9px;
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 10px 11px;
   text-align: left;
+  transition: transform var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), border-color var(--dur-mid) var(--ease-out);
 }
+.quick-card:hover { transform: translateY(-2px); box-shadow: var(--sh-2); border-color: var(--brand-soft); }
 .quick-icon {
   width: 32px;
   height: 32px;
@@ -409,7 +431,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   flex: none;
+  transition: transform var(--dur-mid) var(--ease-spring);
 }
+.quick-card:hover .quick-icon { transform: scale(1.1) rotate(-6deg); }
 .quick-txt { display: flex; flex-direction: column; min-width: 0; }
 .quick-label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
 .quick-desc { font-size: 10px; color: var(--ink-3); margin-top: 1px; }
@@ -436,30 +460,36 @@ onMounted(() => {
   color: var(--ink-3);
 }
 .msg-avatar.ai {
-  background: linear-gradient(135deg, var(--brand), #8A94FF);
+  background: var(--brand-grad);
   color: #fff;
+  box-shadow: 0 4px 10px rgba(76, 92, 255, 0.3);
 }
 .msg-col { max-width: 78%; display: flex; flex-direction: column; gap: 6px; }
 .msg.user .msg-col { align-items: flex-end; }
 .msg-bubble {
   padding: 10px 13px;
-  border-radius: 14px;
+  border-radius: 16px 16px 16px 6px;
   font-size: 13.5px;
   line-height: 1.6;
   word-break: break-word;
+  box-shadow: var(--sh-1);
 }
 .msg-bubble.user {
-  background: var(--brand);
+  background: var(--brand-grad);
   color: #fff;
-  border-bottom-right-radius: 4px;
+  border-radius: 16px 16px 6px 16px;
+  box-shadow: 0 6px 16px rgba(76, 92, 255, 0.3);
 }
 .msg-bubble.ai {
   background: var(--card);
   border: 1px solid var(--line);
-  border-bottom-left-radius: 4px;
 }
 .typing-cursor { animation: blink 0.8s infinite; }
 @keyframes blink { 50% { opacity: 0; } }
+.thinking { display: inline-flex; gap: 5px; padding: 4px 0; }
+.thinking i { width: 7px; height: 7px; border-radius: 50%; background: var(--brand-2); animation: zf-typing 1.2s infinite; }
+.thinking i:nth-child(2) { animation-delay: .15s; }
+.thinking i:nth-child(3) { animation-delay: .3s; }
 .ai-reason {
   display: flex;
   align-items: flex-start;
@@ -471,7 +501,7 @@ onMounted(() => {
   padding: 8px 10px;
   line-height: 1.5;
 }
-.ai-reason svg { margin-top: 2px; flex: none; }
+.ai-reason svg { margin-top: 2px; flex: none; animation: zf-glow 1.6s ease-in-out infinite; }
 .mini-list {
   display: flex;
   flex-direction: column;
@@ -487,7 +517,9 @@ onMounted(() => {
   border-radius: 12px;
   padding: 8px;
   cursor: pointer;
+  transition: transform var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out);
 }
+.mini-item:hover { transform: translateY(-2px); box-shadow: var(--sh-2); }
 .mini-img {
   width: 46px;
   height: 46px;
@@ -517,7 +549,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   flex: none;
+  transition: transform var(--dur-fast) var(--ease-spring), background var(--dur-fast) var(--ease-out);
 }
+.mini-add:active { transform: scale(1.25); }
 .mini-add svg { width: 13px; height: 13px; }
 .conn-bar {
   margin: 0 12px 8px;
@@ -528,6 +562,7 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  animation: zf-bounce-in .4s var(--ease-out) both;
 }
 .conn-bar.reconnecting {
   background: #fff7e6;
@@ -554,7 +589,8 @@ onMounted(() => {
   border-top: 1px solid var(--line);
   background: var(--card);
 }
-.mic-btn { color: var(--ink-3); display: flex; padding: 6px; }
+.mic-btn { color: var(--ink-3); display: flex; padding: 6px; transition: transform var(--dur-fast) var(--ease-spring); }
+.mic-btn:active { transform: scale(.88); }
 .pending-img {
   flex: none;
   position: relative;
@@ -592,19 +628,24 @@ onMounted(() => {
   background: var(--bg);
   border-radius: 999px;
   font-size: 13.5px;
+  transition: box-shadow var(--dur-mid) var(--ease-out);
 }
+.input-bar input:focus { box-shadow: 0 0 0 2px var(--brand-soft); }
 .send-btn {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: var(--brand);
+  background: var(--brand-grad);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
+  box-shadow: 0 4px 12px rgba(76, 92, 255, 0.35);
+  transition: transform var(--dur-fast) var(--ease-spring), opacity var(--dur-fast) var(--ease-out);
 }
-.send-btn:disabled { opacity: 0.45; }
+.send-btn:active:not(:disabled) { transform: scale(.9); }
+.send-btn:disabled { opacity: 0.45; box-shadow: none; }
 <style scoped>
 .support-card {
   margin-top: 8px;

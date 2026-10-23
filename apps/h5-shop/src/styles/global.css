@@ -1,4 +1,4 @@
-/* 智购 H5 — 全局样式 */
+/* 智购 H5 — 全局样式 v2（前端深度优化 P1：动效原语 + 质感基础） */
 @import './variables.css';
 
 * {
@@ -53,3 +53,86 @@ a {
 
 /* 滚动条隐藏 */
 ::-webkit-scrollbar { display: none; }
+
+/* ============ 动效原语（P1） ============ */
+
+/* 按压反馈：可点击元素统一加 .press */
+.press { transition: transform var(--dur-fast) var(--ease-spring); }
+.press:active { transform: scale(.96); }
+
+/* 玻璃拟态 */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+}
+
+/* 渐变主按钮 */
+.btn-brand {
+  background: var(--brand-grad);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(76, 92, 255, 0.32);
+  transition: transform var(--dur-fast) var(--ease-spring), box-shadow var(--dur-mid) var(--ease-out);
+}
+.btn-brand:active { transform: scale(.96); box-shadow: 0 6px 14px rgba(76, 92, 255, 0.25); }
+
+/* ============ 动画关键帧 ============ */
+@keyframes zf-floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes zf-glow {
+  0%, 100% { opacity: .5; transform: scale(1); }
+  50% { opacity: .9; transform: scale(1.08); }
+}
+@keyframes zf-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+@keyframes zf-pulse-ring {
+  0% { transform: scale(.9); opacity: .7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes zf-bounce-in {
+  0% { opacity: 0; transform: translateY(14px) scale(.97); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.01); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes zf-typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+@keyframes zf-badge-pop {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+@keyframes zf-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 入场通用类：.anim-in + 可选 style="animation-delay:.1s" 实现 stagger */
+.anim-in {
+  animation: zf-bounce-in var(--dur-slow) var(--ease-out) both;
+}
+.anim-float { animation: zf-floaty 3s ease-in-out infinite; }
+.anim-glow { animation: zf-glow 3.2s ease-in-out infinite; }
+
+/* 骨架 shimmer（内容感知，全局复用） */
+.skel-block {
+  background: linear-gradient(90deg, #F0F1F8 25%, #E6E8F4 50%, #F0F1F8 75%);
+  background-size: 400px 100%;
+  animation: zf-shimmer 1.4s linear infinite;
+}
+
+/* ============ 无障碍：尊重系统减少动效偏好 ============ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
