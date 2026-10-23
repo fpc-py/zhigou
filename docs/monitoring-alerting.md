@@ -93,7 +93,7 @@ groups:
 
 ## 四、压测基线（发布前必查）
 
-- 报告：`docs/load-test/全链路压测报告.md`、`docs/load-test/results-20261002.json`
+- 报告：`docs/reports/全链路压测报告.md`、`docs/reports/results-20261002.json`
 - 命令：`k6 run scripts/load-test/full-chain-load-test.js --vus 100 --duration 60s`
 - 基线：见报告内 QPS / P95 / 错误率；发布后劣化 > 20% 视为回归
 

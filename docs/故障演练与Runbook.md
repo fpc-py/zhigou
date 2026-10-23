@@ -62,7 +62,7 @@
 2. **初步定位**：看最近一次发布/变更（`CHANGELOG.md`、git log）；业务指标异常优先查 outbox/MQ/对账
 3. **定级上报**：P1 立即通知发布负责人；P2/P3 按窗口处理（定级表见 `docs/monitoring-alerting.md`）
 4. **处置**：按 Runbook 速查表匹配；配置问题改配置重启；代码缺陷走修复+灰度
-5. **复盘**：记录到 `docs/测试问题bug记录.md` 与 `docs/progress.md`，缺陷转 `docs/未完成任务清单.md`
+5. **复盘**：记录到 `docs/测试问题bug记录.md` 与 `docs/progress.md`，缺陷转 `docs/智购开发任务差距分析报告.md` 附录 B（未完成任务清单）
 
 ---
 

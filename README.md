@@ -44,8 +44,7 @@
 | M3 大促压测 — 5000 QPS | ✅ [0.2.56] 容量模型：BFF 横扩 1.83x + 读层 1263 RPS + 5000 QPS 集群形态决策（单机可解释容量验收） |
 | M4 上线 — 灰度 + 监控 + 回滚 | ✅ [0.2.55] 回滚演练实测闭环 + release-checklist §1-§6 签核（生产前置项注明） |
 
-> 详细进度见 [docs/progress.md](docs/progress.md)；与目标态的差距与执行顺序见 [docs/智购开发任务差距分析报告.md](docs/智购开发任务差距分析报告.md)。
-
+> 详细进度见 [docs/progress.md](docs/progress.md)；
 ### 文档导航
 
 **所有文档的统一索引见 [docs/README.md](docs/README.md)**。核心文档：
@@ -55,13 +54,13 @@
 | 产品愿景（五大生态、AI 全链路） | [docs/智购功能文档.md](docs/智购功能文档.md) |
 | 可交互原型（H5 已对齐） | [docs/智购AI超级商城-企业级可交互原型.html](docs/智购AI超级商城-企业级可交互原型.html) |
 | 生产级架构蓝图 | [docs/智购-企业级工程化技术方案.md](docs/智购-企业级工程化技术方案.md) |
-| 架构决策记录 | [docs/adr/](docs/adr/) |
-| 前端改造与 BFF 接口清单 | [docs/前端改造说明-原型对齐与后端对接.md](docs/前端改造说明-原型对齐与后端对接.md) |
+| 架构决策记录 | [技术方案·ADR 附录](docs/智购-企业级工程化技术方案.md) |
+| 前端原型与接口清单 | [docs/智购AI超级商城-企业级可交互原型.html](docs/智购AI超级商城-企业级可交互原型.html) |
 | 生产就绪度评估（已并入差距报告附录 A） | [docs/智购开发任务差距分析报告.md](docs/智购开发任务差距分析报告.md) |
 | 发布检查清单 | [docs/release-checklist.md](docs/release-checklist.md) |
 | **简历面试深度叙事（坑 + 实测数据 + 追问应答）** | [docs/面试深度叙事.md](docs/面试深度叙事.md) |
 | 生产级加固实测报告（traceId/熔断/压测/告警） | [docs/生产级加固实测报告.md](docs/生产级加固实测报告.md) |
-| **未完成任务清单（含验收标准）** | [docs/未完成任务清单.md](docs/未完成任务清单.md) |
+| **未完成任务清单（含验收标准）** | [差距报告·附录 B](docs/智购开发任务差距分析报告.md) |
 
 ## 快速开始
 
@@ -343,9 +342,9 @@ k6 run scripts/load-test/smoke-test.js
 | 20 | 1,500 | 0% | 46ms | 102ms | 504ms | 387 |
 | 50 | 4,500 | 0% | 77ms | 131ms | 142ms | 718 |
 
-> 完整报告见 [docs/load-test/](docs/load-test/)
+> 完整报告见 [docs/reports/](docs/reports/)
 >
-> **最新（[0.2.56] M3 容量模型）**：BFF 横扩 1.83x（单 290 → 双 531 RPS 零错误）+ 读层 1263 RPS + 写链路瓶颈定位（order→product 级联超时，坑 #62），详见 [docs/load-test/M3生产化路径容量模型.md](docs/load-test/M3生产化路径容量模型.md)
+> **最新（[0.2.56] M3 容量模型）**：BFF 横扩 1.83x（单 290 → 双 531 RPS 零错误）+ 读层 1263 RPS + 写链路瓶颈定位（order→product 级联超时，坑 #62），详见 [docs/reports/M3生产化路径容量模型.md](docs/reports/M3生产化路径容量模型.md)
 
 ## 红线
 

@@ -226,7 +226,7 @@ TAG=<prev-tag> docker compose -f infra/compose/services.yml up -d --pull always
 | JVM 堆使用率 | — | — | — |
 | GC 暂停时间 | — | — | — |
 
-（压测基线参考：`docs/load-test/全链路压测报告.md`、`results-20261002.json`）
+（压测基线参考：`docs/reports/全链路压测报告.md`、`docs/reports/results-20261002.json`）
 
 ---
 
