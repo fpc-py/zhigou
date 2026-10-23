@@ -100,3 +100,9 @@ export async function getReplenishList(): Promise<HomeAsset[]> {
   const res = await http.get<{ code: number; data: HomeAsset[] }>('/closet/home/replenish');
   return res.data.data ?? [];
 }
+
+/** AI 衣物识别录入（衣橱零录入：图片 URL → LLM 视觉识别 → 自动加入衣橱） */
+export async function scanClosetItem(imageUrl: string): Promise<{ message: string } | null> {
+  const res = await http.post<{ code: number; data: { message: string } | null }>('/closet/scan', { imageUrl });
+  return res.data.data;
+}

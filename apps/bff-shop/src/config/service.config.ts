@@ -120,6 +120,8 @@ export const SERVICE_PATHS = {
   closetHomeList:     '/closet/home/list',
   closetHomeItem:     '/closet/home/item',
   closetHomeReplenish: '/closet/home/replenish',
+  // AI 衣物识别录入（衣橱零录入，ai-orchestrator 8095）
+  closetScan: '/api/v1/closet/scan',
   // AI 主动提醒中心（块2，ai-orchestrator 8095）
   remindersMine: '/api/v1/reminders/mine',
   remindersScan: '/api/v1/reminders/scan',

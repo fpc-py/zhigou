@@ -51,6 +51,28 @@ async def reminders_read(reminder_id: str, x_user_id: str | None = Header(defaul
         raise HTTPException(status_code=404, detail="提醒不存在或不属于当前用户")
     return {"data": r}
 
+closet_router = APIRouter(prefix="/closet", tags=["closet"])
+
+
+@closet_router.post("/scan")
+async def closet_scan(req: dict, x_user_id: str | None = Header(default=None)):
+    """AI 衣物识别录入：图片 URL → LLM 视觉识别 → 自动加入衣橱（衣橱零录入 H5 闭环）。"""
+    from .tools import _current_user_id, closet_scan_item
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="缺少用户身份")
+    image_url = (req or {}).get("image_url", "").strip()
+    if not image_url:
+        raise HTTPException(status_code=422, detail="image_url 必填")
+    _current_user_id.set(x_user_id)
+    try:
+        message = await closet_scan_item.ainvoke({"image_url": image_url})
+        return {"code": 200, "message": "success", "data": {"message": message}}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        logger.warning("closet scan 失败: %s", e)
+        return {"code": 500, "message": "AI 识别失败，请稍后重试", "data": None}
+
 metrics_router = APIRouter(prefix="", tags=["metrics"])
 
 

@@ -6,8 +6,12 @@
         <p class="head-title">我的衣橱</p>
         <p class="head-sub"><Icon name="ai" size="xs" /> 小智已记住 {{ items.length }} 件单品</p>
       </div>
-      <button class="add-btn" @click="openAdd"><Icon name="plus" /></button>
+      <div class="head-actions">
+        <button v-if="tab === 'items'" class="ai-scan-btn" @click="pickImage"><Icon name="ai" size="xs" /> 拍照识别</button>
+        <button class="add-btn" @click="openAdd"><Icon name="plus" /></button>
+      </div>
     </header>
+    <input ref="fileInput" type="file" accept="image/*" hidden @change="onPickImage" />
 
     <!-- Tab：衣物 / 穿搭 / 家居 -->
     <div class="tabs">
@@ -129,7 +133,7 @@
       </div>
     </div>
 
-    <div class="planning-note">穿搭推荐为规则引擎（演示，非 AI 模型）；衣物识别/图像导入规划中</div>
+    <div class="planning-note">穿搭推荐为规则引擎 + AI 润色；「拍照识别」由 AI 视觉模型自动录入衣物</div>
   </div>
 </template>
 
@@ -140,9 +144,10 @@ import { showToast } from '@/utils';
 import Icon from '@/components/Icon.vue';
 import {
   getClosetItems, addClosetItem, wearClosetItem, deleteClosetItem,
-  recommendOutfit, getHomeAssets, addHomeAsset, getReplenishList,
+  recommendOutfit, getHomeAssets, addHomeAsset, getReplenishList, scanClosetItem,
 } from '@/api/closet';
 import type { ClosetItem, HomeAsset, OutfitRecommend } from '@/api/closet';
+import { uploadImage } from '@/api/file';
 
 const router = useRouter();
 const tabs = [
@@ -166,6 +171,8 @@ const occasion = ref('通勤');
 
 const showAdd = ref(false);
 const form = ref<Record<string, any>>({ name: '', category: '', season: '四季', color: '', quantity: 1, unit: '件', expireAt: '' });
+const fileInput = ref<HTMLInputElement | null>(null);
+const scanning = ref(false);
 
 const filtered = computed(() => (cat.value === '全部' ? items.value : items.value.filter((i) => i.category === cat.value)));
 const filteredAssets = computed(() => (assetCat.value === '全部' ? assets.value : assets.value.filter((a) => a.category === assetCat.value)));
@@ -245,6 +252,34 @@ function openAdd() {
     : { name: '', category: '上装', season: '四季', color: '' };
   showAdd.value = true;
 }
+
+/** AI 拍照识别录入（衣橱零录入）：选图 → 上传 file-service → LLM 视觉识别 → 自动入库 */
+function pickImage() {
+  if (scanning.value) return;
+  fileInput.value?.click();
+}
+async function onPickImage(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  if (!/^image\//.test(file.type)) {
+    toast('请选择图片文件');
+    return;
+  }
+  scanning.value = true;
+  try {
+    const up = await uploadImage(file, { compress: true, bizType: 'other' });
+    toast('AI 识别中，请稍候…');
+    const data = await scanClosetItem(up.url);
+    if (data?.message) toast(data.message);
+    loadItems();
+  } catch (e: any) {
+    toast(e.message || 'AI 识别失败，请稍后重试');
+  } finally {
+    scanning.value = false;
+  }
+}
 async function submitAdd() {
   if (!form.value.name) {
     toast('请填写名称');
@@ -289,6 +324,9 @@ onMounted(() => {
 .head-sub { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; display: flex; align-items: center; gap: 4px; }
 .head-sub svg { color: var(--brand); }
 .add-btn { width: 34px; height: 34px; border-radius: 12px; background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; }
+.head-actions { display: flex; align-items: center; gap: 8px; }
+.ai-scan-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--brand); background: var(--brand-soft); border-radius: 999px; padding: 8px 12px; }
+.ai-scan-btn:disabled { opacity: 0.6; }
 .card { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
 .tabs { display: flex; background: var(--bg); border-radius: 12px; padding: 3px; margin-bottom: 12px; }
 .tab { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: var(--ink-3); padding: 8px 0; border-radius: 10px; cursor: pointer; }

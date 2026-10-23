@@ -151,4 +151,19 @@ export class ClosetService {
     );
     return unwrapOrThrow(resp, this.logger, 'closet/home/replenish', []);
   }
+
+  /** AI 衣物识别录入（衣橱零录入：图片 URL → ai-orchestrator /closet/scan → LLM 视觉识别自动入库） */
+  async scanItem(userId: string, imageUrl: string): Promise<any | null> {
+    const url = `${SERVICES.aiOrchestrator.url}${SERVICE_PATHS.closetScan}`;
+    const resp = await firstValueFrom(
+      this.http.post(url, { image_url: imageUrl }, { headers: this.authHeader(userId) }).pipe(
+        timeout(SERVICES.aiOrchestrator.timeout),
+        catchError((err) => {
+          this.logger.warn(`ai-orchestrator /closet/scan 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'closet/scan', null);
+  }
 }

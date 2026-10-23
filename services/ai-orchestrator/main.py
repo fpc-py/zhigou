@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # 确保项目根目录在 sys.path 中，支持直接运行 python main.py
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from app.api import metrics_router, reminders_router, router as chat_router
+from app.api import closet_router, metrics_router, reminders_router, router as chat_router
 from app.config import settings
 from app.fallback_config import init_config as init_fallback_config
 
@@ -50,6 +50,7 @@ app.add_middleware(
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(metrics_router)
 app.include_router(reminders_router, prefix="/api/v1")
+app.include_router(closet_router, prefix="/api/v1")
 app.include_router(rag_router)
 app.include_router(community_router)
 

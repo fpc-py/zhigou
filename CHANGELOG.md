@@ -21,6 +21,17 @@
 - 复扫验证：响应侧 Long id 缺口 **0**；金额字段误注解 **0**；请求 DTO 维持 HEAD 基线
 - 面试叙事：一个 2^53 精度 bug 的**系统级闭环**——盘点全仓 180+ 字段 → 分类（响应/请求/金额）→ 白名单/黑名单双纪律 → 全覆盖 + 复扫自证；「类型标注 String ≠ 运行时保真」认知盲区
 
+## [0.2.85] · 衣橱零录入 H5 闭环（AI 端点 + BFF 透传 + 拍照识别入口）（2026-10-23）
+### feat: AI 衣物识别录入端到端闭环
+- ai-orchestrator 新增 `POST /api/v1/closet/scan`（X-User-Id 鉴权 → closet_scan_item → LLM 视觉识别自动入库；401/422/降级兜底）
+- BFF 新增 `POST /closet/scan` 透传（JWT → X-User-Id 注入，imageUrl 校验）；SERVICE_PATHS 登记 closetScan
+- H5 衣橱页新增「拍照识别」入口：选图 → file-service 上传（compress）→ AI 识别 → 自动入库 → 列表刷新；文案更新（识别已上线）
+### fix: AI 服务端口对齐（坑 #84）
+- config.py app_port 默认 8000 → 8095（与 BFF service.config.ts 及注释一致；8000 曾与其他项目冲突）
+### test: 全量验证
+- AI：py_compile + pytest 79 passed；真实链路——识别 unsplash 衣物图自动入库（中文/字符串 id 正常）、无身份 401、无效 URL 降级
+- BFF：nest build 通过；H5：vue-tsc type-check 通过
+
 ## [0.2.84] · 衣橱零录入 + AI 每日穿搭（AI 工具 ×2，TOOLS 35→37）（2026-10-23）
 ### feat: 多模态衣橱 AI 工具
 - `closet_scan_item`：衣物照片 → LLM 视觉识别（复用 `_vision_extract`，参数化 schema product/closet）→ 自动入库（免手填分类/季节/颜色）

@@ -4,6 +4,13 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-23 · [0.2.85] 衣橱零录入 H5 闭环（AI 端点 + BFF + 拍照识别）
+- **AI 端点**：`POST /api/v1/closet/scan`（X-User-Id → closet_scan_item；401/422/降级兜底）；main.py 注册
+- **BFF**：`POST /closet/scan` 透传（JWT → X-User-Id）；SERVICE_PATHS.closetScan
+- **H5**：衣橱页「拍照识别」入口（file-service 上传 → AI 识别 → 自动入库 → 刷新）；文案更新
+- **端口对齐（坑 #84）**：config app_port 8000→8095（与 BFF 一致）
+- **验证**：pytest 79 passed + py_compile；nest build OK；vue-tsc OK；真实链路识别入库（中文/字符串 id）PASS
+
 ## 2026-10-23 · [0.2.84] 衣橱零录入 + AI 每日穿搭（TOOLS 35→37）
 - **工具**：`closet_scan_item`（衣物图 → 视觉识别 → 自动入库）+ `outfit_daily`（真实衣橱 + 场合规则 + AI 润色，失败降级）；`_vision_extract` 参数化 schema
 - **路由/提示词**：chat_service 2 条规则 + system.md 工具表登记

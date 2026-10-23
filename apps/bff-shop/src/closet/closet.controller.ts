@@ -71,4 +71,14 @@ export class ClosetController {
     const data = await this.closet.replenishList(this.uid(req));
     return ApiResponse.ok(data);
   }
+
+  /** AI 衣物识别录入（衣橱零录入：上传图片 URL → LLM 视觉识别 → 自动加入衣橱） */
+  @Post('closet/scan')
+  async scan(@Body('imageUrl') imageUrl: string, @Req() req: Request) {
+    if (!imageUrl || typeof imageUrl !== 'string' || !/^https?:\/\//.test(imageUrl)) {
+      return ApiResponse.fail(422, 'imageUrl 必须为有效的 http(s) 图片地址');
+    }
+    const data = await this.closet.scanItem(this.uid(req), imageUrl);
+    return ApiResponse.ok(data);
+  }
 }

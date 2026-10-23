@@ -9,7 +9,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # ── 应用 ──
     app_name: str = "ai-orchestrator"
-    app_port: int = 8000
+    # 智购 AI 固定 8095（与 BFF service.config.ts 对齐；本机 8000 曾与其他项目冲突）
+    app_port: int = 8095
     log_level: str = "INFO"
 
     # ── 系统提示词路径 ──
