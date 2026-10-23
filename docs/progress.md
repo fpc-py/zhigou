@@ -4,6 +4,12 @@
 > 状态：✅ 已完成 / 🚧 进行中 / ⬜ 未开始 / ⚠️ 有风险
 > 与目标态的差距清单与执行顺序见 `docs/智购开发任务差距分析报告.md`。
 
+## 2026-10-23 · [0.2.83] A4 双场景端到端实测闭环（部分退款 + 部分发货）
+- **① 部分发货 PASS**：订单 2113578357719015424（3 件 ¥132）→ ship-partial 2+1 分批发 → SHIPPED + /shipments 2 条明细（SF-TEST-001/002）
+- **② 部分退款 PASS**：订单 2113579450880466944（2 件 ¥88）→ payment/create + mock-pay（签名）→ PAID → 1+1 分批发 → SHIPPED → 售后 ¥44 apply/approve/refund → REFUNDED；payment_refund 落库 4400/SUCCESS/RF8ACD6CCAB5FE4D70；订单保持 SHIPPED；超退申请 13200 → 400 拦截
+- **差距报告附录 B A4 行勾销**（✅ 端到端实测 PASS）
+- **坑**：#70 跨服务退款强依赖真实支付单（order 直调 payCallback 则 payment 侧无单 → refund 404）；#71 mock-pay 沙箱签名（sha256(paymentNo+sandbox-secret)）文档未写明算法，按 SandboxChannel 复算通过
+
 ## 2026-10-23 · [0.2.82] 精度闭环收口：读路径 19 位 id 字符串化（bug #63 根治）
 - **修复**：响应 DTO/Entity 的 Long id 语义字段全量 `@JsonSerialize(ToStringSerializer)`——39 文件 61 字段（含 Shipment/CalculateResponse 两处拆行避开金额字段）+ 17 文件补 import
 - **纪律**：请求 DTO 不动；金额字段永不注解；id 语义 = id + 以 Id/id/No 结尾

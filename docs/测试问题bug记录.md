@@ -5,6 +5,18 @@
 
 > 早期 bug 记录（#1–#40，共 15 条）已归档至 `docs/archive/bug-history.md`；本文保留 #41 起全部近期记录。
 
+## #80 A4 补验坑①：跨服务退款强依赖真实支付单（[0.2.83]）
+- **背景**：A4 部分退款实测首轮用 order 直调 payCallback 置 PAID，售后 apply/approve 均过，但 refund 阶段 aftersale→payment/refund 返回 404「支付单不存在: orderNo=...」。
+- **根因**：order 的 payCallback 是**模拟支付入口**，只在 order 侧置 PAID；payment-service 的 payment 表没有该订单支付单 → 跨服务退款按 orderNo 查支付单必然为空。真实链路必须先 payment/create 建支付单。
+- **修复（测试路径）**：A4 实测改用真实支付链路 payment/create → sandbox/mock-pay → 订单 PAID；售后退款全链路通过（REFUNDED + payment_refund 落库）。
+- **教训**：**端到端实测必须走真实链路**——用「捷径」模拟中间态会掩盖跨服务依赖；跨服务退款强依赖支付单存在，这本身就是一致性设计（无支付单不可退款）。
+
+## #81 A4 补验坑②：mock-pay 沙箱签名算法文档缺失（[0.2.83]）
+- **背景**：mock-pay 直接传 sign='sandbox' 报「签名校验失败」（403 业务码），订单未转 PAID。
+- **根因**：sign = sha256(paymentNo + payment.sandbox-secret)（HMAC 简化版），算法只在 SandboxChannel.verifyCallback 一行代码里，接口文档未写明。
+- **修复**：按代码复算签名（SHA256(paymentNo+'sandbox-secret-key')）后 mock-pay 成功，支付单 SUCCESS、订单 PAID。
+- **教训**：沙箱/测试入口也是生产代码——签名算法应入接口文档；测试脚本遇 403 应先查服务日志（日志会打印 expected 与 sign 明文对比）。
+
 ## #70 商家售后管家开发三坑：BFF 路由顺序 / H5 Pinia 初始化时机 / Windows JWT BOM（[0.2.75]）
 - **① BFF 新路由必须在 `@Get(':no')` 之前声明**：NestJS 路由按声明顺序匹配，`merchant/pending` 若声明在 `:no` 动态参数之后会被吞成参数路由 → 404/错匹配。修复：具名路由前置声明。
 - **② H5 token 走 Pinia userStore**：localStorage 注入 token 后，Pinia store 初始化早于注入则读不到（store 只在启动时读一次 localStorage）→ 页面停留旧态。修复：注入后整页刷新 / 登录页跳转前显式初始化 store。

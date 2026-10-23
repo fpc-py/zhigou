@@ -21,6 +21,14 @@
 - 复扫验证：响应侧 Long id 缺口 **0**；金额字段误注解 **0**；请求 DTO 维持 HEAD 基线
 - 面试叙事：一个 2^53 精度 bug 的**系统级闭环**——盘点全仓 180+ 字段 → 分类（响应/请求/金额）→ 白名单/黑名单双纪律 → 全覆盖 + 复扫自证；「类型标注 String ≠ 运行时保真」认知盲区
 
+## [0.2.83] · A4 双场景端到端实测闭环（部分退款 + 部分发货）（2026-10-23）
+### test: 差距报告附录 B A4 勾销
+- **① 部分发货 PASS**：订单 2113578357719015424（3 件 ¥132）→ ship-partial 2+1 分批发 → SHIPPED，/shipments 2 条发货明细（SF-TEST-001/002）
+- **② 部分退款 PASS**：订单 2113579450880466944（2 件 ¥88）真实支付链路（payment/create + mock-pay 签名）→ PAID → 1+1 分批发 → SHIPPED → 售后 ¥44 apply/approve/refund → REFUNDED，payment_refund 落库 4400/SUCCESS/RF8ACD6CCAB5FE4D70，订单保持 SHIPPED；超退申请 13200（可退 8800）→ 400 拦截
+### fix: 补验暴露的链路约束（坑 #80-#81）
+- #70：A4 售后退款**必须走真实支付链路**——order 直调 payCallback 置 PAID 时 payment 侧无支付单，aftersale→payment/refund 404「支付单不存在」；跨服务退款强依赖真实支付单
+- #71：mock-pay 沙箱签名校验——sign = sha256(paymentNo + payment.sandbox-secret)，文档未写明算法，按 SandboxChannel.verifyCallback 复算后支付成功
+
 ## [0.2.80] · AI 深水区④ AI 评测回归集（离线确定性断言进 CI）（2026-10-22）
 ### feat: scripts/ai-eval 三脚本 + CI job
 - `scripts/ai-eval/test_tool_schema.py`：TOOLS 全量 convert_to_openai_tool + 名称唯一 + 参数 properties 完整（防 #144 漏注册重演）
