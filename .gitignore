@@ -66,3 +66,8 @@ data/
 .sessions
 # ===== 运行时日志 =====
 logs/
+
+# ===== Open-source policy: internal docs / agent configs are NOT committed =====
+/docs/
+.claude/
+.trae/
