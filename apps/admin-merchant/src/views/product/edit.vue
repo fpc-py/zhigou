@@ -60,8 +60,8 @@ const form = ref({
   subtitle: '',
   mainImage: '',
   description: '',
-  categoryId: 0,
-  brandId: 0,
+  categoryId: 0 as number | string,
+  brandId: 0 as number | string,
   skus: [] as any[],
 });
 
@@ -85,7 +85,7 @@ async function save() {
       })),
     };
     if (isEdit) {
-      await updateSpu(Number(spuId), payload);
+      await updateSpu(spuId, payload);
       ElMessage.success('更新成功');
     } else {
       await createSpu(payload);
@@ -103,7 +103,7 @@ onMounted(async () => {
   if (isEdit) {
     loading.value = true;
     try {
-      const detail = await getSpuDetail(Number(spuId));
+      const detail = await getSpuDetail(spuId);
       form.value = {
         name: detail.name || '',
         subtitle: detail.subtitle || '',

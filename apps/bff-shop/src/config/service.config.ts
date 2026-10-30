@@ -38,6 +38,8 @@ export const SERVICE_PATHS = {
   productPage:       '/product/page',
   productDetail:     (spuId: string) => `/product/${spuId}`,
   productSku:        (skuId: string) => `/product/sku/${skuId}`,
+  productSpu:        '/product/spu',
+  productSpuItem:    (spuId: string) => `/product/spu/${spuId}`,
   productRecommend:  '/recommend',
   priceCompare:      '/price/compare',
   userCoupons:       '/coupon/mine',

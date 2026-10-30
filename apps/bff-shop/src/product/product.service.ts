@@ -49,6 +49,52 @@ export class ProductService {
     return resp.data?.data ?? null;
   }
 
+  /** 新增商品（商家） */
+  async createSpu(data: any, userId: string): Promise<string | null> {
+    const url = `${SERVICES.productService.url}${SERVICE_PATHS.productSpu}`;
+    const resp = await firstValueFrom(
+      this.http.post(url, data, { headers: { 'x-user-id': userId } }).pipe(
+        timeout(SERVICES.productService.timeout),
+        catchError((err) => {
+          this.logger.warn(`product-service POST /product/spu 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    const spuId = resp.data?.data?.spuId;
+    return spuId != null ? String(spuId) : null;
+  }
+
+  /** 更新商品（商家） */
+  async updateSpu(spuId: string, data: any, userId: string): Promise<boolean> {
+    const url = `${SERVICES.productService.url}${SERVICE_PATHS.productSpuItem(spuId)}`;
+    const resp = await firstValueFrom(
+      this.http.put(url, data, { headers: { 'x-user-id': userId } }).pipe(
+        timeout(SERVICES.productService.timeout),
+        catchError((err) => {
+          this.logger.warn(`product-service PUT /product/spu/${spuId} 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return resp.data?.code === 0 || resp.data?.data !== undefined;
+  }
+
+  /** 下架商品（商家） */
+  async offShelf(spuId: string, userId: string): Promise<boolean> {
+    const url = `${SERVICES.productService.url}${SERVICE_PATHS.productSpuItem(spuId)}`;
+    const resp = await firstValueFrom(
+      this.http.delete(url, { headers: { 'x-user-id': userId } }).pipe(
+        timeout(SERVICES.productService.timeout),
+        catchError((err) => {
+          this.logger.warn(`product-service DELETE /product/spu/${spuId} 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return resp.data?.code === 0 || resp.data?.data !== undefined;
+  }
+
   async getDetail(spuId: string, userId: string): Promise<ProductDetailResponse> {
     const [productResult, ragResult] = await Promise.all([
       this.safeCall<Record<string, any>>(this.fetchProduct(spuId, userId)),
