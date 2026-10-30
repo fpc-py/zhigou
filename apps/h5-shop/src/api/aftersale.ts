@@ -24,7 +24,8 @@ export interface ApplyBody {
   type: string;
   reason?: string;
   amount: number;
-  skuId?: number | null;
+  /** skuId 19 位雪花 ID：必须字符串透传，JS Number 会丢精度（CLAUDE.md 红线） */
+  skuId?: string | null;
   count?: number | null;
   images?: string[];
 }

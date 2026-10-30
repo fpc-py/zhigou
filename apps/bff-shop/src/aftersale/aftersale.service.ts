@@ -1,12 +1,42 @@
 /**
  * Aftersale Service — 售后透传
  * aftersale-service 的查询/商家操作均需 X-User-Id 头（内网鉴权），BFF 统一从 JWT 注入。
+ * 修复 #88：下游业务错误（HTTP 200 + body.code!=200 / HTTP >=400）显式透传，
+ * 不再吞成 success-null，前端可提示真实失败原因。
  */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom, catchError, timeout } from 'rxjs';
+import { firstValueFrom, catchError, timeout, of } from 'rxjs';
 import { SERVICES } from '../config/service.config.js';
 import type { AftersaleOrder } from './aftersale.types.js';
+
+/** 下游业务错误（HTTP 200 + body.code!=200）→ 按业务码抛 HttpException，避免吞成 success-null */
+function unwrapBizOrThrow<T>(
+  resp: { data: { code?: number; message?: string; data?: T | null } },
+  logger: Logger,
+  label: string,
+  fallback: T,
+): T {
+  const body = resp.data;
+  if (body == null) return fallback;
+  if (body.code !== undefined && body.code !== 200) {
+    const status = typeof body.code === 'number' && body.code >= 400 && body.code < 600 ? body.code : HttpStatus.BAD_REQUEST;
+    logger.warn(`${label} 业务失败: code=${body.code} message=${body.message}`);
+    throw new HttpException(body.message || `${label} 业务处理失败`, status);
+  }
+  return (body.data as T) ?? fallback;
+}
+
+/** HTTP 层错误（下游 4xx/5xx）→ 按原状态码抛，透传鉴权/越权等语义 */
+function throwHttpOrFallback(err: any, logger: Logger, label: string) {
+  const st = err.response?.status;
+  if (st && st >= 400) {
+    const msg = err.response?.data?.message || err.response?.data?.error || `${label} 失败`;
+    throw new HttpException(msg, st);
+  }
+  logger.warn(`${label} 失败: ${err.message}`);
+  return of({ data: { data: null } });
+}
 
 @Injectable()
 export class AftersaleService {
@@ -25,13 +55,10 @@ export class AftersaleService {
     const resp = await firstValueFrom(
       this.http.post(`${this.base}/aftersale/apply`, rawBody, { headers: { 'x-user-id': userId, 'content-type': 'application/json' } }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/apply 失败: ${err.message}`);
-          return Promise.resolve({ data: { data: null } });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, 'aftersale-service /aftersale/apply')),
       ),
     );
-    return resp.data?.data ?? null;
+    return unwrapBizOrThrow(resp, this.logger, 'aftersale/apply', null);
   }
 
   async mine(userId: string): Promise<AftersaleOrder[]> {
@@ -40,13 +67,10 @@ export class AftersaleService {
         headers: this.authHeader(userId),
       }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/mine 失败: ${err.message}`);
-          return Promise.resolve({ data: { data: [] } });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, 'aftersale-service /aftersale/mine')),
       ),
     );
-    return resp.data?.data ?? [];
+    return unwrapBizOrThrow<AftersaleOrder[]>(resp, this.logger, 'aftersale/mine', []);
   }
 
   async detail(userId: string, no: string): Promise<AftersaleOrder | null> {
@@ -55,27 +79,22 @@ export class AftersaleService {
         headers: this.authHeader(userId),
       }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/${no} 失败: ${err.message}`);
-          return Promise.resolve({ data: { data: null } });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, `aftersale-service /aftersale/${no}`)),
       ),
     );
-    return resp.data?.data ?? null;
+    return unwrapBizOrThrow(resp, this.logger, `aftersale/${no}`, null);
   }
 
   async cancel(userId: string, no: string): Promise<void> {
-    await firstValueFrom(
+    const resp = await firstValueFrom(
       this.http.post(`${this.base}/aftersale/${encodeURIComponent(no)}/cancel`, null, {
         headers: this.authHeader(userId),
       }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/${no}/cancel 失败: ${err.message}`);
-          return Promise.resolve({ data: null });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, `aftersale-service /aftersale/${no}/cancel`)),
       ),
     );
+    unwrapBizOrThrow(resp, this.logger, `aftersale/${no}/cancel`, undefined);
   }
 
   /** 商家售后工作台：待处理列表 + 全状态统计（status 可选，默认 APPLYING） */
@@ -86,43 +105,36 @@ export class AftersaleService {
         headers: this.authHeader(userId),
       }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/merchant/pending 失败: ${err.message}`);
-          return Promise.resolve({ data: { data: null } });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, 'aftersale-service /aftersale/merchant/pending')),
       ),
     );
-    return resp.data?.data ?? null;
+    return unwrapBizOrThrow(resp, this.logger, 'aftersale/merchant/pending', null);
   }
 
   /** 商家同意退款（售后单 -> SELLER_APPROVED） */
   async approve(userId: string, no: string): Promise<void> {
-    await firstValueFrom(
+    const resp = await firstValueFrom(
       this.http.post(`${this.base}/aftersale/${encodeURIComponent(no)}/approve`, null, {
         headers: this.authHeader(userId),
       }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/${no}/approve 失败: ${err.message}`);
-          return Promise.resolve({ data: null });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, `aftersale-service /aftersale/${no}/approve`)),
       ),
     );
+    unwrapBizOrThrow(resp, this.logger, `aftersale/${no}/approve`, undefined);
   }
 
   /** 商家拒绝售后：rawBody 字符串透传（rejectReason） */
   async reject(userId: string, no: string, rawBody: string): Promise<void> {
-    await firstValueFrom(
+    const resp = await firstValueFrom(
       this.http.post(`${this.base}/aftersale/${encodeURIComponent(no)}/reject`, rawBody, {
         headers: { 'x-user-id': userId, 'content-type': 'application/json' },
       }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/${no}/reject 失败: ${err.message}`);
-          return Promise.resolve({ data: null });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, `aftersale-service /aftersale/${no}/reject`)),
       ),
     );
+    unwrapBizOrThrow(resp, this.logger, `aftersale/${no}/reject`, undefined);
   }
 
   /** 质保提醒：30 天内到期 / 已过期 / 正常 */
@@ -132,13 +144,10 @@ export class AftersaleService {
         headers: this.authHeader(userId),
       }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/warranty/alerts 失败: ${err.message}`);
-          return Promise.resolve({ data: { data: null } });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, 'aftersale-service /aftersale/warranty/alerts')),
       ),
     );
-    return resp.data?.data ?? null;
+    return unwrapBizOrThrow(resp, this.logger, 'aftersale/warranty/alerts', null);
   }
 
   /** 创建维修预约（演示口径 PENDING，正式版需商家确认排期）——rawBody 字符串透传 */
@@ -148,13 +157,10 @@ export class AftersaleService {
         headers: { 'x-user-id': userId, 'content-type': 'application/json' },
       }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/repair/appointment 失败: ${err.message}`);
-          return Promise.resolve({ data: { data: null } });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, 'aftersale-service /aftersale/repair/appointment')),
       ),
     );
-    return resp.data?.data ?? null;
+    return unwrapBizOrThrow(resp, this.logger, 'aftersale/repair/appointment', null);
   }
 
   /** 我的维修预约 */
@@ -164,12 +170,9 @@ export class AftersaleService {
         headers: this.authHeader(userId),
       }).pipe(
         timeout(this.t),
-        catchError((err) => {
-          this.logger.warn(`aftersale-service /aftersale/repair/appointments 失败: ${err.message}`);
-          return Promise.resolve({ data: { data: null } });
-        }),
+        catchError((err) => throwHttpOrFallback(err, this.logger, 'aftersale-service /aftersale/repair/appointments')),
       ),
     );
-    return resp.data?.data ?? null;
+    return unwrapBizOrThrow(resp, this.logger, 'aftersale/repair/appointments', null);
   }
 }

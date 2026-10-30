@@ -41,11 +41,24 @@
         </div>
       </section>
 
+      <!-- 售后进度（本订单售后单状态；商家审核结果同步展示） -->
+      <section v-if="aftersale" class="card as-card" @click="goAftersaleDetail">
+        <div class="as-head">
+          <h3 class="sec-title">售后进度</h3>
+          <span class="as-more">查看详情 ›</span>
+        </div>
+        <p class="as-status" :class="asStatusClass(aftersale.status)">{{ asStatusText(aftersale.status) }}</p>
+        <p v-if="aftersale.status === 'REJECTED' && aftersale.rejectReason" class="as-reason">拒绝原因：{{ aftersale.rejectReason }}</p>
+      </section>
+
       <!-- 操作（按订单状态机收敛：INIT=取消/支付，可售后状态=申请售后，终态无操作） -->
       <div class="order-ops">
         <button v-if="order.orderStatus === 'INIT'" class="op line" @click="cancel">取消订单</button>
         <button v-if="order.orderStatus === 'INIT'" class="op brand" @click="pay">立即支付</button>
-        <button v-else-if="['PAID', 'SHIPPED', 'COMPLETED'].includes(order.orderStatus)" class="op line" @click="goAftersale">申请售后</button>
+        <template v-else-if="['PAID', 'SHIPPED', 'COMPLETED'].includes(order.orderStatus)">
+          <button v-if="aftersale" class="op line" @click="goAftersaleDetail">查看售后单</button>
+          <button v-else class="op line" @click="goAftersale">申请售后</button>
+        </template>
       </div>
     </template>
   </div>
@@ -56,6 +69,8 @@ import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getOrderDetail, cancelOrder } from '@/api/order';
 import type { OrderDetail } from '@/api/order';
+import { getAftersaleMine } from '@/api/aftersale';
+import type { AftersaleOrder } from '@/api/aftersale';
 import { createPayment, mockPay } from '@/api/payment';
 import { showToast, formatPrice } from '@/utils';
 import Icon from '@/components/Icon.vue';
@@ -67,6 +82,21 @@ const router = useRouter();
 const orderId = route.params.orderId as string;
 const loading = ref(true);
 const order = ref<OrderDetail | null>(null);
+const aftersale = ref<AftersaleOrder | null>(null);
+
+function asStatusText(s: string) {
+  const map: Record<string, string> = {
+    APPLYING: '待商家审核', SELLER_APPROVED: '审核通过，待退款', REFUNDING: '退款处理中',
+    REFUNDED: '已退款', REJECTED: '已拒绝', CANCELED: '已取消',
+  };
+  return map[s] ?? s;
+}
+
+function asStatusClass(s: string) {
+  if (s === 'APPLYING' || s === 'SELLER_APPROVED' || s === 'REFUNDING') return 'as-mid';
+  if (s === 'REFUNDED') return 'as-ok';
+  return 'as-close';
+}
 
 function statusText(s: string) {
   const map: Record<string, string> = {
@@ -98,6 +128,9 @@ async function load() {
   loading.value = true;
   try {
     order.value = await getOrderDetail(orderId);
+    // 本订单售后单（进行中/已完结均展示，供用户跟踪审核结果）
+    const list = await getAftersaleMine();
+    aftersale.value = list.find((a) => a.orderNo === orderId) ?? null;
   } catch {
     /* 已提示 */
   } finally {
@@ -138,6 +171,12 @@ function toast(msg: string) {
 /** 跳售后申请页（携带订单信息） */
 function goAftersale() {
   router.push({ path: '/aftersale/apply', query: { orderId: orderId } });
+}
+
+/** 跳售后详情页（商家审核结果跟踪） */
+function goAftersaleDetail() {
+  if (!aftersale.value?.aftersaleNo) return;
+  router.push({ path: `/aftersale/${aftersale.value.aftersaleNo}` });
 }
 
 /** 等待支付回调落库：从结算页支付成功跳转而来时，订单 INIT 状态轮询至 PAID */
@@ -181,6 +220,15 @@ onMounted(async () => {
 .good-right { text-align: right; }
 .good-price { color: var(--accent); font-size: 12px; font-weight: 700; }
 .good-count { font-size: 11px; color: var(--ink-3); }
+.as-card { cursor: pointer; }
+.as-head { display: flex; align-items: center; justify-content: space-between; }
+.as-head .sec-title { margin-bottom: 0; }
+.as-more { font-size: 11.5px; color: var(--ink-3); }
+.as-status { font-size: 15px; font-weight: 700; margin-top: 6px; }
+.as-status.as-mid { color: #4C5CFF; }
+.as-status.as-ok { color: #00A87E; }
+.as-status.as-close { color: #8B90A0; }
+.as-reason { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
 .order-ops { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 414px; display: flex; gap: 10px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background: rgba(255,255,255,.97); border-top: 1px solid var(--line); }
 .op { flex: 1; height: 42px; border-radius: 999px; font-size: 13.5px; font-weight: 600; }
 .op.line { color: var(--ink-2); border: 1px solid var(--line-2); }

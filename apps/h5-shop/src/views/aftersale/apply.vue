@@ -177,10 +177,14 @@ async function submit() {
       type: form.value.type,
       reason: form.value.reason || undefined,
       amount: form.value.amount,
-      skuId: pickedSku.value ? Number(pickedSku.value) : null,
+      skuId: pickedSku.value ? String(pickedSku.value) : null,
       count: pickedSku.value ? pickedCount.value : null,
       images: evidence.value.length ? evidence.value : undefined,
     });
+    if (!ao || !ao.aftersaleNo) {
+      showToast('提交失败，请稍后重试');
+      return;
+    }
     showToast('售后申请已提交');
     router.replace({ path: `/aftersale/${ao.aftersaleNo}` });
   } catch {
