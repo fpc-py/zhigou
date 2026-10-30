@@ -70,6 +70,8 @@ export const SERVICE_PATHS = {
   orderCancel:       (id: string) => `/order/${id}/cancel`,
   orderDetail:       (id: string) => `/order/${id}`,
   orderMine:         '/order/mine',
+  orderMerchantList: '/order/merchant/list',
+  orderMerchantDetail: (id: string) => `/order/merchant/${id}`,
   orderShipPartial:  (id: string) => `/order/${id}/ship-partial`,
   orderShipments:    (id: string) => `/order/${id}/shipments`,
   orderStatsOverview: '/order/stats/overview',

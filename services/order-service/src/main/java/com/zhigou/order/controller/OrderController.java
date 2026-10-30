@@ -36,6 +36,20 @@ public class OrderController {
         orderService.payCallback(orderId); return Result.ok();
     }
 
+    @Operation(summary = "商家订单列表（多商家隔离：按 x-merchant-id 过滤，分页；status 可空=全部）") @GetMapping("/merchant/list")
+    public Result<Map<String, Object>> merchantList(@RequestHeader("x-merchant-id") Long merchantId,
+                                                    @RequestParam(required = false) String status,
+                                                    @RequestParam(defaultValue = "1") int pageNum,
+                                                    @RequestParam(defaultValue = "20") int pageSize) {
+        return Result.ok(orderService.merchantOrders(merchantId, status, pageNum, pageSize));
+    }
+
+    @Operation(summary = "商家订单详情（多商家隔离：归属校验，非本商家订单 403）") @GetMapping("/merchant/{orderId}")
+    public Result<OrderResponse> merchantDetail(@RequestHeader("x-merchant-id") Long merchantId,
+                                                @PathVariable("orderId") Long orderId) {
+        return Result.ok(orderService.merchantDetail(merchantId, orderId));
+    }
+
     @Operation(summary = "订单详情") @GetMapping("/{orderId}")
     public Result<OrderResponse> detail(@PathVariable Long orderId) {
         return Result.ok(orderService.getByOrderId(orderId));

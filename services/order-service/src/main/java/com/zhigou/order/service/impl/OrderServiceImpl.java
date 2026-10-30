@@ -72,8 +72,9 @@ public class OrderServiceImpl implements OrderService {
     private static class CachedSku {
         final long price;
         final String name;
+        final Long merchantId;   // 多商家隔离：下单按 SKU 归属写订单 merchant_id（可空=回源未命中）
         final long ts;
-        CachedSku(long price, String name, long ts) { this.price = price; this.name = name; this.ts = ts; }
+        CachedSku(long price, String name, Long merchantId, long ts) { this.price = price; this.name = name; this.merchantId = merchantId; this.ts = ts; }
     }
 
     /**
@@ -95,12 +96,15 @@ public class OrderServiceImpl implements OrderService {
         long orderId = IdUtil.getSnowflakeNextId();
         long totalAmount = 0;
         List<OrderItem> items = new ArrayList<>();
+        Long orderMerchantId = null;
 
         for (CreateOrderRequest.SkuItem si : req.getSkuItems()) {
             String key = String.valueOf(si.getSkuId());
             CachedSku c = resolveSku(key, userId);
             long price = c != null ? c.price : FALLBACK_PRICE;
             String skuName = c != null ? c.name : "SKU-" + si.getSkuId();
+            // 多商家隔离：订单归属取首个 SKU 的商家（单商家商品订单；混合商家商品仅演示口径，真实场景按商家拆单）
+            if (orderMerchantId == null && c != null && c.merchantId != null) orderMerchantId = c.merchantId;
 
             OrderItem item = new OrderItem();
             item.setOrderId(orderId); item.setSkuId(si.getSkuId()); item.setCount(si.getCount());
@@ -108,9 +112,11 @@ public class OrderServiceImpl implements OrderService {
             totalAmount += item.getPrice() * item.getCount();
             items.add(item);
         }
+        if (orderMerchantId == null) log.warn("订单归属缺失（SKU 缓存未含 merchantId），orderId={}, userId={}", orderId, userId);
 
         OrderMain order = new OrderMain();
         order.setOrderId(orderId); order.setUserId(userId);
+        order.setMerchantId(orderMerchantId);
         order.setRequestId(req.getRequestId());
         order.setOrderStatus(OrderState.INIT.name());
         order.setTotalAmount(totalAmount); order.setPayAmount(totalAmount);
@@ -181,6 +187,7 @@ public class OrderServiceImpl implements OrderService {
             for (Object o : records) {
                 JSONObject spu = (JSONObject) o;
                 String name = spu.getStr("name");
+                Long merchantId = spu.getLong("merchantId");   // 多商家隔离：SPU 归属商家（records 已带 merchant_id）
                 JSONArray skus = spu.getJSONArray("skus");
                 if (skus == null) continue;
                 for (Object s : skus) {
@@ -188,7 +195,7 @@ public class OrderServiceImpl implements OrderService {
                     Long skuId = sku.getLong("skuId");
                     Long price = sku.getLong("price");
                     if (skuId != null && price != null) {
-                        skuCache.put(String.valueOf(skuId), new CachedSku(price, name == null ? "SKU-" + skuId : name, now));
+                        skuCache.put(String.valueOf(skuId), new CachedSku(price, name == null ? "SKU-" + skuId : name, merchantId, now));
                     }
                 }
             }
@@ -224,6 +231,38 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderStatus(OrderState.PAID.name());
         orderMapper.updateById(order);
         log.info("订单支付: orderId={}", orderId);
+    }
+
+    /**
+     * 商家订单列表（多商家隔离）：按归属商家过滤、分页；status 可空=全部状态。
+     * 返回 { records, total, pageNum, pageSize }（records 为 OrderResponse 详情）。
+     */
+    @Override
+    public Map<String, Object> merchantOrders(Long merchantId, String status, int pageNum, int pageSize) {
+        if (merchantId == null) throw new BizException(403, "缺少商家身份 x-merchant-id");
+        int page = Math.max(pageNum, 1), size = Math.max(pageSize, 1);
+        int offset = (page - 1) * size;
+        List<OrderMain> list = orderMapper.selectPageByMerchant(merchantId, status, offset, size);
+        long total = orderMapper.countByMerchant(merchantId, status);
+        Map<String, Object> out = new HashMap<>();
+        out.put("records", list.stream().map(this::buildResponse).collect(Collectors.toList()));
+        out.put("total", total);
+        out.put("pageNum", page);
+        out.put("pageSize", size);
+        return out;
+    }
+
+    /**
+     * 商家订单详情（多商家隔离）：归属校验——订单 merchant_id 必须等于当前商家，否则 403。
+     */
+    @Override
+    public OrderResponse merchantDetail(Long merchantId, Long orderId) {
+        if (merchantId == null) throw new BizException(403, "缺少商家身份 x-merchant-id");
+        OrderMain order = requireOrder(orderId);
+        if (order.getMerchantId() == null || !merchantId.equals(order.getMerchantId())) {
+            throw new BizException(403, "无权查看其他商家的订单");
+        }
+        return buildResponse(order);
     }
 
     @Override

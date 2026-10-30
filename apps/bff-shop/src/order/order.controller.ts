@@ -1,9 +1,10 @@
 /**
  * Order Controller — 订单（BFF 透传）
  */
-import { Controller, Get, Post, Param, Body, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
+import { Roles, RolesGuard } from '../common/guards/roles.guard.js';
 import { OrderService } from './order.service.js';
 import { ApiResponse } from '../common/dto/api-response.js';
 import type { Request } from 'express';
@@ -12,6 +13,25 @@ import type { Request } from 'express';
 @UseGuards(JwtAuthGuard)
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
+
+  @Get('merchant/list')
+  @UseGuards(RolesGuard)
+  @Roles('MERCHANT')
+  async merchantList(@Req() req: Request, @Query('status') status?: string,
+                     @Query('pageNum') pageNum = '1', @Query('pageSize') pageSize = '20') {
+    const merchantId = (req as any).merchantId as string;
+    const data = await this.orderService.merchantList(merchantId, status, Number(pageNum), Number(pageSize));
+    return ApiResponse.ok(data);
+  }
+
+  @Get('merchant/:orderId')
+  @UseGuards(RolesGuard)
+  @Roles('MERCHANT')
+  async merchantDetail(@Param('orderId') orderId: string, @Req() req: Request) {
+    const merchantId = (req as any).merchantId as string;
+    const data = await this.orderService.merchantDetail(merchantId, orderId);
+    return ApiResponse.ok(data);
+  }
 
   @Get('mine')
   async mine(@Req() req: Request) {

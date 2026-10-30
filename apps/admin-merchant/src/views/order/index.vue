@@ -8,6 +8,7 @@
       <template v-else>
         <el-table :data="orders" style="width:100%" v-if="orders.length">
           <el-table-column prop="orderId" label="订单号" width="220" />
+          <el-table-column prop="createTime" label="下单时间" width="180" />
           <el-table-column label="金额" width="120">
             <template #default="{row}">¥{{ ((row.totalAmount ?? row.payAmount ?? 0) / 100).toFixed(2) }}</template>
           </el-table-column>
@@ -33,7 +34,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import http from '@/api/request';
+import { listMerchantOrders } from '@/api/order';
 import Skeleton from '@/components/Skeleton.vue';
 import ErrorRetry from '@/components/ErrorRetry.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -56,8 +57,8 @@ async function load() {
   loading.value = true;
   error.value = false;
   try {
-    const res = await http.get('/order/mine');
-    orders.value = res.data?.data ?? [];
+    const res = await listMerchantOrders();
+    orders.value = res.records ?? [];
   } catch {
     error.value = true;
   } finally {

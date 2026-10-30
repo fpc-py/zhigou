@@ -12,6 +12,13 @@ public interface OrderService {
     void payCallback(Long orderId);   // INIT → PAID
     OrderResponse getByOrderId(Long orderId);
     List<OrderResponse> mine(Long userId);   // 按 userId 查订单列表（创建时间倒序）
+
+    /** 商家订单列表（多商家隔离：merchantId 必传，按归属过滤、分页；status 可空=全部） */
+    java.util.Map<String, Object> merchantOrders(Long merchantId, String status, int pageNum, int pageSize);
+
+    /** 商家订单详情（多商家隔离：归属校验，非本商家订单抛 403） */
+    OrderResponse merchantDetail(Long merchantId, Long orderId);
+
     /** 超时关单：关闭超过 minutes 分钟仍未支付的 INIT 订单（INIT→CLOSED + outbox + 释放库存），返回关单数 */
     int closeExpired(int minutes);
     /** 平台经营概览（商家视角：merchantId 非空按商家过滤，多商家隔离；null=平台聚合） */

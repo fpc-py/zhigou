@@ -58,6 +58,20 @@ public interface OrderMainMapper extends BaseMapper<OrderMain> {
     @Select("SELECT * FROM order_main WHERE order_status = #{status} AND deleted = 0 ORDER BY create_time ASC")
     List<OrderMain> selectFullByStatus(@Param("status") String status);
 
+
+    @ResultMap("orderFullMap")
+    @Select("<script>SELECT * FROM order_main WHERE deleted = 0 "
+            + "<if test='merchantId != null'>AND merchant_id = #{merchantId} </if>"
+            + "<if test='status != null and status != &quot;&quot;'>AND order_status = #{status} </if>"
+            + "ORDER BY create_time DESC LIMIT #{limit} OFFSET #{offset}</script>")
+    List<OrderMain> selectPageByMerchant(@Param("merchantId") Long merchantId, @Param("status") String status,
+                                         @Param("offset") int offset, @Param("limit") int limit);
+
+    @Select("<script>SELECT COUNT(*) FROM order_main WHERE deleted = 0 "
+            + "<if test='merchantId != null'>AND merchant_id = #{merchantId} </if>"
+            + "<if test='status != null and status != &quot;&quot;'>AND order_status = #{status} </if></script>")
+    long countByMerchant(@Param("merchantId") Long merchantId, @Param("status") String status);
+
     @ResultMap("orderFullMap")
     @Select("SELECT * FROM order_main WHERE deleted = 0 ORDER BY create_time DESC")
     List<OrderMain> selectAllFull();

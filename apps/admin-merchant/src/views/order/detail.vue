@@ -63,7 +63,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { getOrderDetail } from '@/api/order';
+import { getMerchantOrderDetail } from '@/api/order';
 
 const route = useRoute();
 const loading = ref(false);
@@ -73,7 +73,7 @@ const shipDialog = ref(false);
 const trackingNo = ref('');
 
 function statusType(s: string) {
-  const m: Record<string, string> = { PAYING: 'warning', PAID: 'primary', SHIPPED: '', RECEIVED: 'success', CLOSED: 'info' };
+  const m: Record<string, string> = { INIT: 'warning', PAID: 'primary', SHIPPED: 'success', COMPLETED: 'info', CLOSED: 'info', REFUNDING: 'danger', REFUNDED: 'danger' };
   return m[s] || 'info';
 }
 
@@ -81,7 +81,7 @@ async function load() {
   loading.value = true;
   error.value = false;
   try {
-    order.value = await getOrderDetail(route.params.id as string);
+    order.value = await getMerchantOrderDetail(route.params.id as string);
   } catch {
     error.value = true;
   } finally {

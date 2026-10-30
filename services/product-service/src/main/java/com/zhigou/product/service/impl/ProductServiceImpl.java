@@ -229,6 +229,7 @@ public class ProductServiceImpl implements ProductService {
                 .mainImage(spu.getMainImage()).description(spu.getDescription())
                 .status(spu.getStatus()).priceMin(spu.getPriceMin()).priceMax(spu.getPriceMax())
                 .salesVolume(spu.getSalesVolume()).categoryId(spu.getCategoryId()).brandId(spu.getBrandId())
+                .merchantId(spu.getMerchantId())
                 .skus(skus.stream().map(s -> SpuDetailResponse.SkuItem.builder()
                         .skuId(s.getSkuId()).specName(s.getSpecName()).specValue(s.getSpecValue())
                         .price(s.getPrice()).stock(s.getStock()).image(s.getImage()).build()

@@ -28,6 +28,8 @@ public class SpuDetailResponse {
     private Long categoryId;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long brandId;
+    /** 归属商家 ID（多商家隔离：order-service 下单按 SPU 归属写订单 merchant_id；普通数字 1/2） */
+    private Long merchantId;
     private List<SkuItem> skus;
 
     @Data

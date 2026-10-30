@@ -24,6 +24,26 @@ function unwrapOrThrow<T>(
   return (body.data as T) ?? fallback;
 }
 
+/**
+ * 业务码透传版：order-service 全局异常处理器将 BizException(403) 映射为 HTTP 200 + body.code:403，
+ * 此处保持业务码语义抛出（>=400 用原码），避免越权 403 被吞成 200 空结果。
+ */
+function unwrapBizOrThrow<T>(
+  resp: { data: { code?: number; message?: string; data?: T } },
+  logger: Logger,
+  label: string,
+  fallback: T,
+): T {
+  const body = resp.data;
+  if (body == null) return fallback;
+  if (body.code !== undefined && body.code !== 200) {
+    const status = typeof body.code === 'number' && body.code >= 400 ? body.code : HttpStatus.BAD_REQUEST;
+    logger.warn(`${label} 业务失败: code=${body.code} message=${body.message}`);
+    throw new HttpException(body.message || `${label} 业务处理失败`, status);
+  }
+  return (body.data as T) ?? fallback;
+}
+
 @Injectable()
 export class OrderService {
   private readonly logger = new Logger(OrderService.name);
@@ -75,6 +95,45 @@ export class OrderService {
       ),
     );
     return resp.data?.data ?? null;
+  }
+
+  /** 商家订单列表（多商家隔离：x-merchant-id 过滤，分页；status 可空=全部） */
+  async merchantList(merchantId: string, status?: string, pageNum = 1, pageSize = 20): Promise<any> {
+    const q = `pageNum=${pageNum}&pageSize=${pageSize}${status ? `&status=${encodeURIComponent(status)}` : ''}`;
+    const url = `${SERVICES.orderService.url}${SERVICE_PATHS.orderMerchantList}?${q}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: { 'x-merchant-id': merchantId } }).pipe(
+        timeout(SERVICES.orderService.timeout),
+        catchError((err) => {
+          const st = err.response?.status;
+          if (st && st >= 400) {
+            throw new HttpException(err.response?.data?.message || 'order-service /order/merchant/list 失败', st);
+          }
+          this.logger.warn(`order-service /order/merchant/list 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: { records: [], total: 0 } } });
+        }),
+      ),
+    );
+    return unwrapBizOrThrow(resp, this.logger, 'order/merchant/list', { records: [], total: 0 });
+  }
+
+  /** 商家订单详情（多商家隔离：归属校验，非本商家订单 403） */
+  async merchantDetail(merchantId: string, orderId: string): Promise<OrderDetail | null> {
+    const url = `${SERVICES.orderService.url}${SERVICE_PATHS.orderMerchantDetail(orderId)}`;
+    const resp = await firstValueFrom(
+      this.http.get(url, { headers: { 'x-merchant-id': merchantId } }).pipe(
+        timeout(SERVICES.orderService.timeout),
+        catchError((err) => {
+          const st = err.response?.status;
+          if (st && st >= 400) {
+            throw new HttpException(err.response?.data?.message || `order-service /order/merchant/${orderId} 失败`, st);
+          }
+          this.logger.warn(`order-service /order/merchant/${orderId} 失败: ${err.message}`);
+          return Promise.resolve({ data: { data: null } });
+        }),
+      ),
+    );
+    return unwrapBizOrThrow(resp, this.logger, `order/merchant/${orderId}`, null);
   }
 
   async mine(userId: string): Promise<OrderDetail[]> {
