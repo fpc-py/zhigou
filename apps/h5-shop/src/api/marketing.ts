@@ -34,6 +34,19 @@ export async function getMyCoupons(status?: string): Promise<UserCoupon[]> {
   return res.data.data ?? [];
 }
 
+/** 领取优惠券（templateId 后端 long，前端字符串透传） */
+export async function claimCoupon(templateId: string): Promise<number | null> {
+  const res = await http.post<{ code: number; data: number | null }>('/coupon/issue', { templateId });
+  return res.data.data;
+}
+
+/** 优惠券模板（领券中心展示；与 marketing-service 种子数据一致） */
+export const COUPON_TEMPLATES = [
+  { id: '1', title: '满 200 减 30', rule: '订单满 ¥200 可用，全场通用', badge: '满减券' },
+  { id: '2', title: '8 折券', rule: '不限门槛，最高减 ¥100', badge: '折扣券' },
+  { id: '3', title: '直减 5 元', rule: '无门槛立减 ¥5', badge: '无门槛' },
+];
+
 /** 优惠试算（满减/优惠券） */
 export async function calculateDiscount(body: {
   items: Array<{ skuId: string; count: number; price: number }>;
@@ -101,4 +114,41 @@ export async function joinGroupBuy(groupId: string): Promise<GroupBuyOrder | nul
 export async function getMyGroupBuys(): Promise<Array<Record<string, any>>> {
   const res = await http.get<{ code: number; data: Array<Record<string, any>> }>('/group-buy/mine');
   return res.data.data ?? [];
+}
+
+// ==================== 秒杀 ====================
+
+export interface SeckillActivity {
+  id: string;
+  skuId: string;
+  title: string;
+  imageUrl?: string;
+  seckillPrice: number;
+  originPrice: number;
+  total: number;
+  sold: number;
+  perUserLimit: number;
+  startTime?: string;
+  endTime?: string;
+  status: number;
+}
+
+/** 秒杀活动列表 */
+export async function getSeckillActivities(): Promise<SeckillActivity[]> {
+  const res = await http.get<{ code: number; data: SeckillActivity[] }>('/seckill/activities');
+  return res.data.data ?? [];
+}
+
+/** 秒杀预扣下单（防超卖 + 限购在营销服务端校验） */
+export async function seckillBuy(activityId: string, count = 1): Promise<Record<string, any> | null> {
+  const res = await http.post<{ code: number; data: Record<string, any> | null }>('/seckill/buy', {
+    activityId,
+    count,
+  });
+  return res.data.data;
+}
+
+/** 释放秒杀预扣（下单失败/超时未支付时归还库存） */
+export async function releaseSeckill(activityId: string, count = 1): Promise<void> {
+  await http.post('/seckill/release', { activityId, count });
 }

@@ -15,6 +15,10 @@ public class CreateOrderRequest {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long couponId;
 
+    /** 秒杀单标识：非空=秒杀订单（营销侧预扣校验 + 秒杀价计价，不可叠加优惠券） */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long seckillActivityId;
+
     @Data public static class SkuItem {
         @NotNull private Long skuId;
         @NotNull private Integer count;

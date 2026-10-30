@@ -6,6 +6,23 @@
       <span class="head-spacer" />
     </header>
 
+    <!-- 领券中心 -->
+    <section class="claim-sec">
+      <h2 class="claim-title">领券中心 <span class="claim-hint">每人每券限领，先到先得</span></h2>
+      <div v-for="t in templates" :key="t.id" class="claim-row">
+        <div class="claim-info">
+          <span class="claim-badge">{{ t.badge }}</span>
+          <div>
+            <p class="claim-name">{{ t.title }}</p>
+            <p class="claim-rule">{{ t.rule }}</p>
+          </div>
+        </div>
+        <button class="claim-btn" :disabled="claiming === t.id" @click="claim(t.id)">
+          {{ claiming === t.id ? '领取中…' : '领取' }}
+        </button>
+      </div>
+    </section>
+
     <div class="tabs">
       <button v-for="t in tabs" :key="t.key" class="tab" :class="{ on: tab === t.key }" @click="switchTab(t.key)">{{ t.label }}</button>
     </div>
@@ -16,7 +33,7 @@
     <div v-else class="coupon-list">
       <div v-for="c in list" :key="c.id" class="coupon card" :class="{ disabled: c.status !== 'UNUSED' }">
         <div class="coupon-left">
-          <p class="coupon-amount">满减券</p>
+          <p class="coupon-amount">{{ templateName(c.couponTemplateId) }}</p>
           <p class="coupon-no">#{{ c.couponTemplateId }}</p>
         </div>
         <div class="coupon-right">
@@ -25,13 +42,15 @@
         </div>
       </div>
     </div>
+
+    <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { getMyCoupons } from '@/api/marketing';
+import { getMyCoupons, claimCoupon, COUPON_TEMPLATES } from '@/api/marketing';
 import type { UserCoupon } from '@/api/marketing';
 import Icon from '@/components/Icon.vue';
 import Skeleton from '@/components/Skeleton.vue';
@@ -46,6 +65,18 @@ const tabs = [
 ] as const;
 const loading = ref(true);
 const list = ref<UserCoupon[]>([]);
+const templates = COUPON_TEMPLATES;
+const claiming = ref('');
+const toast = ref('');
+
+function flash(msg: string) {
+  toast.value = msg;
+  setTimeout(() => (toast.value = ''), 2000);
+}
+
+function templateName(templateId: string) {
+  return COUPON_TEMPLATES.find((t) => t.id === templateId)?.title ?? '优惠券';
+}
 
 async function load() {
   loading.value = true;
@@ -61,6 +92,19 @@ async function load() {
 function switchTab(key: typeof tab.value) {
   tab.value = key;
   load();
+}
+
+async function claim(templateId: string) {
+  claiming.value = templateId;
+  try {
+    await claimCoupon(templateId);
+    flash('领取成功，已放入我的券包');
+    await load();
+  } catch (e) {
+    flash(e instanceof Error ? e.message : '领取失败');
+  } finally {
+    claiming.value = '';
+  }
 }
 
 function statusText(status: string) {
@@ -82,6 +126,17 @@ onMounted(load);
 .head-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
 .head-title { font-size: 15px; font-weight: 700; }
 .head-spacer { width: 32px; }
+.claim-sec { background: linear-gradient(120deg, #fff, #F6F7FF); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
+.claim-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.claim-hint { font-size: 11px; color: var(--ink-3); font-weight: 400; }
+.claim-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.claim-row:last-child { border-bottom: none; }
+.claim-info { display: flex; align-items: center; gap: 10px; }
+.claim-badge { flex: none; font-size: 11px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 8px; padding: 4px 8px; }
+.claim-name { font-size: 13.5px; font-weight: 700; }
+.claim-rule { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+.claim-btn { flex: none; border: none; background: var(--brand); color: #fff; border-radius: 999px; padding: 7px 20px; font-size: 12.5px; font-weight: 700; }
+.claim-btn:disabled { opacity: 0.6; }
 .tabs { display: flex; gap: 22px; margin-bottom: 12px; }
 .tab { font-size: 14px; font-weight: 600; color: var(--ink-3); padding-bottom: 6px; border-bottom: 2px solid transparent; }
 .tab.on { color: var(--ink); border-bottom-color: var(--brand); }
@@ -102,4 +157,5 @@ onMounted(load);
 .coupon-right { text-align: right; }
 .coupon-status { font-size: 12.5px; font-weight: 600; color: var(--brand); }
 .coupon-date { font-size: 10.5px; color: var(--ink-3); margin-top: 4px; }
+.toast { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); background: rgba(0,0,0,.78); color: #fff; padding: 9px 18px; border-radius: 999px; font-size: 13px; z-index: 99; white-space: nowrap; }
 </style>

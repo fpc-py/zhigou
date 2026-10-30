@@ -64,7 +64,7 @@ public class SeckillServiceImpl implements SeckillService {
         int remain = Math.max(0, a.getTotal() - a.getSold() - count);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("activityId", activityId);
-        out.put("skuId", a.getSkuId());
+        out.put("skuId", String.valueOf(a.getSkuId())); // 字符串输出，避免 Long 精度丢失
         out.put("seckillPrice", a.getSeckillPrice());
         out.put("originPrice", a.getOriginPrice());
         out.put("boughtCount", count);

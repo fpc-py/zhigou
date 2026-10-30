@@ -20,6 +20,14 @@ export class MarketingController {
     return ApiResponse.ok(data);
   }
 
+  /** 领取优惠券（templateId 后端为 long，前端字符串透传避免精度丢失） */
+  @Post('coupon/issue')
+  async couponIssue(@Body('templateId') templateId: string, @Req() req: Request) {
+    const userId = (req as any).userId as string;
+    const data = await this.marketingService.issueCoupon(userId, templateId);
+    return ApiResponse.ok(data);
+  }
+
   @Post('discount/calculate')
   async calculate(@Body() body: DiscountCalculateBody, @Req() req: Request) {
     const userId = (req as any).userId as string;

@@ -33,6 +33,8 @@ product-service:
   url: ${PRODUCT_SERVICE_URL:http://localhost:8083}
 inventory-service:
   url: ${INVENTORY_SERVICE_URL:http://localhost:8086}
+marketing-service:
+  url: ${MARKETING_SERVICE_URL:http://localhost:8088}
 order:
   timeout-close-minutes: ${ORDER_TIMEOUT_CLOSE_MINUTES:15}
 rocketmq:

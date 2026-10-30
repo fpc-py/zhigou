@@ -54,6 +54,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Value("${product-service.url}") private String productServiceUrl;
     @Value("${inventory-service.url}") private String inventoryServiceUrl;
+    @Value("${marketing-service.url}") private String marketingServiceUrl;
 
     /** 占位价（product-service 不可用时的回退值，与历史实现一致） */
     private static final long FALLBACK_PRICE = 100L;
@@ -92,19 +93,45 @@ public class OrderServiceImpl implements OrderService {
             return buildResponse(existing);
         }
 
-        // 2. 商品价格/名称：本地缓存优先（坑 #62 修复），未命中才回源 product-service
+        // 2. 秒杀单分支：营销侧权威校验（防篡改取价）；与优惠券互斥、仅支持单 SKU
+        Long seckillActivityId = req.getSeckillActivityId();
+        long seckillPrice = 0;
+        String seckillTitle = null;
+        long seckillSkuId = 0;
+        if (seckillActivityId != null) {
+            if (req.getCouponId() != null) throw new BizException(40046, "秒杀商品不可叠加优惠券");
+            if (req.getSkuItems().size() != 1) throw new BizException(40047, "秒杀仅支持单个商品下单");
+            JSONObject act = fetchSeckillActivity(seckillActivityId, userId);
+            seckillPrice = act.getLong("seckillPrice");
+            seckillTitle = act.getStr("title");
+            seckillSkuId = act.getLong("skuId");
+        }
+
+        // 2.5 商品价格/名称：本地缓存优先（坑 #62 修复），未命中才回源 product-service
         long orderId = IdUtil.getSnowflakeNextId();
         long totalAmount = 0;
         List<OrderItem> items = new ArrayList<>();
         Long orderMerchantId = null;
+        if (seckillActivityId != null) {
+            CachedSku cm = resolveSku(String.valueOf(seckillSkuId), userId);
+            if (cm != null && cm.merchantId != null) orderMerchantId = cm.merchantId;
+        }
 
         for (CreateOrderRequest.SkuItem si : req.getSkuItems()) {
             String key = String.valueOf(si.getSkuId());
-            CachedSku c = resolveSku(key, userId);
-            long price = c != null ? c.price : FALLBACK_PRICE;
-            String skuName = c != null ? c.name : "SKU-" + si.getSkuId();
-            // 多商家隔离：订单归属取首个 SKU 的商家（单商家商品订单；混合商家商品仅演示口径，真实场景按商家拆单）
-            if (orderMerchantId == null && c != null && c.merchantId != null) orderMerchantId = c.merchantId;
+            long price;
+            String skuName;
+            if (seckillActivityId != null) {
+                if (si.getSkuId() != seckillSkuId) throw new BizException(40049, "秒杀商品与活动不匹配");
+                price = seckillPrice;
+                skuName = seckillTitle;
+            } else {
+                CachedSku c = resolveSku(key, userId);
+                price = c != null ? c.price : FALLBACK_PRICE;
+                skuName = c != null ? c.name : "SKU-" + si.getSkuId();
+                // 多商家隔离：订单归属取首个 SKU 的商家（单商家商品订单；混合商家商品仅演示口径，真实场景按商家拆单）
+                if (orderMerchantId == null && c != null && c.merchantId != null) orderMerchantId = c.merchantId;
+            }
 
             OrderItem item = new OrderItem();
             item.setOrderId(orderId); item.setSkuId(si.getSkuId()); item.setCount(si.getCount());
@@ -167,6 +194,38 @@ public class OrderServiceImpl implements OrderService {
      * 一次 /product/page 即可覆盖全部 SKU（演示环境商品量小）；
      * 回源失败仅告警且不清缓存（旧值兜底），杜绝「回退占位价」静默漂移。
      */
+    /**
+     * 秒杀活动权威校验（下单时服务端取价，防客户端篡改价格）：
+     * 状态上架 + 时间窗口内 + 返回秒杀价/标题/SKU；活动不可用抛业务异常。
+     */
+    private JSONObject fetchSeckillActivity(Long activityId, Long userId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-User-Id", String.valueOf(userId));
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        String url = marketingServiceUrl + "/seckill/activity/" + activityId;
+        ResponseEntity<String> resp;
+        try {
+            resp = resilientHttp.execute("orderFetchSeckill",
+                    () -> restTemplate.exchange(url, HttpMethod.GET, entity, String.class));
+        } catch (Exception e) {
+            log.error("秒杀活动查询失败: activityId={}", activityId, e);
+            throw new BizException(500, "秒杀活动查询失败，请稍后重试");
+        }
+        if (resp.getBody() == null) throw new BizException(500, "秒杀活动查询失败");
+        JSONObject body = JSONUtil.parseObj(resp.getBody());
+        JSONObject data = body.getJSONObject("data");
+        if (!Integer.valueOf(200).equals(body.getInt("code")) || data == null) {
+            throw new BizException(40048, body.getStr("message", "秒杀活动不可用"));
+        }
+        if (!Integer.valueOf(1).equals(data.getInt("status"))) throw new BizException(40042, "秒杀活动未上架");
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime start = data.getLocalDateTime("startTime", null);
+        LocalDateTime end = data.getLocalDateTime("endTime", null);
+        if (start != null && now.isBefore(start)) throw new BizException(40043, "秒杀未开始");
+        if (end != null && now.isAfter(end)) throw new BizException(40044, "秒杀已结束");
+        return data;
+    }
+
     private void refreshSkuCache(Long userId) {
         try {
             HttpHeaders headers = new HttpHeaders();

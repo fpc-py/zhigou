@@ -31,6 +31,7 @@ const router = createRouter({
     { path: '/coupons', name: 'coupons', component: () => import('@/views/coupons/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/wallet', name: 'wallet', component: () => import('@/views/wallet/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/groupbuy', name: 'groupbuy', component: () => import('@/views/groupbuy/index.vue'), meta: { requiresAuth: true, tabbar: false } },
+    { path: '/seckill', name: 'seckill', component: () => import('@/views/seckill/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/short-video', name: 'short-video', component: () => import('@/views/short-video/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/live', name: 'live', component: () => import('@/views/live/index.vue'), meta: { requiresAuth: true, tabbar: false } },
     { path: '/live/:id', name: 'live-detail', component: () => import('@/views/live/detail.vue'), meta: { requiresAuth: true, tabbar: false } },

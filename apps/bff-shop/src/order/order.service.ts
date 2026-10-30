@@ -37,7 +37,8 @@ function unwrapBizOrThrow<T>(
   const body = resp.data;
   if (body == null) return fallback;
   if (body.code !== undefined && body.code !== 200) {
-    const status = typeof body.code === 'number' && body.code >= 400 ? body.code : HttpStatus.BAD_REQUEST;
+    // 业务码（如 40046）未必是合法 HTTP 状态码，统一映射为标准 4xx 并保留业务 message
+    const status = typeof body.code === 'number' && body.code >= 400 && body.code <= 599 ? body.code : HttpStatus.BAD_REQUEST;
     logger.warn(`${label} 业务失败: code=${body.code} message=${body.message}`);
     throw new HttpException(body.message || `${label} 业务处理失败`, status);
   }
@@ -67,7 +68,9 @@ export class OrderService {
         }),
       ),
     );
-    return resp.data?.data ?? null;
+    // 业务码透传：order-service 将 BizException 映射为 HTTP 200 + body.code!=200，
+    // 此处必须显式抛出（如秒杀+优惠券互斥 40046），避免被吞成 success-null
+    return unwrapBizOrThrow(resp, this.logger, 'order-create', null);
   }
 
   async cancel(userId: string, orderId: string): Promise<void> {

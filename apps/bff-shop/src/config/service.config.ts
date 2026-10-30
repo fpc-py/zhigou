@@ -43,6 +43,7 @@ export const SERVICE_PATHS = {
   productRecommend:  '/recommend',
   priceCompare:      '/price/compare',
   userCoupons:       '/coupon/mine',
+  couponIssue:       '/coupon/issue',
   discountCalculate: '/discount/calculate',
   groupBuyActivities: '/group-buy/activities',
   groupBuyOpen:       '/group-buy/open',

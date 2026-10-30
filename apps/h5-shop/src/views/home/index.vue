@@ -37,6 +37,26 @@
       <div class="banner-balls" aria-hidden="true"><i /><i /><i /></div>
     </div>
 
+    <!-- 营销双入口（限时秒杀 + 领券中心） -->
+    <div class="market-row anim-in" style="animation-delay:.26s">
+      <button class="market-card seckill press" @click="router.push('/seckill')">
+        <span class="market-ic"><Icon name="flash" /></span>
+        <span class="market-main">
+          <b class="market-title">限时秒杀</b>
+          <span class="market-sub">爆款低至 1.5 折 · 先到先得</span>
+        </span>
+        <span class="market-go">去抢购 →</span>
+      </button>
+      <button class="market-card coupon press" @click="router.push('/coupons')">
+        <span class="market-ic"><Icon name="tag" /></span>
+        <span class="market-main">
+          <b class="market-title">领券中心</b>
+          <span class="market-sub">满减 / 折扣 / 无门槛</span>
+        </span>
+        <span class="market-go">去领券 →</span>
+      </button>
+    </div>
+
     <!-- 商品流 -->
     <div v-if="loading" class="feed-section">
       <Skeleton w="100%" h="200px" :repeat="3" />
@@ -341,6 +361,15 @@ onMounted(() => {
 .entry:hover .entry-ic { transform: scale(1.12) rotate(-5deg); }
 .entry-label { font-size: 12px; font-weight: 600; }
 .entry-sub { font-size: 9.5px; color: var(--ink-3); }
+.market-row { display: flex; gap: 10px; margin: 12px 16px 0; }
+.market-card { flex: 1; display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px; min-width: 0; }
+.market-ic { flex: none; width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 19px; }
+.market-card.seckill .market-ic { background: #fff0ef; color: #d92d20; }
+.market-card.coupon .market-ic { background: #fff7e8; color: #e8890c; }
+.market-main { flex: 1; min-width: 0; text-align: left; }
+.market-title { display: block; font-size: 14px; font-weight: 800; }
+.market-sub { display: block; font-size: 10.5px; color: var(--ink-3); margin-top: 2px; }
+.market-go { flex: none; font-size: 11px; color: var(--brand); font-weight: 700; }
 .banner {
   margin: 2px 16px 16px;
   border-radius: var(--radius);

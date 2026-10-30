@@ -16,11 +16,12 @@ export interface OrderDetail {
   items: OrderItem[];
 }
 
-/** 提交订单（requestId 幂等） */
+/** 提交订单（requestId 幂等；seckillActivityId 非空=秒杀单：营销侧预扣校验 + 秒杀价计价，不可叠加优惠券） */
 export async function createOrder(body: {
   requestId: string;
   skuItems: Array<{ skuId: string; count: number }>;
   couponId?: number | null;
+  seckillActivityId?: number | string;
 }): Promise<OrderDetail> {
   const res = await http.post<{ code: number; data: OrderDetail }>('/order/create', body);
   return res.data.data;

@@ -52,6 +52,23 @@ export class MarketingService {
     return unwrapOrThrow(resp, this.logger, 'coupon/mine', []);
   }
 
+  /** 领取优惠券（透传 /coupon/issue；业务失败按约定抛 HttpException 由前端 toast） */
+  async issueCoupon(userId: string, templateId: string): Promise<number | null> {
+    const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.couponIssue}`;
+    const resp = await firstValueFrom(
+      this.http
+        .post(url, { userId, templateId: Number(templateId) }, { headers: this.authHeader(userId) })
+        .pipe(
+          timeout(SERVICES.marketingSvc.timeout),
+          catchError((err) => {
+            this.logger.warn(`marketing-service /coupon/issue 失败: ${err.message}`);
+            return Promise.resolve({ data: { data: null } });
+          }),
+        ),
+    );
+    return unwrapOrThrow(resp, this.logger, 'coupon/issue', null);
+  }
+
   async calculate(userId: string, body: DiscountCalculateBody): Promise<DiscountCalculateResult | null> {
     const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.discountCalculate}`;
     const resp = await firstValueFrom(
@@ -175,13 +192,20 @@ export class MarketingService {
     return unwrapOrThrow(resp, this.logger, `seckill/activity/${id}`, null);
   }
 
-  /** 秒杀预扣（防超卖）：坑 #63 精度修复——activityId 19 位统一字符串透传 */
+  /** 秒杀预扣（防超卖）：活动 id 为自增小整数，转 Number 兼容后端 (Number) 强转；HTTP≥400 透传避免假成功 */
   async seckillBuy(userId: string, body: { activityId: string; count?: number }): Promise<any | null> {
     const url = `${SERVICES.marketingSvc.url}${SERVICE_PATHS.seckillBuy}`;
+    const payload = { userId, activityId: Number(body.activityId), count: body.count ?? 1 };
     const resp = await firstValueFrom(
-      this.http.post(url, { userId, ...body }, { headers: this.authHeader(userId) }).pipe(
+      this.http.post(url, payload, { headers: this.authHeader(userId) }).pipe(
         timeout(SERVICES.marketingSvc.timeout),
         catchError((err) => {
+          const st = err.response?.status;
+          if (st && st >= 400) {
+            const msg = err.response?.data?.message || '秒杀服务异常';
+            this.logger.warn(`marketing-service /seckill/buy HTTP ${st}: ${msg}`);
+            throw new HttpException(msg, st);
+          }
           this.logger.warn(`marketing-service /seckill/buy 失败: ${err.message}`);
           return Promise.resolve({ data: { data: null } });
         }),
