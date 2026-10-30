@@ -23,43 +23,47 @@ export class ProductController {
     @Req() req: Request,
   ) {
     const userId = (req as any).userId;
+    const merchantId = (req as any).merchantId ?? null;
     const data = await this.productService.page(userId, {
       keyword,
       pageNum: pageNum ? Number(pageNum) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
       categoryId: categoryId ? Number(categoryId) : undefined,
       brandId: brandId ? Number(brandId) : undefined,
-    });
+    }, merchantId);
     return ApiResponse.ok(data);
   }
 
-  /** 新增商品（仅商家） */
+  /** 新增商品（仅商家；merchantId 落库为归属商家） */
   @Post('spu')
   @UseGuards(RolesGuard)
   @Roles('MERCHANT')
   async createSpu(@Body() body: any, @Req() req: Request) {
     const userId = (req as any).userId;
-    const spuId = await this.productService.createSpu(body, userId);
+    const merchantId = (req as any).merchantId ?? null;
+    const spuId = await this.productService.createSpu(body, userId, merchantId);
     return ApiResponse.ok({ spuId });
   }
 
-  /** 更新商品（仅商家） */
+  /** 更新商品（仅商家；merchantId 归属校验） */
   @Put('spu/:spuId')
   @UseGuards(RolesGuard)
   @Roles('MERCHANT')
   async updateSpu(@Param('spuId') spuId: string, @Body() body: any, @Req() req: Request) {
     const userId = (req as any).userId;
-    const ok = await this.productService.updateSpu(spuId, body, userId);
+    const merchantId = (req as any).merchantId ?? null;
+    const ok = await this.productService.updateSpu(spuId, body, userId, merchantId);
     return ApiResponse.ok(ok);
   }
 
-  /** 下架商品（仅商家） */
+  /** 下架商品（仅商家；merchantId 归属校验） */
   @Delete('spu/:spuId')
   @UseGuards(RolesGuard)
   @Roles('MERCHANT')
   async offShelf(@Param('spuId') spuId: string, @Req() req: Request) {
     const userId = (req as any).userId;
-    const ok = await this.productService.offShelf(spuId, userId);
+    const merchantId = (req as any).merchantId ?? null;
+    const ok = await this.productService.offShelf(spuId, userId, merchantId);
     return ApiResponse.ok(ok);
   }
 

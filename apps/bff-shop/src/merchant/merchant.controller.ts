@@ -1,11 +1,12 @@
 /**
- * Merchant Controller — 商家经营概览（BFF 透传；演示：单商家市场 = 平台聚合口径）
+ * Merchant Controller — 商家经营概览（BFF 透传；多商家隔离：merchantId 来自 JWT claim，按归属过滤）
  */
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
 import { Roles, RolesGuard } from '../common/guards/roles.guard.js';
 import { MerchantService } from './merchant.service.js';
 import { ApiResponse } from '../common/dto/api-response.js';
+import type { Request } from 'express';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -13,10 +14,11 @@ import { ApiResponse } from '../common/dto/api-response.js';
 export class MerchantController {
   constructor(private readonly merchant: MerchantService) {}
 
-  /** 商家经营概览 */
+  /** 商家经营概览（按当前登录商家过滤，多商家隔离） */
   @Get('merchant/overview')
-  async overview() {
-    const data = await this.merchant.overview();
+  async overview(@Req() req: Request) {
+    const merchantId = (req as any).merchantId ?? null;
+    const data = await this.merchant.overview(merchantId);
     return ApiResponse.ok(data);
   }
 
@@ -27,10 +29,11 @@ export class MerchantController {
     return ApiResponse.ok(data);
   }
 
-  /** 履约异常（待发货订单 + SKU 明细，缺货/卡单预警） */
+  /** 履约异常（待发货订单 + SKU 明细，缺货/卡单预警；按当前登录商家过滤） */
   @Get('merchant/fulfillment')
-  async fulfillment() {
-    const data = await this.merchant.fulfillment();
+  async fulfillment(@Req() req: Request) {
+    const merchantId = (req as any).merchantId ?? null;
+    const data = await this.merchant.fulfillment(merchantId);
     return ApiResponse.ok(data);
   }
 

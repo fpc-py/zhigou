@@ -25,15 +25,15 @@ public class JwtUtil {
     /**
      * 签发 accessToken
      */
-    public String createAccessToken(Long userId, String phone, String role) {
-        return sign(userId, phone, role, jwtProperties.getAccessExpireSeconds());
+    public String createAccessToken(Long userId, String phone, String role, Long merchantId) {
+        return sign(userId, phone, role, merchantId, jwtProperties.getAccessExpireSeconds());
     }
 
     /**
      * 签发 refreshToken
      */
-    public String createRefreshToken(Long userId, String phone, String role) {
-        return sign(userId, phone, role, jwtProperties.getRefreshExpireSeconds());
+    public String createRefreshToken(Long userId, String phone, String role, Long merchantId) {
+        return sign(userId, phone, role, merchantId, jwtProperties.getRefreshExpireSeconds());
     }
 
     /**
@@ -52,17 +52,21 @@ public class JwtUtil {
         return claims;
     }
 
-    private String sign(Long userId, String phone, String role, long expireSeconds) {
+    private String sign(Long userId, String phone, String role, Long merchantId, long expireSeconds) {
         try {
             JWSSigner signer = new MACSigner(jwtProperties.getSecret().getBytes());
-            JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+            JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder()
                     .subject(String.valueOf(userId))
                     .claim("phone", phone)
                     .claim("role", role)
                     .jwtID(UUID.randomUUID().toString())
                     .issueTime(new Date())
-                    .expirationTime(Date.from(Instant.now().plusSeconds(expireSeconds)))
-                    .build();
+                    .expirationTime(Date.from(Instant.now().plusSeconds(expireSeconds)));
+            // 商家账号携带 merchantId claim（多商家隔离：BFF 据此解析归属商家）
+            if (merchantId != null) {
+                builder.claim("merchantId", merchantId);
+            }
+            JWTClaimsSet claimsSet = builder.build();
             SignedJWT signedJWT = new SignedJWT(
                     new JWSHeader(JWSAlgorithm.HS256),
                     claimsSet

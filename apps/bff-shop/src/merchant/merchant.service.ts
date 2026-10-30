@@ -20,11 +20,11 @@ export class MerchantService {
   private readonly logger = new Logger(MerchantService.name);
   constructor(private readonly http: HttpService) {}
 
-  /** 经营概览（平台聚合，商家视角演示口径） */
-  async overview(): Promise<any | null> {
+  /** 经营概览（merchantId 非空按商家过滤，多商家隔离；null=平台聚合兼容） */
+  async overview(merchantId?: number | null): Promise<any | null> {
     const url = `${SERVICES.orderService.url}${SERVICE_PATHS.orderStatsOverview}`;
     const resp = await firstValueFrom(
-      this.http.get(url).pipe(
+      this.http.get(url, { headers: merchantId != null ? { 'x-merchant-id': String(merchantId) } : {} }).pipe(
         timeout(SERVICES.orderService.timeout),
         catchError((err) => {
           this.logger.warn(`order-service /order/stats/overview 失败: ${err.message}`);
@@ -35,10 +35,12 @@ export class MerchantService {
     return unwrapOrThrow(resp, this.logger, 'merchant/overview', null);
   }
 
-  /** 履约异常：PAID 待发货订单 + SKU 明细（供缺货/卡单预警，演示口径） */
-  async fulfillment(): Promise<any[] | null> {
+  /** 履约异常：PAID 待发货订单 + SKU 明细（供缺货/卡单预警；merchantId 非空按商家过滤） */
+  async fulfillment(merchantId?: number | null): Promise<any[] | null> {
     const resp = await firstValueFrom(
-      this.http.get(`${SERVICES.orderService.url}${SERVICE_PATHS.orderPendingFulfillment}`).pipe(
+      this.http.get(`${SERVICES.orderService.url}${SERVICE_PATHS.orderPendingFulfillment}`, {
+        headers: merchantId != null ? { 'x-merchant-id': String(merchantId) } : {},
+      }).pipe(
         timeout(SERVICES.orderService.timeout),
         catchError((err) => {
           this.logger.warn(`order-service /order/stats/pending-fulfillment 失败: ${err.message}`);

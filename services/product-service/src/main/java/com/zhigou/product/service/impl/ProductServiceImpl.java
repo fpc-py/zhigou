@@ -62,6 +62,10 @@ public class ProductServiceImpl implements ProductService {
         if (query.getBrandId() != null) wrapper.eq(ProductSpu::getBrandId, query.getBrandId());
         if (query.getKeyword() != null && !query.getKeyword().isBlank())
             wrapper.like(ProductSpu::getName, query.getKeyword());
+        // 多商家隔离：商家管理端只查本商家商品；消费者端（merchantId=null）跨商家浏览
+        if (query.getMerchantId() != null) {
+            wrapper.eq(ProductSpu::getMerchantId, query.getMerchantId());
+        }
 
         wrapper.orderByDesc(ProductSpu::getSalesVolume);
         Page<ProductSpu> spuPage = spuMapper.selectPage(page, wrapper);
@@ -104,13 +108,14 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
-    public Long createSpu(SpuCreateRequest request) {
+    public Long createSpu(SpuCreateRequest request, Long merchantId) {
         long spuId = IdUtil.getSnowflakeNextId();
 
         ProductSpu spu = new ProductSpu();
         spu.setSpuId(spuId);
         spu.setCategoryId(request.getCategoryId());
         spu.setBrandId(request.getBrandId());
+        spu.setMerchantId(merchantId); // 多商家隔离：记录归属商家
         spu.setName(request.getName());
         spu.setSubtitle(request.getSubtitle());
         spu.setMainImage(request.getMainImage());
@@ -154,8 +159,8 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     @Transactional
-    public void updateSpu(Long spuId, SpuCreateRequest request) {
-        ProductSpu spu = requireSpu(spuId);
+    public void updateSpu(Long spuId, SpuCreateRequest request, Long merchantId) {
+        ProductSpu spu = requireOwnSpu(spuId, merchantId);
         if (request.getName() != null) spu.setName(request.getName());
         if (request.getSubtitle() != null) spu.setSubtitle(request.getSubtitle());
         if (request.getMainImage() != null) spu.setMainImage(request.getMainImage());
@@ -180,8 +185,8 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public void offShelf(Long spuId) {
-        ProductSpu spu = requireSpu(spuId);
+    public void offShelf(Long spuId, Long merchantId) {
+        ProductSpu spu = requireOwnSpu(spuId, merchantId);
         spu.setStatus(0);
         spuMapper.updateById(spu);
         redisTemplate.delete(DETAIL_CACHE_KEY + spuId);
@@ -235,6 +240,18 @@ public class ProductServiceImpl implements ProductService {
         ProductSpu spu = spuMapper.selectOne(
                 new LambdaQueryWrapper<ProductSpu>().eq(ProductSpu::getSpuId, spuId));
         if (spu == null) throw new BizException(404, "商品不存在");
+        return spu;
+    }
+
+    /**
+     * 归属校验（多商家隔离）：商家只能操作自己名下的商品。
+     * merchantId 为 null（平台直连/调试）时跳过校验以兼容存量调用。
+     */
+    private ProductSpu requireOwnSpu(Long spuId, Long merchantId) {
+        ProductSpu spu = requireSpu(spuId);
+        if (merchantId != null && spu.getMerchantId() != null && !spu.getMerchantId().equals(merchantId)) {
+            throw new BizException(403, "无权操作其他商家的商品");
+        }
         return spu;
     }
 

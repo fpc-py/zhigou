@@ -67,7 +67,10 @@ public class ProductController {
 
     @Operation(summary = "分页查商品")
     @GetMapping("/page")
-    public Result<Page<SpuDetailResponse>> page(SpuPageQuery query) {
+    public Result<Page<SpuDetailResponse>> page(SpuPageQuery query,
+                                                @RequestHeader(value = "x-merchant-id", required = false) Long merchantId) {
+        // 多商家隔离：商家管理端按归属过滤（x-merchant-id 由 BFF 从 JWT 透传）；消费者端为空=跨商家浏览
+        query.setMerchantId(merchantId);
         String key = pageCacheKey(query);
         // 1) 缓存命中直接返回（高并发读接口，避免重复查库装配）
         String cached = redisTemplate.opsForValue().get(key);
@@ -101,24 +104,27 @@ public class ProductController {
 
     @Operation(summary = "新增spu")
     @PostMapping("/spu")
-    public Result<Map<String, String>> create(@Valid @RequestBody SpuCreateRequest request) {
-        // spuId 为 Snowflake ID，转字符串返回避免前端精度丢失
+    public Result<Map<String, String>> create(@Valid @RequestBody SpuCreateRequest request,
+                                              @RequestHeader(value = "x-merchant-id", required = false) Long merchantId) {
+        // spuId 为 Snowflake ID，转字符串返回避免前端精度丢失；merchantId 为归属商家（多商家隔离）
         evictPageCache();
-        return Result.ok(Map.of("spuId", String.valueOf(productService.createSpu(request))));
+        return Result.ok(Map.of("spuId", String.valueOf(productService.createSpu(request, merchantId))));
     }
 
     @Operation(summary = "更新spu")
     @PutMapping("/spu/{spuId}")
-    public Result<Void> update(@PathVariable("spuId") Long spuId, @RequestBody SpuCreateRequest request) {
-        productService.updateSpu(spuId, request);
+    public Result<Void> update(@PathVariable("spuId") Long spuId, @RequestBody SpuCreateRequest request,
+                               @RequestHeader(value = "x-merchant-id", required = false) Long merchantId) {
+        productService.updateSpu(spuId, request, merchantId);
         evictPageCache();
         return Result.ok();
     }
 
     @Operation(summary = "下架")
     @DeleteMapping("/spu/{spuId}")
-    public Result<Void> offShelf(@PathVariable("spuId") Long spuId) {
-        productService.offShelf(spuId);
+    public Result<Void> offShelf(@PathVariable("spuId") Long spuId,
+                                 @RequestHeader(value = "x-merchant-id", required = false) Long merchantId) {
+        productService.offShelf(spuId, merchantId);
         evictPageCache();
         return Result.ok();
     }
@@ -175,6 +181,8 @@ public class ProductController {
                 + (q.getPageSize() == null ? 20 : q.getPageSize()) + ":"
                 + (q.getKeyword() == null ? "" : q.getKeyword()) + ":"
                 + (q.getCategoryId() == null ? "" : q.getCategoryId()) + ":"
-                + (q.getBrandId() == null ? "" : q.getBrandId());
+                + (q.getBrandId() == null ? "" : q.getBrandId()) + ":"
+                // 多商家隔离：缓存 key 带商家维度，避免跨商家缓存串读
+                + (q.getMerchantId() == null ? "global" : q.getMerchantId());
     }
 }

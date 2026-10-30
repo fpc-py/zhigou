@@ -16,6 +16,9 @@ public class OrderMain {
     private Long orderId;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
+    /** 订单归属商家ID（多商家隔离；平台聚合订单为 null） */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long merchantId;
     private String requestId;
     private String orderStatus;
     @TableField(typeHandler = AmountTypeHandler.class, jdbcType = JdbcType.VARCHAR)

@@ -46,14 +46,14 @@ public class OrderController {
         return Result.ok(orderService.mine(userId));
     }
 
-    @Operation(summary = "平台经营概览（商家视角，演示口径）") @GetMapping("/stats/overview")
-    public Result<OrderStatsOverview> overview() {
-        return Result.ok(orderService.overview());
+    @Operation(summary = "平台经营概览（商家视角：多商家隔离按归属过滤）") @GetMapping("/stats/overview")
+    public Result<OrderStatsOverview> overview(@RequestHeader(value = "x-merchant-id", required = false) Long merchantId) {
+        return Result.ok(orderService.overview(merchantId));
     }
 
-    @Operation(summary = "履约异常：PAID 待发货订单 + SKU 明细（缺货/卡单预警）") @GetMapping("/stats/pending-fulfillment")
-    public Result<List<OrderResponse>> pendingFulfillment() {
-        return Result.ok(orderService.pendingFulfillment());
+    @Operation(summary = "履约异常：PAID 待发货订单 + SKU 明细（缺货/卡单预警；多商家隔离按归属过滤）") @GetMapping("/stats/pending-fulfillment")
+    public Result<List<OrderResponse>> pendingFulfillment(@RequestHeader(value = "x-merchant-id", required = false) Long merchantId) {
+        return Result.ok(orderService.pendingFulfillment(merchantId));
     }
 
     @Operation(summary = "异常订单自动处理：写处理动作（SPLIT/DELAY/OFF_SHELF/REPLENISH，演示口径）") @PostMapping("/fulfillment/action")

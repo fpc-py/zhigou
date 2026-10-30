@@ -1,7 +1,7 @@
 /**
  * Product Service — 商品聚合（详情 + 分页）
  */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, HttpException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, catchError, timeout, TimeoutError } from 'rxjs';
 import { SERVICES, SERVICE_PATHS } from '../config/service.config.js';
@@ -17,14 +17,34 @@ export class ProductService {
 
   constructor(private readonly http: HttpService) {}
 
-  /** 商品分页（透传 product-service /product/page） */
+  /** 统一组装下游调用头：x-user-id 恒透传；x-merchant-id 仅商家账号（多商家隔离）透传 */
+  private downstreamHeaders(userId: string, merchantId?: number | null): Record<string, string> {
+    const headers: Record<string, string> = { 'x-user-id': userId };
+    if (merchantId != null) headers['x-merchant-id'] = String(merchantId);
+    return headers;
+  }
+
+  /**
+   * 校验下游业务响应：非 0/200 业务码（如多商家越权 403）抛对应 HTTP 异常，
+   * 避免把下游拒绝误报为成功。
+   */
+  private assertDownstreamOk(resp: any, action: string): void {
+    const code = resp?.data?.code;
+    if (code != null && code !== 0 && code !== 200) {
+      const msg = resp?.data?.message || `product-service ${action} 被下游拒绝`;
+      this.logger.warn(`product-service ${action} 业务拒绝: code=${code} msg=${msg}`);
+      throw new HttpException(msg, code >= 400 && code < 600 ? Number(code) : 502);
+    }
+  }
+
+  /** 商品分页（透传 product-service /product/page；商家账号带 x-merchant-id 按归属过滤） */
   async page(userId: string, query: {
     keyword?: string;
     pageNum?: number;
     pageSize?: number;
     categoryId?: number;
     brandId?: number;
-  }): Promise<Record<string, any> | null> {
+  }, merchantId?: number | null): Promise<Record<string, any> | null> {
     const params = new URLSearchParams();
     if (query.keyword) params.set('keyword', query.keyword);
     params.set('pageNum', String(query.pageNum ?? 1));
@@ -34,7 +54,7 @@ export class ProductService {
 
     const url = `${SERVICES.productService.url}${SERVICE_PATHS.productPage}?${params.toString()}`;
     const resp = await firstValueFrom(
-      this.http.get(url, { headers: { 'x-user-id': userId } }).pipe(
+      this.http.get(url, { headers: this.downstreamHeaders(userId, merchantId) }).pipe(
         timeout(SERVICES.productService.timeout),
         catchError((err) => {
           if (err instanceof TimeoutError) {
@@ -46,14 +66,15 @@ export class ProductService {
         }),
       ),
     );
+    this.assertDownstreamOk(resp, 'GET /product/page');
     return resp.data?.data ?? null;
   }
 
-  /** 新增商品（商家） */
-  async createSpu(data: any, userId: string): Promise<string | null> {
+  /** 新增商品（商家；merchantId 落库为归属商家，多商家隔离） */
+  async createSpu(data: any, userId: string, merchantId?: number | null): Promise<string | null> {
     const url = `${SERVICES.productService.url}${SERVICE_PATHS.productSpu}`;
     const resp = await firstValueFrom(
-      this.http.post(url, data, { headers: { 'x-user-id': userId } }).pipe(
+      this.http.post(url, data, { headers: this.downstreamHeaders(userId, merchantId) }).pipe(
         timeout(SERVICES.productService.timeout),
         catchError((err) => {
           this.logger.warn(`product-service POST /product/spu 失败: ${err.message}`);
@@ -61,15 +82,16 @@ export class ProductService {
         }),
       ),
     );
+    this.assertDownstreamOk(resp, 'POST /product/spu');
     const spuId = resp.data?.data?.spuId;
     return spuId != null ? String(spuId) : null;
   }
 
-  /** 更新商品（商家） */
-  async updateSpu(spuId: string, data: any, userId: string): Promise<boolean> {
+  /** 更新商品（商家；merchantId 归属校验，非本商家商品拒绝） */
+  async updateSpu(spuId: string, data: any, userId: string, merchantId?: number | null): Promise<boolean> {
     const url = `${SERVICES.productService.url}${SERVICE_PATHS.productSpuItem(spuId)}`;
     const resp = await firstValueFrom(
-      this.http.put(url, data, { headers: { 'x-user-id': userId } }).pipe(
+      this.http.put(url, data, { headers: this.downstreamHeaders(userId, merchantId) }).pipe(
         timeout(SERVICES.productService.timeout),
         catchError((err) => {
           this.logger.warn(`product-service PUT /product/spu/${spuId} 失败: ${err.message}`);
@@ -77,14 +99,15 @@ export class ProductService {
         }),
       ),
     );
-    return resp.data?.code === 0 || resp.data?.data !== undefined;
+    this.assertDownstreamOk(resp, `PUT /product/spu/${spuId}`);
+    return resp.data?.data !== undefined && resp.data?.data !== null;
   }
 
-  /** 下架商品（商家） */
-  async offShelf(spuId: string, userId: string): Promise<boolean> {
+  /** 下架商品（商家；merchantId 归属校验，非本商家商品拒绝） */
+  async offShelf(spuId: string, userId: string, merchantId?: number | null): Promise<boolean> {
     const url = `${SERVICES.productService.url}${SERVICE_PATHS.productSpuItem(spuId)}`;
     const resp = await firstValueFrom(
-      this.http.delete(url, { headers: { 'x-user-id': userId } }).pipe(
+      this.http.delete(url, { headers: this.downstreamHeaders(userId, merchantId) }).pipe(
         timeout(SERVICES.productService.timeout),
         catchError((err) => {
           this.logger.warn(`product-service DELETE /product/spu/${spuId} 失败: ${err.message}`);
@@ -92,7 +115,8 @@ export class ProductService {
         }),
       ),
     );
-    return resp.data?.code === 0 || resp.data?.data !== undefined;
+    this.assertDownstreamOk(resp, `DELETE /product/spu/${spuId}`);
+    return resp.data?.data !== undefined && resp.data?.data !== null;
   }
 
   async getDetail(spuId: string, userId: string): Promise<ProductDetailResponse> {

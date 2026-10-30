@@ -18,6 +18,9 @@ public class ProductSpu {
     private Long categoryId;
     @JsonSerialize(using = ToStringSerializer.class)
     private Long brandId;
+    /** 所属商家ID（多商家隔离；平台全局商品为 null） */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long merchantId;
     private String name;
     private String subtitle;
     private String mainImage;

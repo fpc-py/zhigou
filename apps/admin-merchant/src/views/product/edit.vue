@@ -47,6 +47,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { getSpuDetail, createSpu, updateSpu } from '@/api/product';
+import Skeleton from '@/components/Skeleton.vue';
 
 const route = useRoute();
 const router = useRouter();

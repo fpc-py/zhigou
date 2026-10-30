@@ -73,7 +73,8 @@ class ProductServiceIntegrationTest {
         SpuCreateRequest.SkuItem sku = new SpuCreateRequest.SkuItem();
         sku.setSpecName("颜色"); sku.setSpecValue("红色"); sku.setPrice(9900L); sku.setStock(100);
         req.setSkus(List.of(sku));
-        return productService.createSpu(req);
+        // merchantId=1：归属商家（多商家隔离参数）
+        return productService.createSpu(req, 1L);
     }
 
     // ===== 测试 1：缓存命中 =====
@@ -110,7 +111,7 @@ class ProductServiceIntegrationTest {
         // 更新
         SpuCreateRequest updateReq = new SpuCreateRequest();
         updateReq.setCategoryId(1L); updateReq.setName("已更新商品名");
-        productService.updateSpu(spuId, updateReq);
+        productService.updateSpu(spuId, updateReq, 1L);
 
         // 缓存应已删除
         assertThat(redisTemplate.opsForValue().get("product:detail:" + spuId)).isNull();
@@ -125,7 +126,7 @@ class ProductServiceIntegrationTest {
     @Test
     void shouldReturnNullForOffShelfProduct() {
         Long spuId = createSpu("待下架商品");
-        productService.offShelf(spuId);
+        productService.offShelf(spuId, 1L);
 
         SpuDetailResponse r = productService.getDetail(spuId);
         assertThat(r).isNotNull(); // 仍能查到详情
@@ -141,7 +142,7 @@ class ProductServiceIntegrationTest {
         createSpu("上架商品C");
 
         // 下架 B
-        productService.offShelf(spuB);
+        productService.offShelf(spuB, 1L);
 
         var page = productService.page(new com.zhigou.product.dto.SpuPageQuery());
         assertThat(page.getTotal()).isEqualTo(2);

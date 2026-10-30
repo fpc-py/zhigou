@@ -74,6 +74,9 @@ import { ref, onMounted } from 'vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import { getSpuList, offShelf } from '@/api/product';
 import type { SpuItem } from '@/api/product';
+import Skeleton from '@/components/Skeleton.vue';
+import ErrorRetry from '@/components/ErrorRetry.vue';
+import EmptyState from '@/components/EmptyState.vue';
 
 const loading = ref(false);
 const error = ref(false);

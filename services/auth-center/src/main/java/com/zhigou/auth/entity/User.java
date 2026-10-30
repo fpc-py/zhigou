@@ -23,6 +23,10 @@ public class User {
     /** 账号角色：USER=消费者（默认） / MERCHANT=商家 */
     private String role;
 
+    /** 商家ID（MERCHANT 角色归属商家，多商家隔离；USER 为 null） */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long merchantId;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

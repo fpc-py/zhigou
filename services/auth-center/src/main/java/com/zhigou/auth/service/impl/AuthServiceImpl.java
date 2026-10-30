@@ -66,11 +66,12 @@ public class AuthServiceImpl implements AuthService {
             log.info("新用户注册: userId={}, phone={}, role={}", user.getUserId(), phone, user.getRole());
         }
 
-        // 4. 签发 token（subject 用业务 userId，下游服务据此识别用户；role 用于商家后台 RBAC）
-        String accessToken = jwtUtil.createAccessToken(user.getUserId(), phone, user.getRole());
-        String refreshToken = jwtUtil.createRefreshToken(user.getUserId(), phone, user.getRole());
+        // 4. 签发 token（subject 用业务 userId，下游服务据此识别用户；role 用于商家后台 RBAC；merchantId 用于多商家隔离）
+        Long merchantId = user.getMerchantId();
+        String accessToken = jwtUtil.createAccessToken(user.getUserId(), phone, user.getRole(), merchantId);
+        String refreshToken = jwtUtil.createRefreshToken(user.getUserId(), phone, user.getRole(), merchantId);
 
-        log.info("登录成功: userId={}, role={}", user.getUserId(), user.getRole());
+        log.info("登录成功: userId={}, role={}, merchantId={}", user.getUserId(), user.getRole(), merchantId);
 
         return LoginResponse.builder()
                 .userId(user.getUserId())
@@ -78,6 +79,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken)
                 .expiresIn(7200)
                 .role(user.getRole())
+                .merchantId(merchantId)
                 .build();
     }
 }

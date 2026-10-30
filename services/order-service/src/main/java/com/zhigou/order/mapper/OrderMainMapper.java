@@ -24,6 +24,7 @@ public interface OrderMainMapper extends BaseMapper<OrderMain> {
             @Result(column = "id", property = "id", id = true),
             @Result(column = "order_id", property = "orderId"),
             @Result(column = "user_id", property = "userId"),
+            @Result(column = "merchant_id", property = "merchantId"),
             @Result(column = "request_id", property = "requestId"),
             @Result(column = "order_status", property = "orderStatus"),
             @Result(column = "total_amount", property = "totalAmount", typeHandler = AmountTypeHandler.class, jdbcType = JdbcType.VARCHAR),

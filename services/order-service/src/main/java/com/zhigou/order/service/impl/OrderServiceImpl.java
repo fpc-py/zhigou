@@ -343,10 +343,22 @@ public class OrderServiceImpl implements OrderService {
         return o;
     }
 
+    /** 多商家隔离：merchantId 非空时只保留本商家订单；null=平台聚合（兼容直连/消费者口径） */
+    private List<OrderMain> filterByMerchant(List<OrderMain> orders, Long merchantId) {
+        if (merchantId == null || orders == null || orders.isEmpty()) return orders;
+        return orders.stream()
+                .filter(o -> merchantId.equals(o.getMerchantId()))
+                .collect(Collectors.toList());
+    }
+
     @Override
-    public OrderStatsOverview overview() {
-        List<OrderMain> orders = orderMapper.selectAllFull();
-        List<OrderItem> items = itemMapper.selectList(new LambdaQueryWrapper<OrderItem>());
+    public OrderStatsOverview overview(Long merchantId) {
+        List<OrderMain> orders = filterByMerchant(orderMapper.selectAllFull(), merchantId);
+        // 多商家隔离：明细只统计本商家订单条目，避免跨商家热销串数据
+        java.util.Set<Long> orderIds = orders.stream().map(OrderMain::getOrderId).collect(Collectors.toSet());
+        List<OrderItem> items = orderIds.isEmpty()
+                ? List.of()
+                : itemMapper.selectList(new LambdaQueryWrapper<OrderItem>().in(OrderItem::getOrderId, orderIds));
 
         OrderStatsOverview ov = new OrderStatsOverview();
         ov.setTotalOrders((long) orders.size());
@@ -396,8 +408,9 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<OrderResponse> pendingFulfillment() {
-        List<OrderMain> orders = orderMapper.selectFullByStatus(OrderState.PAID.name());
+    public List<OrderResponse> pendingFulfillment(Long merchantId) {
+        List<OrderMain> orders = filterByMerchant(
+                orderMapper.selectFullByStatus(OrderState.PAID.name()), merchantId);
         // 已处理订单集合（存在 DONE 处理记录）
         Set<Long> handled = listFulfillmentActions(1000).stream()
                 .map(com.zhigou.order.entity.FulfillmentAction::getOrderId).collect(Collectors.toSet());

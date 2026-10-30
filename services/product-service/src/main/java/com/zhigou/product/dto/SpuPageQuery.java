@@ -9,4 +9,6 @@ public class SpuPageQuery {
     private Long categoryId;
     private Long brandId;
     private String keyword;
+    /** 商家ID（多商家隔离：商家管理端按归属过滤；为空=消费者端跨商家浏览） */
+    private Long merchantId;
 }

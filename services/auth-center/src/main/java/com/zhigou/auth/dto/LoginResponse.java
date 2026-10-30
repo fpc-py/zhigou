@@ -21,4 +21,7 @@ public class LoginResponse {
     private long expiresIn;
     /** 账号角色：USER=消费者 / MERCHANT=商家（商家后台据此鉴权） */
     private String role;
+    /** 商家ID（MERCHANT 角色登录返回，多商家隔离用；消费者为 null） */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long merchantId;
 }

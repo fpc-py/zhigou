@@ -14,10 +14,10 @@ public interface OrderService {
     List<OrderResponse> mine(Long userId);   // 按 userId 查订单列表（创建时间倒序）
     /** 超时关单：关闭超过 minutes 分钟仍未支付的 INIT 订单（INIT→CLOSED + outbox + 释放库存），返回关单数 */
     int closeExpired(int minutes);
-    /** 平台经营概览（全平台聚合，商家视角演示口径） */
-    OrderStatsOverview overview();
-    /** 履约异常：PAID 待发货订单 + SKU 明细（供缺货/卡单预警） */
-    List<OrderResponse> pendingFulfillment();
+    /** 平台经营概览（商家视角：merchantId 非空按商家过滤，多商家隔离；null=平台聚合） */
+    OrderStatsOverview overview(Long merchantId);
+    /** 履约异常：PAID 待发货订单 + SKU 明细（供缺货/卡单预警；merchantId 非空按商家过滤） */
+    List<OrderResponse> pendingFulfillment(Long merchantId);
     /** 异常订单自动处理：对指定 PAID 订单写处理动作记录（SPLIT/DELAY/OFF_SHELF/REPLENISH，演示口径直接标记 DONE），返回处理单数 */
     int fulfillmentAction(String action, List<Long> orderIds, String reason);
     /** 最近异常订单处理记录（按时间倒序） */
