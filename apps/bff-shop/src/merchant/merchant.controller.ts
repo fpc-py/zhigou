@@ -3,11 +3,13 @@
  */
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
+import { Roles, RolesGuard } from '../common/guards/roles.guard.js';
 import { MerchantService } from './merchant.service.js';
 import { ApiResponse } from '../common/dto/api-response.js';
 
 @Controller()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('MERCHANT')
 export class MerchantController {
   constructor(private readonly merchant: MerchantService) {}
 

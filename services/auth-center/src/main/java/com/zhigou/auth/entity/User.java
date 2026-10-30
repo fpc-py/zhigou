@@ -20,6 +20,9 @@ public class User {
 
     private String phone;
 
+    /** 账号角色：USER=消费者（默认） / MERCHANT=商家 */
+    private String role;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

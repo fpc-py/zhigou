@@ -24,7 +24,8 @@
       </el-form>
 
       <div style="text-align:center;color:#999;font-size:12px">
-        演示账号：13800138000（验证码由短信服务发放，开发环境从 Redis 读取）
+        演示商家账号：13900000001（验证码由短信服务发放，开发环境从 Redis 读取）<br>
+        消费者账号（13800138000）无法登录商家后台
       </div>
     </div>
   </div>
@@ -81,6 +82,12 @@ async function login() {
     const token = res.data?.data?.accessToken;
     if (!token) {
       ElMessage.error('登录失败：未获取到凭证');
+      return;
+    }
+    // 商家后台只允许商家角色账号登录（RBAC：与消费者账号体系分离）
+    const role = res.data?.data?.role;
+    if (role !== 'MERCHANT') {
+      ElMessage.error('该账号不是商家账号，无法登录商家后台');
       return;
     }
     userStore.setToken(token);

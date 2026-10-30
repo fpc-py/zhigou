@@ -4,12 +4,13 @@
 import { Controller, Get, Post, Param, Body, Req, Query, UseGuards } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js';
+import { Roles, RolesGuard } from '../common/guards/roles.guard.js';
 import { AftersaleService } from './aftersale.service.js';
 import { ApiResponse } from '../common/dto/api-response.js';
 import type { Request } from 'express';
 
 @Controller('aftersale')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AftersaleController {
   constructor(private readonly aftersaleService: AftersaleService) {}
 
@@ -54,6 +55,7 @@ export class AftersaleController {
 
   /** 商家售后工作台：待处理列表 + 全状态统计（商家中心/AI 商家侧共用） */
   @Get('merchant/pending')
+  @Roles('MERCHANT')
   async merchantPending(@Req() req: Request, @Query('status') status?: string) {
     const userId = (req as any).userId as string;
     const data = await this.aftersaleService.merchantPending(userId, status);
@@ -69,6 +71,7 @@ export class AftersaleController {
 
   /** 商家同意退款 */
   @Post(':no/approve')
+  @Roles('MERCHANT')
   async approve(@Param('no') no: string, @Req() req: Request) {
     const userId = (req as any).userId as string;
     await this.aftersaleService.approve(userId, no);
@@ -77,6 +80,7 @@ export class AftersaleController {
 
   /** 商家拒绝售后：rawBody 透传 reason */
   @Post(':no/reject')
+  @Roles('MERCHANT')
   async reject(@Param('no') no: string, @Req() req: RawBodyRequest<Request>) {
     const userId = (req as any).userId as string;
     const raw = req.rawBody?.toString() ?? '{}';

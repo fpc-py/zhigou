@@ -19,4 +19,6 @@ public class LoginResponse {
     private String accessToken;
     private String refreshToken;
     private long expiresIn;
+    /** 账号角色：USER=消费者 / MERCHANT=商家（商家后台据此鉴权） */
+    private String role;
 }

@@ -55,6 +55,8 @@ export class JwtAuthGuard implements CanActivate {
 
       // 挂 userId 到请求对象
       (request as any).userId = userId;
+      // 挂角色到请求对象（商家后台 RBAC 用；旧 token 无 role claim 则为 undefined）
+      (request as any).role = (payload as any).role;
 
       // 透传给下游
       request.headers['x-user-id'] = String(userId);

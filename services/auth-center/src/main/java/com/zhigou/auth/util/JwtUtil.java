@@ -25,15 +25,15 @@ public class JwtUtil {
     /**
      * 签发 accessToken
      */
-    public String createAccessToken(Long userId, String phone) {
-        return sign(userId, phone, jwtProperties.getAccessExpireSeconds());
+    public String createAccessToken(Long userId, String phone, String role) {
+        return sign(userId, phone, role, jwtProperties.getAccessExpireSeconds());
     }
 
     /**
      * 签发 refreshToken
      */
-    public String createRefreshToken(Long userId, String phone) {
-        return sign(userId, phone, jwtProperties.getRefreshExpireSeconds());
+    public String createRefreshToken(Long userId, String phone, String role) {
+        return sign(userId, phone, role, jwtProperties.getRefreshExpireSeconds());
     }
 
     /**
@@ -52,12 +52,13 @@ public class JwtUtil {
         return claims;
     }
 
-    private String sign(Long userId, String phone, long expireSeconds) {
+    private String sign(Long userId, String phone, String role, long expireSeconds) {
         try {
             JWSSigner signer = new MACSigner(jwtProperties.getSecret().getBytes());
             JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                     .subject(String.valueOf(userId))
                     .claim("phone", phone)
+                    .claim("role", role)
                     .jwtID(UUID.randomUUID().toString())
                     .issueTime(new Date())
                     .expirationTime(Date.from(Instant.now().plusSeconds(expireSeconds)))

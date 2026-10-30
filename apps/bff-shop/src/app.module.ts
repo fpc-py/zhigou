@@ -8,6 +8,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter.js';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor.js';
 import { AnalyticsInterceptor } from './common/interceptors/analytics.interceptor.js';
+import { RolesGuard } from './common/guards/roles.guard.js';
 import { GuardedHttpService } from './common/guarded-http.service.js';
 import { HomeController } from './home/home.controller.js';
 import { HomeService } from './home/home.service.js';
@@ -117,6 +118,8 @@ import { CostSaverService } from './cost-saver/cost-saver.service.js';
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AnalyticsInterceptor },
+    // 商家后台 RBAC 角色守卫（方法级 @Roles 元数据驱动，无元数据端点放行）
+    RolesGuard,
   ],
 })
 export class AppModule {}

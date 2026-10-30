@@ -61,21 +61,23 @@ public class AuthServiceImpl implements AuthService {
             user = new User();
             user.setUserId(IdUtil.getSnowflakeNextId());
             user.setPhone(phone);
+            user.setRole("USER"); // 新注册账号默认消费者角色
             userMapper.insert(user);
-            log.info("新用户注册: userId={}, phone={}", user.getUserId(), phone);
+            log.info("新用户注册: userId={}, phone={}, role={}", user.getUserId(), phone, user.getRole());
         }
 
-        // 4. 签发 token（subject 用业务 userId，下游服务据此识别用户）
-        String accessToken = jwtUtil.createAccessToken(user.getUserId(), phone);
-        String refreshToken = jwtUtil.createRefreshToken(user.getUserId(), phone);
+        // 4. 签发 token（subject 用业务 userId，下游服务据此识别用户；role 用于商家后台 RBAC）
+        String accessToken = jwtUtil.createAccessToken(user.getUserId(), phone, user.getRole());
+        String refreshToken = jwtUtil.createRefreshToken(user.getUserId(), phone, user.getRole());
 
-        log.info("登录成功: userId={}", user.getUserId());
+        log.info("登录成功: userId={}, role={}", user.getUserId(), user.getRole());
 
         return LoginResponse.builder()
                 .userId(user.getUserId())
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .expiresIn(7200)
+                .role(user.getRole())
                 .build();
     }
 }
