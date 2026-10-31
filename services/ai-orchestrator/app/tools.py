@@ -5,6 +5,7 @@
 不一致返回 403 错误信息。调用后端服务失败时返回友好提示。
 """
 
+import re
 import asyncio
 import json
 import logging
@@ -771,18 +772,84 @@ async def search_by_image(image_url: str, limit: int = 5) -> str:
         features = await _vision_extract(image_url)
         if not features or not features.get("keywords"):
             return "图片识别失败：暂时无法看清图中的商品，请换一张更清晰的图试试？"
-        # 基于特征搜索真实商品
-        keyword = features.get("keywords")[0]
-        matched = await search_products.ainvoke({"keyword": keyword, "limit": limit})
+        # 基于特征搜索真实商品：category 优先，keywords 逐个补搜，命中即用
+        cat = features.get("category") or ""
+        candidates: list[str] = []
+        if cat:
+            candidates.append(cat)
+        for kw in features.get("keywords") or []:
+            if kw and kw not in candidates:
+                candidates.append(kw)
+        matched, used_kw = "", ""
+        for kw in candidates[:5]:
+            try:
+                m = await search_products.ainvoke({"keyword": kw, "limit": limit})
+                if m and m.strip() != "未搜索到相关商品。":
+                    matched, used_kw = m, kw
+                    break
+            except Exception:
+                continue
+        if not matched:
+            return (
+                f"从图片中识别到：{cat or '未知品类'}"
+                f"（颜色 {features.get('colors', '未知')}，风格 {features.get('style', '未知')}）。"
+                f"按「{candidates[0] if candidates else '品类'}」等关键词搜索后，平台暂无在售同款，"
+                f"建议换一张更清晰的商品图，或直接告诉我商品名称/品类关键词，我用文字帮你搜。"
+            )
         return (
-            f"从图片中识别到：{features.get('category', '未知品类')}"
+            f"从图片中识别到：{cat}"
             f"（颜色 {features.get('colors', '未知')}，风格 {features.get('style', '未知')}）\n"
-            f"基于特征「{keyword}」搜到以下商品（真实在售）：\n{matched}\n"
+            f"基于特征「{used_kw}」搜到以下商品（真实在售）：\n{matched}\n"
             f"（说明：图片识别仅供参考，商品以实际搜索结果为准）"
         )
     except Exception as e:
         logger.warning("search_by_image 调用失败: %s", e)
         return "这项信息暂时没查到"
+
+
+def _to_vision_data_url(url: str) -> str:
+    """下载图片转 data URL；下载失败/非图片返回原 URL（视觉模型自行尝试）。"""
+    try:
+        import urllib.request, base64, mimetypes
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (zhigou-ai)"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = r.read()
+            if len(data) > 15 * 1024 * 1024:
+                return url
+            ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if not ctype or not ctype.startswith("image/"):
+                ctype = mimetypes.guess_type(url.split("?")[0])[0] or "image/jpeg"
+            return f"data:{ctype};base64,{base64.b64encode(data).decode('ascii')}"
+    except Exception:
+        return url
+
+
+def _parse_vision_json(text: str) -> dict | None:
+    """解析视觉模型 JSON 输出：标准 JSON 优先，Python 风格单引号 dict 兜底。"""
+    t = (text or "").strip()
+    if t.startswith("```"):
+        t = t.strip("`").removeprefix("json").strip()
+    m = re.search(r"\{.*\}", t, re.S)
+    if not m:
+        return None
+    s = m.group(0)
+    try:
+        obj = json.loads(s)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        pass
+    try:
+        import ast
+        obj = ast.literal_eval(s)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        pass
+    try:
+        s2 = re.sub(r"(?<!\\)'", '"', s)
+        obj = json.loads(s2)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        return None
 
 
 async def _vision_extract(image_url: str, schema: str = "product") -> dict | None:
@@ -792,6 +859,8 @@ async def _vision_extract(image_url: str, schema: str = "product") -> dict | Non
     """
     from openai import AsyncOpenAI
     schema_prompt = _VISION_SCHEMA_PROMPT.get(schema, _VISION_SCHEMA_PROMPT["product"])
+    # 本地/内网图片云端拉不到 → 本地下载转 base64 data URL，视觉模型免访问
+    vision_url = _to_vision_data_url(image_url)
     last_err: Exception | None = None
     for attempt in (1, 2):
         try:
@@ -804,15 +873,12 @@ async def _vision_extract(image_url: str, schema: str = "product") -> dict | Non
                     "role": "user",
                     "content": [
                         {"type": "text", "text": schema_prompt},
-                        {"type": "image_url", "image_url": {"url": image_url}},
+                        {"type": "image_url", "image_url": {"url": vision_url}},
                     ],
                 }],
             )
             text = resp.choices[0].message.content or ""
-            text = text.strip()
-            if text.startswith("```"):
-                text = text.strip("`").removeprefix("json").strip()
-            parsed = json.loads(text)
+            parsed = _parse_vision_json(text)
             if parsed:
                 return parsed
         except Exception as e:
@@ -825,8 +891,8 @@ async def _vision_extract(image_url: str, schema: str = "product") -> dict | Non
 # ── 衣橱零录入 + AI 每日穿搭（多模态复用 _vision_extract，不造轮子） ──
 
 _VISION_SCHEMA_PROMPT = {
-    "product": "识别这张商品图，只输出 JSON：{'category': '品类', 'colors': ['颜色'], 'style': '风格', 'keywords': ['2-3个搜索关键词']}，不要解释。",
-    "closet": "识别这张衣物照片，只输出 JSON：{'name': '衣物名称（简洁，如：白色圆领T恤）', 'category': '上装/下装/外套/鞋履/配饰 之一', 'season': '春夏秋冬/四季 之一', 'color': '主色调', 'tags': ['2-3个标签，如：休闲/通勤/棉质']}，不要解释。",
+    "product": "识别这张商品图，只输出 JSON，格式如下（双引号、无注释、无其他文字）：{\"category\": \"品类\", \"colors\": [\"颜色\"], \"style\": \"风格\", \"keywords\": [\"2-3个搜索关键词\"]}",
+    "closet": "识别这张衣物照片，只输出 JSON，格式如下（双引号、无注释、无其他文字）：{\"name\": \"衣物名称（简洁，如：白色圆领T恤）\", \"category\": \"上装/下装/外套/鞋履/配饰 之一\", \"season\": \"春夏秋冬/四季 之一\", \"color\": \"主色调\", \"tags\": [\"2-3个标签，如：休闲/通勤/棉质\"]}",
 }
 
 

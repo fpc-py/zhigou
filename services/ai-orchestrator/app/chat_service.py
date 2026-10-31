@@ -122,6 +122,7 @@ _ROUTE_RULES: list[tuple[str, "re.Pattern"]] = [
     ("review_assistant", re.compile(r"差评|待回复评论|评论.{0,4}(怎么回|处理|回复)|负面预警|回复评论")),
     ("closet_scan_item", re.compile(r"放进衣橱|加入衣橱|录入衣橱|识别这件衣服|识别衣物|这件衣服|这件衣物")),
     ("outfit_daily", re.compile(r"今天穿什么|穿什么好|怎么搭配|搭配建议|穿搭建议|穿什么")),
+    ("search_by_image", re.compile(r"找同款|搜同款|图片搜款|按图搜|看图识物|同款|类似款|类似的商品|有没有类似|图片里的商品|图里的商品|这张图|这个图片|图上这个|图里这个")),
 ]
 
 
@@ -182,7 +183,7 @@ async def _dispatch_tool(name: str, args: dict) -> Any:
     raise ValueError(f"未知工具: {name}")
 
 
-async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Optional[str] = None) -> AsyncGenerator[dict, None]:
+async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Optional[str] = None, forced_image_url: str = "") -> AsyncGenerator[dict, None]:
     """原生 OpenAI 流式工具循环（替代 LangGraph）。
 
     流式产出事件（与 LangGraph astream_events 契约一致）：
@@ -307,6 +308,8 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
                 args = json.loads(tc["args"] or "{}")
             except json.JSONDecodeError:
                 args = {}
+            if name == "search_by_image" and forced_image_url:
+                args["image_url"] = forced_image_url  # 强制注入真实上传图片地址，禁止 LLM 用示例 URL
             safe_args = dict(args)
             if "userId" in safe_args:
                 safe_args["userId"] = str(safe_args["userId"])[:3] + "***"
@@ -337,6 +340,23 @@ async def _run_agent(messages: list[dict], timeout_s: float, forced_tool: Option
 # ── 构建消息列表（系统提示 + 会话历史 + 当前 query，OpenAI 原生格式） ──
 
 
+def _to_chat_data_url(url: str) -> str:
+    """下载图片转 data URL；失败返回原 URL。多模态消息用，避免云端拉不到 localhost/内网图。"""
+    try:
+        import urllib.request, base64 as _b64, mimetypes as _mime
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (zhigou-ai)"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = r.read()
+            if len(data) > 15 * 1024 * 1024:
+                return url
+            ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if not ctype or not ctype.startswith("image/"):
+                ctype = _mime.guess_type(url.split("?")[0])[0] or "image/jpeg"
+            return f"data:{ctype};base64,{_b64.b64encode(data).decode('ascii')}"
+    except Exception:
+        return url
+
+
 def _build_messages(query: str, history: Optional[list[dict]] = None, image_url: str = "") -> list[dict]:
     global _system_prompt
     if not _system_prompt:
@@ -355,7 +375,7 @@ def _build_messages(query: str, history: Optional[list[dict]] = None, image_url:
         messages.append(
             {
                 "role": "system",
-                "content": "用户上传了商品图片。你必须先调用 search_by_image 工具（入参 image_url 为图片地址）识别图片特征并搜索同款/类似商品，禁止直接文字回答跳过工具。",
+                "content": f"用户上传了商品图片，图片地址为：「{image_url}」。你必须先调用 search_by_image 工具，且该工具入参 image_url 必须一字不差地填写上述图片地址（禁止编造或改写图片地址），识别图片特征并搜索同款/类似商品，禁止直接文字回答跳过工具。",
             }
         )
         messages.append(
@@ -363,7 +383,7 @@ def _build_messages(query: str, history: Optional[list[dict]] = None, image_url:
                 "role": "user",
                 "content": [
                     {"type": "text", "text": query or "帮我看下这张图里的商品，找同款"},
-                    {"type": "image_url", "image_url": {"url": image_url}},
+                    {"type": "image_url", "image_url": {"url": _to_chat_data_url(image_url)}},
                 ],
             }
         )
@@ -426,7 +446,7 @@ async def chat_stream(
 
         try:
             async with asyncio.timeout(timeout_s):
-                async for event in _run_agent(input_messages, timeout_s, forced_tool=_route_tool(query)):
+                async for event in _run_agent(input_messages, timeout_s, forced_tool=_route_tool(query), forced_image_url=image_url):
                     if event["event"] == "token":
                         response_text += json.loads(event["data"])["content"]
                     yield event
